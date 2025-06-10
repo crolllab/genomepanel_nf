@@ -86,7 +86,7 @@ Available parameters
 
 - `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line. `SRR...`, `SRP...`, `SRX...`, etc. should work. The header line is mandatory and must include `Accessions`. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids.
 
-NB: Some SRA/ENA accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). The problem can often be resolved by providing all individual SRR/ERR of a project instead of the SRP/ERP project accession.
+NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). Try to remove these accessions from the list. An alternative is to obtain all ftp download links from the SRA Explorer website and use the `--reads` option to specify the downloaded files.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
