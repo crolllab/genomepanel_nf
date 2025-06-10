@@ -1,0 +1,16 @@
+process trimSequences {
+    maxForks = 20
+    tag "FASTP fastq files trimming"
+    memory '4GB'
+      
+    input:
+    tuple val(sample_id), path(reads)
+  
+    output:
+    tuple val(sample_id), path("${sample_id}_{1,2}_trimmed.fastq.gz")
+
+    script:
+    """
+    fastp -w $task.cpus -i ${reads[0]} -I ${reads[1]} -o ${sample_id}_1_trimmed.fastq.gz -O ${sample_id}_2_trimmed.fastq.gz
+    """
+}
