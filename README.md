@@ -197,14 +197,17 @@ final_variants.clean.PLINK.king.id
 
 1. `fastp` is run with default settings
 2. `bwa-mem2` is run with default settings
-3. `gatk` Haplotypecaller sets `--sample-ploidy 1`
-4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0` or `>2.0`, `MQRankSum <-2.0` or `>2.0` and `BaseQRankSum <-2.0` or `>2.0`. No filtering based on `QUAL` values as these are sample size dependent.
+3. `gatk` Haplotypecaller emits GVCF, you need to set `--sample-ploidy` (see above)
+4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0 | >2.0`, `MQRankSum <-2.0 | >2.0` and `BaseQRankSum <-2.0 | >2.0`. No filtering based on `QUAL` values as these are sample size dependent.
 5. `plink2` filters variants for a MAF of 0.1 and estimates King distances.
 
-## Features to consider
-- increase retry attempts for NBCI SRA downloads, manage parallel access.
+## Features to consider / bug fixes
+- Some SRA / ENA downloads fail with the error `ERROR ~ Cannot invoke method split() on null object`. You can circumvent this by removing the problematic accessions from the `--SRA_index` file and download the files manually first (see above).
+- include GATK CNV calling
 - `vcftools` producing files for population genetics analyses (e.g. MAF filter)
-- add GATK CNV calling
+- run basic pop gen analyses
+- include sample renaming step as an option
+
 
 ## Utilities
 
