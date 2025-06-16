@@ -13,7 +13,7 @@ Implemented steps:
 - `picard`: mark duplicates
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
-- `vctools`: Producing a high-quality variants file
+- `vcftools`: Producing a high-quality variants file
 - `plink`: IBS estimation
 
 Current limitations:
