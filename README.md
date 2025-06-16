@@ -84,9 +84,9 @@ Available parameters
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples.
 
-- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line. `SRR...`, `SRP...`, `SRX...`, etc. should work. The header line is mandatory and must include `Accessions`. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids.
+- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids.
 
-NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). Try to remove these accessions from the list. An alternative is to obtain all ftp download links from the SRA Explorer website and use the `--reads` option to specify the downloaded files.
+NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). Try to remove these accessions from the list. An alternative is to obtain all ftp download links from the SRA Explorer website, download the files separately, and use the `--reads` option to specify the downloaded files.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
@@ -95,14 +95,14 @@ NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invok
 ### Obtain the _Zymoseptoria tritici_ IPO323 reference genome
 
 ```bash
-# Option 1 - from LEGserv
-cp /legserv/NGS_data/Zymoseptoria/Zt_Reference_genomes/19Pangenome_genomes/IPO323/Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa .
-mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
-
-# Option 2 - from Ensembl Fungi
+# General option - from Ensembl Fungi
 wget http://ftp.ensemblgenomes.org/pub/fungi/release-61/fasta/zymoseptoria_tritici/dna/Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
 gunzip Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
 mv Zymoseptoria_tritici.MG2.dna.toplevel.fa IPO323.fasta
+
+# From local LEGserv
+cp /legserv/NGS_data/Zymoseptoria/Zt_Reference_genomes/19Pangenome_genomes/IPO323/Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa .
+mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
 ```
 
 ### Select sets of local fastq file pairs
@@ -119,31 +119,33 @@ mv Zymoseptoria_tritici.MG2.dna.toplevel.fa IPO323.fasta
 
 # Option 4 - select all files (including all subdirectories), with optional variation in fq/fastq, 1/R1 (2/R2), optional _001 or _001_ additions
 --reads '/path/to/reads/**_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
+````
 
+```bash
 # Option 4 will include these files among others:
-ST01IR_A48b.cleanData_1.fq.gz with ST01IR_A48b.cleanData_2.fq.gz
-ST01IR_A26b.cleanData_R1.fq.gz with ST01IR_A26b.cleanData_R2.fq.gz
-ST01IR_A26b.cleanData_R1.fastq.gz with ST01IR_A26b.cleanData_R2.fastq.gz
-ST01IR_A26b.cleanData_R1_001.fastq.gz with ST01IR_A26b.cleanData_R2_001.fastq.gz
-J9_L2_R1_001_18ku2CAeFgfk.fastq.gz with J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
+ST01IR_A48b.cleanData_1.fq.gz and ST01IR_A48b.cleanData_2.fq.gz
+ST01IR_A26b.cleanData_R1.fq.gz and ST01IR_A26b.cleanData_R2.fq.gz
+ST01IR_A26b.cleanData_R1.fastq.gz and ST01IR_A26b.cleanData_R2.fastq.gz
+ST01IR_A26b.cleanData_R1_001.fastq.gz and ST01IR_A26b.cleanData_R2_001.fastq.gz
+J9_L2_R1_001_18ku2CAeFgfk.fastq.gz and J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
 ```
 
 ### Define NCBI SRA accessions
 
-Example file to provide for the `--SRA_index ...` option. Note the mandatory `Accessions` header.
+Example file to provide for the `--SRA_index ...` option. 
 
 ```bash
-Accessions
 ERR13824484
 ERR13824571
 ERR13824499
 ```
-Save the text file e.g. as `SRA_accessions.txt`
+
+Save the text file e.g. as `SRA_accessions.txt`. The repository includes an example file.
 
 ## Step 4: `genomepanel_nf` run example
 
 ```bash
-# example input reference genome (see above)
+# example input reference genome (see above how to obtain it)
 REF=$PWD/IPO323.fasta
 
 # read selection example 1 (small set) - selects 9 paired-end reads from LEGserv
@@ -152,7 +154,7 @@ READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_*_{1,2}.
 READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
 ```
 
-Start the pipeline using `slurm` and processimg local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `genomepanel_nf`. An `SRA_accessions.txt` example file is included in the repository.
+Start the pipeline using `slurm` and processing local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `my_nf_run_output` folder. The `SRA_accessions.txt` example file is included in the repository.
 
 ```bash
 micromamba activate nf_gp_env
