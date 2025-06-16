@@ -209,7 +209,7 @@ final_variants.clean.PLINK.king.id
 - `vcftools` producing files for population genetics analyses (e.g. MAF filter)
 - run basic pop gen analyses
 - include sample renaming step as an option
-
+- allow for multiple SRA accessions or fastq pairs per sample
 
 ## Utilities
 
