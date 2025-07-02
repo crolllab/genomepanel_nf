@@ -103,5 +103,5 @@ workflow variant_calling {
     RQualPlotting(R_script, concat_vcf)
 
     // PLINK IBS analysis
-    PLINKIBS(concat_clean_vcf)
+    PLINKIBSPCA(concat_clean_vcf)
 }
