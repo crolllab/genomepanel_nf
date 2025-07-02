@@ -1,5 +1,5 @@
-process PLINKIBS {
-    tag "PLINK IBS calculation"
+process PLINKIBSPCA {
+    tag "PLINK IBS + PCA calculation"
     cpus 1
     memory '16GB'
     publishDir params.outdir, mode: 'copy'
@@ -14,5 +14,6 @@ process PLINKIBS {
 
     """   
     plink2 --vcf ${concat_clean_vcf} --make-king square0 --maf 0.1 --out final_variants.clean.PLINK
+    plink2 --vcf ${concat_clean_vcf} --pca --maf 0.05 --out final_variants.clean.PLINK
     """
 }
