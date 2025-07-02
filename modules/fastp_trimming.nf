@@ -2,6 +2,7 @@ process trimSequences {
     maxForks = 20
     tag "FASTP fastq files trimming"
     memory '4GB'
+    cpus 16
       
     input:
     tuple val(sample_id), path(reads)
