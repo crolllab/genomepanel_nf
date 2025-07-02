@@ -14,7 +14,7 @@ Implemented steps:
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
 - `vcftools`: Producing a high-quality variants file
-- `plink`: IBS estimation
+- `plink`: IBS, PCA calculations
 
 Current limitations:
 - If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
@@ -22,6 +22,7 @@ Current limitations:
 
 ## Step 1: Repository, singularity containers and nextflow environment
 
+Cloning the repository 
 ```bash
 git clone git@github.com:crolllab/genomepanel_nf.git
 cd genomepanel_nf
@@ -82,9 +83,9 @@ Available parameters
 
 - `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa` or `.fas`).
 
-- `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples.
+- `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
-- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids.
+- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. Important: accepts only paired-end reads.
 
 NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). Try to remove these accessions from the list. An alternative is to obtain all ftp download links from the SRA Explorer website, download the files separately, and use the `--reads` option to specify the downloaded files.
 
@@ -210,6 +211,7 @@ final_variants.clean.PLINK.king.id
 - run basic pop gen analyses
 - include sample renaming step as an option
 - allow for multiple SRA accessions or fastq pairs per sample
+- accept single-end read datasets
 
 ## Utilities
 

@@ -21,7 +21,7 @@ log.info """
      3. GATK HaplotypeCaller
      4. GATK VariantFiltration
      5. Variant quality plotting
-     6. PLINK IBS analysis   
+     6. PLINK IBS/PCA analyses   
    
    Configuration:
      outdir       : ${params.outdir}

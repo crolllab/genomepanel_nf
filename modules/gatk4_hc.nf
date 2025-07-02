@@ -2,8 +2,6 @@ process GATKHC {
     tag "GATK4 HaplotypeCaller"
     cpus 1
     memory '20GB'
-    maxRetries 2
-    errorStrategy = { (task.attempt <= process.maxRetries) ? 'retry' : 'ignore' }
 
     input:
     path reference
