@@ -1,4 +1,4 @@
-include {trimSequences} from '../modules/trimmomatic'
+include {trimSequences} from '../modules/fastp_trimming'
 include {bwaIndex} from '../modules/bwa_index'
 include {gatkIndex} from '../modules/gatk_index'
 include {fastaIndex} from '../modules/index_fasta'
