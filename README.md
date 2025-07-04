@@ -22,7 +22,7 @@ Current limitations:
 
 ## Step 1: Repository, singularity containers and nextflow environment
 
-Cloning the repository 
+Cloning the repository, 
 ```bash
 git clone git@github.com:crolllab/genomepanel_nf.git
 cd genomepanel_nf
@@ -51,7 +51,9 @@ Alternatively, you can pull the images directly from the Galaxy Project depot.
 mkdir -p singularity
 cd singularity
 # fastp
-singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
+#singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
+# trimmomatic
+singularity pull https://depot.galaxyproject.org/singularity/trimmomatic%3A0.39--hdfd78af_2
 # bwa
 singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.2.1--he70b90d_8
 # samtools
@@ -87,7 +89,7 @@ Available parameters
 
 - `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. Important: accepts only paired-end reads.
 
-NB: Some accessions (mostly ENA?) may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object`). Try to remove these accessions from the list. An alternative is to obtain all ftp download links from the SRA Explorer website, download the files separately, and use the `--reads` option to specify the downloaded files.
+Known issues with direct SRA downloads: Some accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object` or `fastp` errors due to incomplete downloads). Try to remove these accessions from the list. An alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
@@ -214,6 +216,31 @@ final_variants.clean.PLINK.king.id
 - accept single-end read datasets
 
 ## Utilities
+
+### Download SRA files manually
+
+Use conda/micromamba to install the `sratools` package, which includes the `fastq-dump` command.
+
+Create the following file e.g. `SRA_download.sh` with one accession per line:
+
+```bash
+#!/bin/bash
+fastq-dump --split-files --gzip SRR24910574
+fastq-dump --split-files --gzip SRR24910575
+fastq-dump --split-files --gzip SRR25074049
+fastq-dump --split-files --gzip SRR25074050
+...
+```
+
+Parallelize the download using GNU parallel:
+
+```bash
+parallel -j 10 < SRA_download.sh
+```
+
+NB: Don't try to download too many files at once, as NCBI will stall you.
+
+Proceed with `genomepanel_nf` as described above, using the `--reads` option to point to the download folder.
 
 ### Rename samples in final vcf  
 
