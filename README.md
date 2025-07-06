@@ -51,9 +51,7 @@ Alternatively, you can pull the images directly from the Galaxy Project depot.
 mkdir -p singularity
 cd singularity
 # fastp
-#singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
-# trimmomatic
-singularity pull https://depot.galaxyproject.org/singularity/trimmomatic%3A0.39--hdfd78af_2
+singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
 # bwa
 singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.2.1--he70b90d_8
 # samtools

@@ -1,5 +1,6 @@
 process RQualPlotting {
     tag "Quality plotting with R"
+    errorStrategy 'ignore'
     cpus 1
     memory '16GB'
     publishDir params.outdir, mode: 'copy'

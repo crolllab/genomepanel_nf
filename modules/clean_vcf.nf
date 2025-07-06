@@ -1,5 +1,6 @@
 process CleanVCFs {
     tag "Clean VCFs"
+    errorStrategy 'ignore'
     cpus 1
     memory '16GB'
 

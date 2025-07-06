@@ -1,8 +1,8 @@
 process addRG {
     tag "PICARD adding ReadGroup in BAM files"
+    errorStrategy 'ignore'
     cpus 1
     memory '16GB'
-    errorStrategy 'ignore'
     
     input:
     tuple val(sample_id), path(sorted_bam)

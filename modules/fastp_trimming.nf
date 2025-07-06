@@ -1,6 +1,7 @@
 process trimSequences {
     maxForks = 20
     tag "FASTP fastq files trimming"
+    errorStrategy 'ignore'
     memory '4GB'
     cpus 16
       

@@ -1,5 +1,6 @@
 process GATKHC {
     tag "GATK4 HaplotypeCaller"
+    errorStrategy 'ignore'
     cpus 1
     memory '20GB'
 

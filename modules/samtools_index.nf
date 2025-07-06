@@ -1,8 +1,8 @@
 process samtoolsRealignedIndex {
     tag "Indexing BAM files"
+    errorStrategy 'ignore'
     cpus 1
     memory '4GB'
-    errorStrategy 'ignore'
 
     input:
     path realigned_bam

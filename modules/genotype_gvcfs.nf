@@ -1,5 +1,6 @@
 process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
+    errorStrategy 'ignore'
     cpus 1
     time '72h'
 

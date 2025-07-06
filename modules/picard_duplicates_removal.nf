@@ -1,8 +1,8 @@
 process dupRemoval {
     tag "PICARD marking duplicates in BAM files"
+    errorStrategy 'ignore'
     cpus 1
     memory '16GB'
-    errorStrategy 'ignore'
 
     input:
     path rg_bam
