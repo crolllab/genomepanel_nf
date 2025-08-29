@@ -69,9 +69,18 @@ workflow variant_calling {
     dedup_bams = dupRemoval(rg_bam)
 
     // GATK4 HaplotypeCaller
-    dedup_bai = samtoolsRealignedIndex(dedup_bams)
-    gvcf = GATKHC(params.reference, fai_index, gatk_index, dedup_bams, dedup_bai)
+    // First, combine dedup_bams with their indices and sample IDs
+    dedup_with_index = dedup_bams
+        .map { bam, bai -> 
+            def sample_id = bam.baseName.replaceFirst(/_RG_dedup$/, '')
+            tuple(sample_id, bam, bai)
+        }
+    
+    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
 
+    // GATK4 HaplotypeCaller
+    // dedup_bai = samtoolsRealignedIndex(dedup_bams)
+    // gvcf = GATKHC(params.reference, fai_index, gatk_index, dedup_bams, dedup_bai)
     // Extract all bam and bai paths and collect all of them
     gvcf_ch = gvcf.collect()
 
