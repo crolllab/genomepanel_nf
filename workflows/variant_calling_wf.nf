@@ -36,6 +36,7 @@ workflow variant_calling {
         // First get and process IDs
         sra_list = file(params.SRA_index).readLines()
         read_pairs_ch = Channel.fromSRA(sra_list, apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
+        read_pairs_ch = read_pairs_ch.buffer(10)  // only 10 in-flight at a time
         read_pairs_ch.view()
         }
 
@@ -77,7 +78,7 @@ workflow variant_calling {
         }
     
     gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
-    
+
     // GATK4 HaplotypeCaller
     // dedup_bai = samtoolsRealignedIndex(dedup_bams)
     // gvcf = GATKHC(params.reference, fai_index, gatk_index, dedup_bams, dedup_bai)
