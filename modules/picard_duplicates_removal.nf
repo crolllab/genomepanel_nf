@@ -8,8 +8,7 @@ process dupRemoval {
     path rg_bam
 
     output:
-    path "${rg_bam[0].baseName}_dedup.bam"
-    path "${rg_bam[0].baseName}_dedup.bam.bai"
+    tuple path("${rg_bam[0].baseName}_dedup.bam"), path("${rg_bam[0].baseName}_dedup.bam.bai")
 
     script:
     """

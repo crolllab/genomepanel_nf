@@ -63,13 +63,13 @@ workflow variant_calling {
     // BWA mem mapping
     mapped_sam = bwaMap(params.reference, bwa_index, trimmed_ch)
 
-    // Sorting bam, adding read groups and removing duplicates
+// Sorting bam, adding read groups and removing duplicates
     sorted_bam = samtoolsSort(mapped_sam)
     rg_bam = addRG(sorted_bam)
     dedup_bams = dupRemoval(rg_bam)
 
     // GATK4 HaplotypeCaller
-    // First, combine dedup_bams with their indices and sample IDs
+    // Transform the dedup_bams tuple to include sample ID
     dedup_with_index = dedup_bams
         .map { bam, bai -> 
             def sample_id = bam.baseName.replaceFirst(/_RG_dedup$/, '')
@@ -77,7 +77,7 @@ workflow variant_calling {
         }
     
     gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
-
+    
     // GATK4 HaplotypeCaller
     // dedup_bai = samtoolsRealignedIndex(dedup_bams)
     // gvcf = GATKHC(params.reference, fai_index, gatk_index, dedup_bams, dedup_bai)
