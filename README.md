@@ -85,9 +85,12 @@ Available parameters
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
-- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. Important: accepts only paired-end reads.
+- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
 
-Known issues with direct SRA downloads: Some accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object` or `fastp` errors due to incomplete downloads). Try to remove these accessions from the list. An alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
+  Important:
+  - Avoid empty lines in the file.
+  - Accepts only paired-end reads.
+  - Some accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object` or `fastp` errors due to incomplete downloads). Try to remove these accessions from the list. An alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
