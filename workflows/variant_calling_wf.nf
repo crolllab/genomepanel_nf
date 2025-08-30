@@ -1,3 +1,4 @@
+include {SRAdownload} from '../modules/sra_download'
 include {trimSequences} from '../modules/fastp_trimming'
 include {bwaIndex} from '../modules/bwa_index'
 include {gatkIndex} from '../modules/gatk_index'
@@ -33,15 +34,35 @@ workflow variant_calling {
 
     if (params.SRA_index) {
 
+        input:
+        path SRA_index
+        val max_concurrent = 10
+
+        output:
+        set val(sra_id), file("${sra_id}*.fastq") into read_pairs_ch
+
+        // Read and clean SRA IDs
+        sra_list = SRA_index.readLines()
+            .collect { it?.trim() }
+            .findAll { it }
+
+        // Create channel
+         Channel.from(sra_list)
+            .set { sra_ids_ch }
+
+        // Call download process
+        downloadSRA()
+
+
         // First get and process IDs
-        sra_list = file(params.SRA_index).readLines()
+//        sra_list = file(params.SRA_index).readLines()
         // Read SRA IDs from file, remove empty lines and trim whitespace
-        sra_list = file(params.SRA_index)
-            .readLines()
-            .collect { it?.trim() }      // remove leading/trailing whitespace
-            .findAll { it }              // remove nulls and empty strings
-        read_pairs_ch = Channel.fromSRA(sra_list, apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
-        read_pairs_ch.view()
+//        sra_list = file(params.SRA_index)
+//            .readLines()
+//            .collect { it?.trim() }      // remove leading/trailing whitespace
+//            .findAll { it }              // remove nulls and empty strings
+//        read_pairs_ch = Channel.fromSRA(sra_list, apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
+//        read_pairs_ch.view()
         }
 
     if (params.reads) {
