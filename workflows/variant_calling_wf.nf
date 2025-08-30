@@ -35,6 +35,11 @@ workflow variant_calling {
 
         // First get and process IDs
         sra_list = file(params.SRA_index).readLines()
+        // Read SRA IDs from file, remove empty lines and trim whitespace
+        sra_list = file(params.SRA_index)
+            .readLines()
+            .collect { it?.trim() }      // remove leading/trailing whitespace
+            .findAll { it }              // remove nulls and empty strings
         read_pairs_ch = Channel.fromSRA(sra_list, apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
         read_pairs_ch = read_pairs_ch.buffer(10)  // only 10 in-flight at a time
         read_pairs_ch.view()
