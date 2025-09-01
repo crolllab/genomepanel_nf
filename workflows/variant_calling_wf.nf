@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 // ---------------------
 // Module includes
 // ---------------------
-include { SRAdownload } from '../modules/sra_download.nf'
+include { SRAdownload } from '../modules/sra_download'
 include { trimSequences } from '../modules/fastp_trimming'
 include { bwaIndex } from '../modules/bwa_index'
 include { gatkIndex } from '../modules/gatk_index'
@@ -44,25 +44,12 @@ workflow variant_calling {
     // ---------------------
     if (params.SRA_index) {
 
-    Channel
-        .fromPath(params.SRA_index)
-        .splitText()
-        .map { it.trim() }
-        .filter { it }   // drop empty lines
-        .flatMap { id ->
-           if( id =~ /^(PRJ|SRP|ERP|DRP)\w+/ ) {
-               // Expand study/project ID into SRRs
-               Channel.fromSRA(id)
-           } else {
-               // Already an SRR, keep as-is
-               Channel.of(id)
-           }
+        // First get and process IDs
+        sra_list = file(params.SRA_index).readLines()
+        read_pairs_sra_ch = Channel.fromSRA(sra_list, 
+            apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
+        read_pairs_sra_ch.view()
        }
-    .set { sra_ids_ch }
-
-    read_pairs_sra_ch = SRAdownload(sra_ids_ch)
-
-    }
 
     // ---------------------
     // Local FASTQ reads
@@ -74,12 +61,16 @@ workflow variant_calling {
     // ---------------------
     // Merge reads channels
     // ---------------------
+    // Filter out empty entries first
+    def filtered_sra_ch = read_pairs_sra_ch.filter { it != null && it.size() > 0 }
+    def filtered_local_ch = read_pairs_local_ch.filter { it != null && it.size() > 0 }
+
     if (params.reads && params.SRA_index) {
-        read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
+        read_pairs_ch = filtered_sra_ch.mix(filtered_local_ch)
     } else if (params.reads) {
-        read_pairs_ch = read_pairs_local_ch
+        read_pairs_ch = filtered_local_ch
     } else {
-        read_pairs_ch = read_pairs_sra_ch
+        read_pairs_ch = filtered_sra_ch
     }
 
     // ---------------------
