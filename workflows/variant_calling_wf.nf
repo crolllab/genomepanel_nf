@@ -1,142 +1,140 @@
-include {SRAdownload} from '../modules/sra_download'
-include {trimSequences} from '../modules/fastp_trimming'
-include {bwaIndex} from '../modules/bwa_index'
-include {gatkIndex} from '../modules/gatk_index'
-include {fastaIndex} from '../modules/index_fasta'
-include {bwaMap} from '../modules/bwa_mapping'
-include {samtoolsSort} from '../modules/samtools_sort'
-include {addRG} from '../modules/picard_add_read_groups'
-include {GATKHC} from '../modules/gatk4_hc'
-include {dupRemoval} from '../modules/picard_duplicates_removal'
-include {samtoolsRealignedIndex} from '../modules/samtools_index'
-include {CombineGVCFs} from '../modules/combine_gvcfs'
-include {GenotypeGVCFs} from '../modules/genotype_gvcfs'
-include {FilterVCFs} from '../modules/filter_vcf'
-include {CleanVCFs} from '../modules/clean_vcf'
-include {ConcatVCFs} from '../modules/concat_vcf'
-include {ConcatCleanVCFs} from '../modules/concat_clean_vcf'
-include {RQualPlotting} from '../modules/r_plotting'
-include {PLINKIBSPCA} from '../modules/plink_ibs_pca'
-
 nextflow.enable.dsl=2
 
+// ---------------------
+// Module includes
+// ---------------------
+include { SRAdownload } from '../modules/sra_download.nf'
+include { trimSequences } from '../modules/fastp_trimming'
+include { bwaIndex } from '../modules/bwa_index'
+include { gatkIndex } from '../modules/gatk_index'
+include { fastaIndex } from '../modules/index_fasta'
+include { bwaMap } from '../modules/bwa_mapping'
+include { samtoolsSort } from '../modules/samtools_sort'
+include { addRG } from '../modules/picard_add_read_groups'
+include { dupRemoval } from '../modules/picard_duplicates_removal'
+include { samtoolsRealignedIndex } from '../modules/samtools_index'
+include { GATKHC } from '../modules/gatk4_hc'
+include { CombineGVCFs } from '../modules/combine_gvcfs'
+include { GenotypeGVCFs } from '../modules/genotype_gvcfs'
+include { FilterVCFs } from '../modules/filter_vcf'
+include { CleanVCFs } from '../modules/clean_vcf'
+include { ConcatVCFs } from '../modules/concat_vcf'
+include { ConcatCleanVCFs } from '../modules/concat_clean_vcf'
+include { RQualPlotting } from '../modules/r_plotting'
+include { PLINKIBSPCA } from '../modules/plink_ibs_pca'
+
+// ---------------------
+// Main workflow
+// ---------------------
 workflow variant_calling {
 
+    // ---------------------
+    // Input checks
+    // ---------------------
     if (!params.reference) {
-        error "ERROR: Reference genome is not specified. Please provide an absolute path to the reference genome. The file must end with .fasta.\n"
-        }
-
-    if (!params.reads && !params.SRA_index) {
-        error "ERROR: No input reads provided. Please provide local FASTQ files and/or a file with SRA run accessions.\n"
-        }
-
-    // Read SRA run accessions from a file
-
-    if (params.SRA_index) {
-
-        input:
-        path SRA_index
-        val max_concurrent = 10
-
-        output:
-        set val(sra_id), file("${sra_id}*.fastq") into read_pairs_ch
-
-        // Read and clean SRA IDs
-        sra_list = SRA_index.readLines()
-            .collect { it?.trim() }
-            .findAll { it }
-
-        // Create channel
-         Channel.from(sra_list)
-            .set { sra_ids_ch }
-
-        // Call download process
-        downloadSRA()
-
-
-        // First get and process IDs
-//        sra_list = file(params.SRA_index).readLines()
-        // Read SRA IDs from file, remove empty lines and trim whitespace
-//        sra_list = file(params.SRA_index)
-//            .readLines()
-//            .collect { it?.trim() }      // remove leading/trailing whitespace
-//            .findAll { it }              // remove nulls and empty strings
-//        read_pairs_ch = Channel.fromSRA(sra_list, apiKey: params.NCBI_api_key, cache: false, protocol: 'ftp')
-//        read_pairs_ch.view()
-        }
-
-    if (params.reads) {
-            Channel
-               .fromFilePairs(params.reads, checkIfExists: false)
-               .set { read_pairs_local_ch }
-
-            
-            if (params.SRA_index) {
-                read_pairs_ch = read_pairs_ch.mix(read_pairs_local_ch)
-            } else {
-                read_pairs_ch = read_pairs_local_ch
-            }
+        error "ERROR: Reference genome is not specified (.fasta file required)."
     }
 
-    // Trim reads  
+    if (!params.reads && !params.SRA_index) {
+        error "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
+    }
+
+    // ---------------------
+    // SRA reads
+    // ---------------------
+    if (params.SRA_index) {
+
+        Channel
+           .fromPath(params.SRA_index)
+           .splitText()
+           .map { it.trim() }
+           .filter { it }    // drop empty lines
+           .set { sra_ids_ch }
+
+        read_pairs_sra_ch = SRAdownload(sra_ids_ch)
+    }
+
+    // ---------------------
+    // Local FASTQ reads
+    // ---------------------
+    if (params.reads) {
+        read_pairs_local_ch = Channel.fromFilePairs(params.reads, checkIfExists: false)
+    }
+
+    // ---------------------
+    // Merge reads channels
+    // ---------------------
+    if (params.reads && params.SRA_index) {
+        read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
+    } else if (params.reads) {
+        read_pairs_ch = read_pairs_local_ch
+    } else {
+        read_pairs_ch = read_pairs_sra_ch
+    }
+
+    // ---------------------
+    // Trim reads
+    // ---------------------
     trimmed_ch = trimSequences(read_pairs_ch)
 
-    // Preparing reference genome indexes and depth of coverage files
-    bwa_index = bwaIndex(params.reference)
-    gatk_index = gatkIndex(params.reference)
-    fai_index = fastaIndex(params.reference)
+    // ---------------------
+    // Reference indexes
+    // ---------------------
+    bwa_index   = bwaIndex(params.reference)
+    gatk_index  = gatkIndex(params.reference)
+    fai_index   = fastaIndex(params.reference)
 
-    // BWA mem mapping
+    // ---------------------
+    // Mapping
+    // ---------------------
     mapped_sam = bwaMap(params.reference, bwa_index, trimmed_ch)
 
-// Sorting bam, adding read groups and removing duplicates
+    // ---------------------
+    // Post-processing BAM
+    // ---------------------
     sorted_bam = samtoolsSort(mapped_sam)
-    rg_bam = addRG(sorted_bam)
+    rg_bam     = addRG(sorted_bam)
     dedup_bams = dupRemoval(rg_bam)
 
-    // GATK4 HaplotypeCaller
-    // Transform the dedup_bams tuple to include sample ID
+    // ---------------------
+    // Transform BAM tuples to include sample ID
+    // ---------------------
     dedup_with_index = dedup_bams
-        .map { bam, bai -> 
+        .map { bam, bai ->
             def sample_id = bam.baseName.replaceFirst(/_RG_dedup$/, '')
             tuple(sample_id, bam, bai)
         }
-    
-    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
 
-    // GATK4 HaplotypeCaller
-    // dedup_bai = samtoolsRealignedIndex(dedup_bams)
-    // gvcf = GATKHC(params.reference, fai_index, gatk_index, dedup_bams, dedup_bai)
-    // Extract all bam and bai paths and collect all of them
-    gvcf_ch = gvcf.collect()
+    // ---------------------
+    // GATK HaplotypeCaller
+    // ---------------------
+    gvcf_ch = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
 
-   // Extract chromosomes to parallelize SNP calling
+    // ---------------------
+    // Parallel SNP calling by chromosome
+    // ---------------------
     chromosomes_ch = fai_index
-                            .splitCsv(sep: '\t')
-                            .map { it[0] }
+        .splitCsv(sep: '\t')
+        .map { it[0] }
 
+    // ---------------------
+    // Combine, genotype, filter VCFs
+    // ---------------------
+    cgvcf_ch        = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    vcf_ch          = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    fvcf_ch         = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    clean_vcf_ch    = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    concat_clean_ch = ConcatCleanVCFs(clean_vcf_ch)
 
-    // Run CombineGVCFs, collecting all GVCFs into a single file
-    cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    cgvcf_ch = cgvcf.collect()
-
-    // Run GenotypeGVCF
-    vcf = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    vcf_ch = vcf.collect()
-    // Run FilterVCFs
-    fvcf = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    fvcf_ch = fvcf.collect()
-
-    // Clean + concat VCFs
-    clean_vcf = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    clean_vcf_ch = clean_vcf.collect()
-    concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
-
-    // R plotting
-    concat_vcf = ConcatVCFs(fvcf_ch)
+    // ---------------------
+    // Optional R plotting
+    // ---------------------
+    concat_vcf_ch = ConcatVCFs(fvcf_ch)
     R_script = file('./VariantQualPlot.R')
-    RQualPlotting(R_script, concat_vcf)
+    RQualPlotting(R_script, concat_vcf_ch)
 
-    // PLINK IBS analysis
-    PLINKIBSPCA(concat_clean_vcf)
+    // ---------------------
+    // Optional PLINK IBS/PCA analysis
+    // ---------------------
+    PLINKIBSPCA(concat_clean_ch)
 }
