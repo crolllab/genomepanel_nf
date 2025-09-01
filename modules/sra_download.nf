@@ -10,7 +10,6 @@ process SRAdownload {
 
     script:
     """
-    prefetch $sra_id
-    fasterq-dump $sra_id --split-files --outdir .
+    fasterq-dump $sra_id --split-files --outdir . --legacy
     """
 }

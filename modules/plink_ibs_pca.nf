@@ -15,5 +15,6 @@ process PLINKIBSPCA {
 
     """   
     plink2 --vcf ${concat_clean_vcf} --make-king square0 --maf 0.1 --out final_variants.clean.PLINK
+    plink2 --vcf $(concat_clean_vcf) --pca 10 --out final_variants.clean.PLINK
     """
 }
