@@ -18,3 +18,4 @@ process PLINKIBSPCA {
     plink2 --vcf ${concat_clean_vcf} --pca 10 --out final_variants.clean.PLINK
     """
 }
+

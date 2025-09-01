@@ -44,14 +44,24 @@ workflow variant_calling {
     // ---------------------
     if (params.SRA_index) {
 
-        Channel
-           .fromPath(params.SRA_index)
-           .splitText()
-           .map { it.trim() }
-           .filter { it }    // drop empty lines
-           .set { sra_ids_ch }
+    Channel
+        .fromPath(params.SRA_index)
+        .splitText()
+        .map { it.trim() }
+        .filter { it }   // drop empty lines
+        .flatMap { id ->
+           if( id =~ /^(PRJ|SRP|ERP|DRP)\w+/ ) {
+               // Expand study/project ID into SRRs
+               Channel.fromSRA(id)
+           } else {
+               // Already an SRR, keep as-is
+               Channel.of(id)
+           }
+       }
+    .set { sra_ids_ch }
 
-        read_pairs_sra_ch = SRAdownload(sra_ids_ch)
+    read_pairs_sra_ch = SRAdownload(sra_ids_ch)
+
     }
 
     // ---------------------

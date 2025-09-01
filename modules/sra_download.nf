@@ -1,6 +1,6 @@
 process SRAdownload {
     tag "$sra_id"
-    maxForks params.max_concurrent ?: 10
+    maxForks params.max_concurrent
     errorStrategy 'retry'
     maxRetries 2
 
@@ -14,20 +14,14 @@ process SRAdownload {
     """
     set -euo pipefail
 
-    echo "Downloading and converting $sra_id"
-
-    # First attempt
-    fasterq-dump $sra_id --split-files --outdir . || {
-
-        echo "First attempt failed, retrying with --legacy"
-        # Retry with --legacy option
-        fasterq-dump $sra_id --split-files --outdir . --legacy || {
-
-            echo "Download failed for $sra_id after retry"
-            exit 1
-        }
-    }
-
-    echo "$sra_id download and conversion complete"
+    # Check if files already exist
+    if ls ${sra_id}_*.fastq 1>/dev/null 2>&1; then
+        echo "Skipping $sra_id, FASTQ files already exist"
+    else
+        echo "Downloading and converting $sra_id"
+        fasterq-dump $sra_id --split-files --outdir .
+        echo "$sra_id download and conversion complete"
+    fi
     """
 }
+
