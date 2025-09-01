@@ -27,17 +27,16 @@ include { PLINKIBSPCA } from '../modules/plink_ibs_pca'
 // ---------------------
 workflow variant_calling {
 
-    // ---------------------
-    // Input checks
-    // ---------------------
-    if (!params.reference) {
-        error "ERROR: Reference genome is not specified (.fasta file required)."
+    / ---------------------
+    / Input checks
+    / ---------------------
+    f (!params.reference) {
+       exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
     }
-
-    if (!params.reads && !params.SRA_index) {
-        error "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
+    
+    f (!params.reads && !params.SRA_index) {
+       exit 1, "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
     }
-
     // ---------------------
     // SRA reads
     // ---------------------
@@ -49,6 +48,7 @@ workflow variant_calling {
             apiKey: params.NCBI_api_key, 
             cache: false, 
             protocol: 'ftp')
+
         read_pairs_sra_ch.view()
        }
 
@@ -57,7 +57,7 @@ workflow variant_calling {
     // ---------------------
     if (params.reads) {
         read_pairs_local_ch = Channel.fromFilePairs(params.reads, checkIfExists: false)
-    }
+      }
 
     // ---------------------
     // Merge reads channels
