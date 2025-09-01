@@ -27,16 +27,17 @@ include { PLINKIBSPCA } from '../modules/plink_ibs_pca'
 // ---------------------
 workflow variant_calling {
 
-    / ---------------------
-    / Input checks
-    / ---------------------
-    f (!params.reference) {
+    // ---------------------
+    // Input checks
+    // ---------------------
+    if (!params.reference) {
        exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
     }
     
-    f (!params.reads && !params.SRA_index) {
+    if (!params.reads && !params.SRA_index) {
        exit 1, "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
     }
+    
     // ---------------------
     // SRA reads
     // ---------------------
