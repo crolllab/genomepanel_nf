@@ -108,7 +108,7 @@ workflow variant_calling {
     // ---------------------
     // GATK HaplotypeCaller
     // ---------------------
-    gvcf_ch = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
+    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
 
     // ---------------------
     // Parallel SNP calling by chromosome
@@ -120,6 +120,8 @@ workflow variant_calling {
     // ---------------------
     // Combine, genotype, filter VCFs
     // ---------------------
+    gvcf_ch = gvcf.collect()
+
     cgvcf_ch        = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
     vcf_ch          = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
     fvcf_ch         = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
