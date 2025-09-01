@@ -50,8 +50,6 @@ Alternatively, you can pull the images directly from the Galaxy Project depot.
 ```bash
 mkdir -p singularity
 cd singularity
-# sra-tools
-singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
 # fastp
 singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
 # bwa
