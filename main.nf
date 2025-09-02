@@ -3,9 +3,9 @@
 params.outdir = "./nf_output/"
 params.reference = ""
 params.reads = ""
-params.SRA-index = ""
+params.SRA_index = ""
 params.ploidy = ""
-params.NCBI-API-key = ""
+params.NCBI_API_key = ""
 
 include { variant_calling } from './workflows/variant_calling_wf'
 

@@ -34,19 +34,19 @@ workflow variant_calling {
        exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
     }
     
-    if (!params.reads && !params.SRA-index) {
+    if (!params.reads && !params.SRA_index) {
        exit 1, "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
     }
     
     // ---------------------
     // SRA reads
     // ---------------------
-    if (params.SRA-index) {
+    if (params.SRA_index) {
 
         // First get and process IDs
-        sra_list = file(params.SRA-index).readLines()
+        sra_list = file(params.SRA_index).readLines()
         read_pairs_sra_ch = Channel.fromSRA(sra_list, 
-            apiKey: params.NCBI-API-key, 
+            apiKey: params.NCBI_API_key, 
             cache: false, 
             protocol: 'ftp')
 
@@ -67,7 +67,7 @@ workflow variant_calling {
     // def filtered_sra_ch = read_pairs_sra_ch.filter { it != null && it.size() > 0 }
     // def filtered_local_ch = read_pairs_local_ch.filter { it != null && it.size() > 0 }
 
-    if (params.reads && params.SRA-index) {
+    if (params.reads && params.SRA_index) {
         read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
     } else if (params.reads) {
         read_pairs_ch = read_pairs_local_ch
@@ -124,22 +124,35 @@ workflow variant_calling {
     // Combine, genotype, filter VCFs
     // ---------------------
     gvcf_ch = gvcf.collect()
+    cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
-    cgvcf_ch        = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    vcf_ch          = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    fvcf_ch         = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    clean_vcf_ch    = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-    concat_clean_ch = ConcatCleanVCFs(clean_vcf_ch)
+    // Run GenotypeGVCF
+    cgvcf_ch = cgvcf.collect()
+    vcf = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+
+    // ---------------------
+    // Run FilterVCFs
+    // ---------------------
+    vcf_ch = vcf.collect()
+    fvcf = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+
+   // ---------------------
+   // Clean + concat VCFs
+   // ---------------------
+    fvcf_ch = fvcf.collect()
+    clean_vcf = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    clean_vcf_ch = clean_vcf.collect()
+    concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // ---------------------
     // Optional R plotting
     // ---------------------
-    concat_vcf_ch = ConcatVCFs(fvcf_ch)
+    concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./VariantQualPlot.R')
-    RQualPlotting(R_script, concat_vcf_ch)
+    RQualPlotting(R_script, concat_vcf)
 
     // ---------------------
     // Optional PLINK IBS/PCA analysis
     // ---------------------
-    PLINKIBSPCA(concat_clean_ch)
+    PLINKIBSPCA(concat_clean_vcf)
 }
