@@ -9,13 +9,15 @@ process PLINKIBSPCA {
     path concat_clean_vcf
  
     output:
-    path "final_variants.clean.PLINK.*"
+    path "final_variants.clean.PLINK*"
 
     script:
 
     """   
-    plink2 --vcf ${concat_clean_vcf} --make-king square0 --maf 0.1 --out final_variants.clean.PLINK
-    plink2 --vcf ${concat_clean_vcf} --pca 10 --out final_variants.clean.PLINK
+    plink2 --vcf ${concat_clean_vcf} --keep-allele-order --set-missing-var-ids @:#  --make-bed --out final_variants.clean.PLINK --max-alleles 2
+    plink2 --bfile final_variants.clean.PLINK  --freq --out final_variants.clean.PLINK
+    plink2 --read-freq final_variants.clean.PLINK.afreq --pca 10 --bfile final_variants.clean.PLINK
+    plink2 --bfile final_variants.clean.PLINK --make-king square0 --maf 0.1 --out final_variants.clean.PLINK
     """
 }
 
