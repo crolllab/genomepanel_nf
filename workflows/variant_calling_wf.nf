@@ -145,14 +145,14 @@ workflow variant_calling {
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // ---------------------
-    // Optional R plotting
-    // ---------------------
-    concat_vcf = ConcatVCFs(fvcf_ch)
-    R_script = file('./VariantQualPlot.R')
-    RQualPlotting(R_script, concat_vcf)
-
-    // ---------------------
-    // Optional PLINK IBS/PCA analysis
+    // PLINK IBS/PCA analysis
     // ---------------------
     PLINKIBSPCA(concat_clean_vcf)
+
+    // ---------------------
+    // R plotting
+    // ---------------------
+    concat_vcf = ConcatVCFs(fvcf_ch)
+    R_script = file('./R_plotting.R')
+    RQualPlotting(R_script, concat_vcf)
 }

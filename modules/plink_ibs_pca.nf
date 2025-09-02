@@ -9,7 +9,12 @@ process PLINKIBSPCA {
     path concat_clean_vcf
  
     output:
-    path "final_variants.clean.PLINK*"
+    tuple path("final_variants.clean.PLINK.eigenvec"), \
+          path("final_variants.clean.PLINK.afreq"), \
+          path("final_variants.clean.PLINK.king"), \
+          path("final_variants.clean.PLINK.bed"), \
+          path("final_variants.clean.PLINK.bim"), \
+          path("final_variants.clean.PLINK.fam")
 
     script:
 
