@@ -147,7 +147,7 @@ workflow variant_calling {
     // ---------------------
     // PLINK IBS/PCA analysis
     // ---------------------
-    plink_outPLINKIBSPCA(concat_clean_vcf)
+    plink_out = PLINKIBSPCA(concat_clean_vcf)
 
     // ---------------------
     // R plotting
