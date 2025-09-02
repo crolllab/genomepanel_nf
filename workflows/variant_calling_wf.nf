@@ -147,12 +147,12 @@ workflow variant_calling {
     // ---------------------
     // PLINK IBS/PCA analysis
     // ---------------------
-    PLINKIBSPCA(concat_clean_vcf)
+    plink_outPLINKIBSPCA(concat_clean_vcf)
 
     // ---------------------
     // R plotting
     // ---------------------
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
-    RQualPlotting(R_script, concat_vcf)
+    RQualPlotting(R_script, concat_vcf, plink_out)
 }
