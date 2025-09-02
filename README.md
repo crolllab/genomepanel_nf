@@ -81,11 +81,13 @@ Available parameters
 
 - `-resume`: Optional. If set, the pipeline will resume from the last completed step, skipping already completed steps. The `work-dir` needs to be intact for this.
 
+- `--NCBI-API-key`: Required for querying and downloading from NCBI SRA. You can get your key by creating an [account on NCBI](https://account.ncbi.nlm.nih.gov/). After registration/login, find on the top right the link to the "Account settings". Click on "Create API key" and copy it.
+
 - `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa` or `.fas`).
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
-- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
+- `--SRA-index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
 
   Important:
   - Avoid empty lines in the file.
@@ -136,7 +138,7 @@ J9_L2_R1_001_18ku2CAeFgfk.fastq.gz and J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
 
 ### Define NCBI SRA accessions
 
-Example file to provide for the `--SRA_index ...` option. 
+Example file to provide for the `--SRA-index ...` option. 
 
 ```bash
 ERR13824484
@@ -161,8 +163,12 @@ READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{
 Start the pipeline using `slurm` and processing local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `my_nf_run_output` folder. The `SRA_accessions.txt` example file is included in the repository.
 
 ```bash
+# substitute with your own NCBI API key
+NCBI_API_KEY=alcks837shakanc1ahj
+# activate conda environment
 micromamba activate nf_gp_env
-nextflow run main.nf -config nextflow.config -profile slurm -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --reference $REF --reads $READS --SRA_index './SRA_accessions.txt' --ploidy 1
+# run nextflow pipeline
+nextflow run main.nf -config nextflow.config -profile slurm -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --NCBI-API-key $NCBI_API_KEY --reference $REF --reads $READS --SRA-index './SRA_accessions.txt' --ploidy 1
 ```
 
 Notes on the exection:
@@ -208,7 +214,7 @@ final_variants.clean.PLINK.king.id
 5. `plink2` filters variants for a MAF of 0.1 and estimates King distances.
 
 ## Features to consider / bug fixes
-- Some SRA / ENA downloads fail with the error `ERROR ~ Cannot invoke method split() on null object`. You can circumvent this by removing the problematic accessions from the `--SRA_index` file and download the files manually first (see above).
+- Some SRA / ENA downloads fail with the error `ERROR ~ Cannot invoke method split() on null object`. You can circumvent this by removing the problematic accessions from the `--SRA-index` file and download the files manually first (see above).
 - include GATK CNV calling
 - `vcftools` producing files for population genetics analyses (e.g. MAF filter)
 - run basic pop gen analyses

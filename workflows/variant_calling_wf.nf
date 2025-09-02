@@ -34,19 +34,19 @@ workflow variant_calling {
        exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
     }
     
-    if (!params.reads && !params.SRA_index) {
+    if (!params.reads && !params.SRA-index) {
        exit 1, "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
     }
     
     // ---------------------
     // SRA reads
     // ---------------------
-    if (params.SRA_index) {
+    if (params.SRA-index) {
 
         // First get and process IDs
-        sra_list = file(params.SRA_index).readLines()
+        sra_list = file(params.SRA-index).readLines()
         read_pairs_sra_ch = Channel.fromSRA(sra_list, 
-            apiKey: params.NCBI_api_key, 
+            apiKey: params.NCBI-API-key, 
             cache: false, 
             protocol: 'ftp')
 
@@ -67,7 +67,7 @@ workflow variant_calling {
     // def filtered_sra_ch = read_pairs_sra_ch.filter { it != null && it.size() > 0 }
     // def filtered_local_ch = read_pairs_local_ch.filter { it != null && it.size() > 0 }
 
-    if (params.reads && params.SRA_index) {
+    if (params.reads && params.SRA-index) {
         read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
     } else if (params.reads) {
         read_pairs_ch = read_pairs_local_ch
