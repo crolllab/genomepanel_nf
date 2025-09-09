@@ -14,7 +14,6 @@ Implemented steps:
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
 - `vcftools`: Producing a high-quality variants file
-- `plink`: IBS, PCA calculations
 
 Current limitations:
 - If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
@@ -64,8 +63,6 @@ singularity pull https://depot.galaxyproject.org/singularity/gatk4-spark%3A4.6.2
 singularity pull https://depot.galaxyproject.org/singularity/bcftools%3A1.21--h8b25389_0
 # R with tidyverse
 singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
-# plink2
-singularity pull https://depot.galaxyproject.org/singularity/plink2%3A2.00a5.12--h9948957_1
 cd ..
 ```
 
@@ -199,19 +196,15 @@ final_variants.plots.QD.pdf
 final_variants.plots.QUAL.pdf
 ```
 
-PLINK estimation of IBS (identity by state) based on the King method. The output can be used to prune clones.
-```bash
-final_variants.clean.PLINK.king
-final_variants.clean.PLINK.king.id
-```
-
 ## Description of pipeline steps
 
 1. `fastp` is run with default settings
 2. `bwa-mem2` is run with default settings
 3. `gatk` Haplotypecaller emits GVCF, you need to set `--sample-ploidy` (see above)
 4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0 | >2.0`, `MQRankSum <-2.0 | >2.0` and `BaseQRankSum <-2.0 | >2.0`. No filtering based on `QUAL` values as these are sample size dependent.
-5. `plink2` filters variants for a MAF of 0.1 and estimates King distances.
+5. `vcftools` is used to produce a high-quality variants file including only variants passing the GATK VariantFiltration criteria.
+6. Variant quality metrics are plotted using an R script.
+
 
 ## Features to consider / bug fixes
 - Some SRA / ENA downloads fail with the error `ERROR ~ Cannot invoke method split() on null object`. You can circumvent this by removing the problematic accessions from the `--SRA-index` file and download the files manually first (see above).
