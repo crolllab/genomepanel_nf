@@ -20,7 +20,6 @@ include { CleanVCFs } from '../modules/clean_vcf'
 include { ConcatVCFs } from '../modules/concat_vcf'
 include { ConcatCleanVCFs } from '../modules/concat_clean_vcf'
 include { RQualPlotting } from '../modules/r_plotting'
-include { PLINKIBSPCA } from '../modules/plink_ibs_pca'
 
 // ---------------------
 // Main workflow
