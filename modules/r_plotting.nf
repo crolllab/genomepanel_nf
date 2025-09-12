@@ -8,7 +8,6 @@ process RQualPlotting {
     input:
     path R_script
     path concat_vcf
-    tuple path(eigenvec), path(afreq), path(king), path(bed), path(bim), path(fam)
  
     output:
     path "final_variants.*.pdf"
