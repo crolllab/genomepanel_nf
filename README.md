@@ -160,8 +160,8 @@ READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{
 Start the pipeline using `slurm` and processing local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `my_nf_run_output` folder. The `SRA_accessions.txt` example file is included in the repository.
 
 ```bash
-# substitute with your own NCBI API key
-NCBI_API_KEY=alcks837shakanc1ahj
+# substitute with your own NCBI API key!
+NCBI_API_KEY=abcdef1234567890
 # activate conda environment
 micromamba activate nf_gp_env
 # run nextflow pipeline
