@@ -48,7 +48,8 @@ workflow variant_calling {
         read_pairs_sra_ch = Channel.fromSRA(sra_list, 
             apiKey: params.NCBI_API_key, 
             cache: true, 
-            protocol: 'https')
+            retryPolicy: [delay: '250ms', maxAttempts: 5],
+            protocol: 'ftp')
 
    //     read_pairs_sra_ch.view()
        }
