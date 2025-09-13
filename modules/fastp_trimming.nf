@@ -1,9 +1,8 @@
 process trimSequencesPE {
-    maxForks = 20
     tag "FASTP PE trimming"
     errorStrategy 'ignore'
     memory '4GB'
-    cpus 16
+    cpus 4
       
     input:
     tuple val(sample_id), path(reads)
@@ -18,11 +17,10 @@ process trimSequencesPE {
 }
 
 process trimSequencesSE {
-    maxForks = 20
     tag "FASTP SE trimming"
     errorStrategy 'ignore'
     memory '4GB'
-    cpus 16
+    cpus 4
 
     input:
     tuple val(sample_id), path(r1)
