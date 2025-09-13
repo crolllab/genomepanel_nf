@@ -57,9 +57,12 @@ workflow variant_calling {
     // Local FASTQ reads
     // ---------------------
     if (params.reads) {
-        read_pairs_local_ch = Channel.fromFilePairs(params.reads, checkIfExists: false)
-      }
-
+        read_pairs_local_ch = Channel.fromFilePairs(
+            params.reads,
+            checkIfExists: true,   // make sure files exist
+            flat: false             // keeps paired R1/R2 in a tuple
+        )
+    }
     // ---------------------
     // Merge reads channels
     // ---------------------
@@ -67,21 +70,28 @@ workflow variant_calling {
     // def filtered_sra_ch = read_pairs_sra_ch.filter { it != null && it.size() > 0 }
     // def filtered_local_ch = read_pairs_local_ch.filter { it != null && it.size() > 0 }
 
+  
     if (params.reads && params.SRA_index) {
         read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
     } else if (params.reads) {
         read_pairs_ch = read_pairs_local_ch
     } else {
         read_pairs_ch = read_pairs_sra_ch
-    }
+    }   
 
     // ---------------------
     // Trim reads (separate for SE and PE)
     // ---------------------
 
+read_se_ch = read_pairs_ch.filter { sample_id, reads ->
+    reads instanceof String        // SE: reads is a single path
+}
 
-    read_se_ch = read_pairs_ch.filter { it.size() == 2 }
-    read_pe_ch = read_pairs_ch.filter { it.size() == 3 }
+read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
+    reads instanceof List          // PE: reads is a list of 2 paths
+}
+//    read_se_ch = read_pairs_ch.filter { it.size() == 2 }
+//    read_pe_ch = read_pairs_ch.filter { it.size() == 3 }
 
     trimmed_se_ch = trimSequencesSE(read_se_ch)
     trimmed_pe_ch = trimSequencesPE(read_pe_ch)
