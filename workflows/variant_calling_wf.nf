@@ -3,7 +3,8 @@ nextflow.enable.dsl=2
 // ---------------------
 // Module includes
 // ---------------------
-include { trimSequences } from '../modules/fastp_trimming'
+include { trimSequencesPE } from '../modules/fastp_trimming'
+include { trimSequencesSE } from '../modules/fastp_trimming'
 include { bwaIndex } from '../modules/bwa_index'
 include { gatkIndex } from '../modules/gatk_index'
 include { fastaIndex } from '../modules/index_fasta'
@@ -75,9 +76,19 @@ workflow variant_calling {
     }
 
     // ---------------------
-    // Trim reads
+    // Trim reads (separate for SE and PE)
     // ---------------------
-    trimmed_ch = trimSequences(read_pairs_ch)
+
+
+    read_se_ch = read_pairs_ch.filter { it.size() == 2 }
+    read_pe_ch = read_pairs_ch.filter { it.size() == 3 }
+
+    trimmed_se_ch = trimSequencesSE(read_se_ch)
+    trimmed_pe_ch = trimSequencesPE(read_pe_ch)
+
+    // Merge if you want a unified channel of trimmed outputs
+    trimmed_ch = trimmed_se_ch.mix(trimmed_pe_ch)
+
 
     // ---------------------
     // Reference indexes

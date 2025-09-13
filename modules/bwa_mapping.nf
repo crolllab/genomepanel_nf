@@ -16,7 +16,9 @@ process bwaMap {
     path "${sample_id}.sam"
 
     script:
+    // Build bwa-mem input dynamically
+    def reads_cmd = trimmed_reads.size() == 2 ? "${trimmed_reads[0]} ${trimmed_reads[1]}" : "${trimmed_reads[0]}"
     """
-    bwa-mem2 mem -t $task.cpus $reference ${trimmed_reads[0]} ${trimmed_reads[1]} > ${sample_id}.sam
+    bwa-mem2 mem -t $task.cpus $reference $reads_cmd > ${sample_id}.sam
     """
 }
