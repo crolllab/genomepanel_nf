@@ -88,7 +88,7 @@ Available parameters
 
   Important:
   - Avoid empty lines in the file.
-  - Accepts only paired-end reads.
+  - Accepts only paired-end reads locally. Both SE and PE are accepted from SRA.
   - Some accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object` or `fastp` errors due to incomplete downloads). Try to remove these accessions from the list. An alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
@@ -213,7 +213,6 @@ final_variants.plots.QUAL.pdf
 - run basic pop gen analyses
 - include sample renaming step as an option
 - allow for multiple SRA accessions or fastq pairs per sample
-- accept single-end read datasets
 
 ## Utilities
 
