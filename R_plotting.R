@@ -43,13 +43,13 @@ ggsave("final_variants.plots.QD.pdf", width = 4, height = 4)
 # Plot VCF filtering stats
 ##############################
 
-df <- read.csv("final_variants.clean.PLINK.eigenvec", sep = " ", header = F)
+#df <- read.csv("final_variants.clean.PLINK.eigenvec", sep = " ", header = F)
 
-pca.data <- as.data.frame(allchr.pc$scores)
+#pca.data <- as.data.frame(allchr.pc$scores)
 
 ## visualisation de la structure, ajout de texte identifiant les populations
-ggplot(pca.data, aes(x = PC1, y = PC2, fill=region, color=region)) +
-  geom_point(size = 3, alpha = 0.5) +
-  geom_text(aes(x = PC1, y = PC2, label = pop), size = 2)
+#ggplot(pca.data, aes(x = PC1, y = PC2, fill=region, color=region)) +
+#  geom_text(aes(x = PC1, y = PC2, label = pop), size = 2)
+#  geom_point(size = 3, alpha = 0.5) +
 
-ggsave("PCA_structure_poptext.pdf", width = 12, height = 10)
+#ggsave("PCA_structure_poptext.pdf", width = 12, height = 10)

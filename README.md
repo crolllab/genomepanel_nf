@@ -13,7 +13,8 @@ Implemented steps:
 - `picard`: mark duplicates
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
-- `vcftools`: Producing a high-quality variants file
+- `bcftools`: Producing a high-quality variants file
+- `vcftools`: A basic population genetics VCF file
 
 Current limitations:
 - If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
@@ -54,7 +55,7 @@ singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--hea
 # bwa
 singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.2.1--he70b90d_8
 # samtools
-singularity pull https://depot.galaxyproject.org/singularity/samtools%3A1.6--h5fe306e_12
+singularity pull https://depot.galaxyproject.org/singularity/samtools%3A1.22.1--h96c455f_0
 # picard
 singularity pull https://depot.galaxyproject.org/singularity/picard%3A3.4.0--hdfd78af_0
 # gatk
@@ -63,7 +64,8 @@ singularity pull https://depot.galaxyproject.org/singularity/gatk4-spark%3A4.6.2
 singularity pull https://depot.galaxyproject.org/singularity/bcftools%3A1.21--h8b25389_0
 # R with tidyverse
 singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
-cd ..
+# vcftools
+singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--pl5321h077b44d_0
 ```
 
 ## Step 2: Configure `genomepanel_nf` options  
@@ -202,8 +204,9 @@ final_variants.plots.QUAL.pdf
 2. `bwa-mem2` is run with default settings
 3. `gatk` Haplotypecaller emits GVCF, you need to set `--sample-ploidy` (see above)
 4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0 | >2.0`, `MQRankSum <-2.0 | >2.0` and `BaseQRankSum <-2.0 | >2.0`. No filtering based on `QUAL` values as these are sample size dependent.
-5. `vcftools` is used to produce a high-quality variants file including only variants passing the GATK VariantFiltration criteria.
+5. `bcftools` is used to produce a high-quality variants file including only variants passing the GATK VariantFiltration criteria.
 6. Variant quality metrics are plotted using an R script.
+7. `vcftools` is used to produce a a thinned (1 SNP per kb), MAF > 0.05 and high genotyping rate (> 90 genotyping rate) VCF file.
 
 
 ## Features to consider / bug fixes

@@ -21,6 +21,9 @@ include { CleanVCFs } from '../modules/clean_vcf'
 include { ConcatVCFs } from '../modules/concat_vcf'
 include { ConcatCleanVCFs } from '../modules/concat_clean_vcf'
 include { RQualPlotting } from '../modules/r_plotting'
+include { PopGenVCF } from '../modules/popgen_vcf'
+include { RSummarizingBWA } from '../modules/r_process_summary_bwa'
+include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
 
 // ---------------------
 // Main workflow
@@ -94,12 +97,28 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
 //    read_se_ch = read_pairs_ch.filter { it.size() == 2 }
 //    read_pe_ch = read_pairs_ch.filter { it.size() == 3 }
 
+//    trimmed_se_ch = trimSequencesSE(read_se_ch)[0]
+    
+//    trimmed_pe_ch = trimSequencesPE(read_pe_ch)[0]
+//    fastp_json_ch = trimSequencesPE(read_pe_ch)[1]
+    
+    // Merge if you want a unified channel of trimmed outputs
+//
+//     trimmed_ch = trimmed_se_ch.mix(trimmed_pe_ch)
+
+    // Trim SE + PE reads
     trimmed_se_ch = trimSequencesSE(read_se_ch)
     trimmed_pe_ch = trimSequencesPE(read_pe_ch)
 
-    // Merge if you want a unified channel of trimmed outputs
-    trimmed_ch = trimmed_se_ch.mix(trimmed_pe_ch)
+    // Collect the JSON reports (second output channel, `emit: report`)
+    se_reports_ch = trimmed_se_ch[1].collect()
+    pe_reports_ch = trimmed_pe_ch[1].collect()
 
+    // Merge SE + PE reports into one channel
+    fastp_json_ch = se_reports_ch.mix(pe_reports_ch)
+
+    // Merge SE + PE trimmed reads into one channel
+    trimmed_ch = trimmed_se_ch[0].mix(trimmed_pe_ch[0])
 
     // ---------------------
     // Reference indexes
@@ -117,7 +136,10 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     // Post-processing BAM
     // ---------------------
     sorted_bam = samtoolsSort(mapped_sam)
-    rg_bam     = addRG(sorted_bam)
+    bam_reports_ch = sorted_bam[1].collect()
+
+    rg_bam     = addRG(sorted_bam[0])
+
     dedup_bams = dupRemoval(rg_bam)
 
     // ---------------------
@@ -158,17 +180,24 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     fvcf = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
    // ---------------------
-   // Clean + concat VCFs
+   // Clean + concat clean VCFs
    // ---------------------
     fvcf_ch = fvcf.collect()
     clean_vcf = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
     clean_vcf_ch = clean_vcf.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
+    PopGenVCF(concat_clean_vcf)
 
     // ---------------------
-    // R plotting
+    // Concat all variants (incl. low qual) + R plotting
     // ---------------------
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
     RQualPlotting(R_script, concat_vcf)
+
+    // ---------------------
+    // Summarize FASTP and BWA steps with R
+    // ---------------------
+    RSummarizingFASTP(fastp_json_ch)
+    RSummarizingBWA(bam_reports_ch)    
 }

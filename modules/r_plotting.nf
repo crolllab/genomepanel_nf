@@ -3,7 +3,7 @@ process RQualPlotting {
     errorStrategy 'ignore'
     cpus 1
     memory '16GB'
-    publishDir params.outdir, mode: 'copy'
+    publishDir "${params.outdir}/qual_plots", mode: 'copy'
 
     input:
     path R_script
