@@ -1,5 +1,6 @@
 process RSummarizingFASTP {
     tag "Summarizing FASTP step with R"
+    cpus 1
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

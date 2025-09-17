@@ -4,20 +4,20 @@ process trimSequencesPE {
     memory '4GB'
     cpus 4
     publishDir "${params.outdir}/fastp", mode: 'copy', pattern: "*.json"
-
+    
     input:
-    tuple val(sample_id), path(reads)
-
+    tuple val(sample_id), path(read1), path(read2)
+    
     output:
     tuple val(sample_id), path("${sample_id}_{1,2}_trimmed.fastq.gz"), emit: reads
     path "${sample_id}_fastp.json", emit: report
-
+    
     script:
     """
     fastp \
         -w $task.cpus \
-        -i ${reads[0]} \
-        -I ${reads[1]} \
+        -i $read1 \
+        -I $read2 \
         -o ${sample_id}_1_trimmed.fastq.gz \
         -O ${sample_id}_2_trimmed.fastq.gz \
         --json ${sample_id}_fastp.json

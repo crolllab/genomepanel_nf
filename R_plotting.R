@@ -5,7 +5,7 @@ library(tidyverse)
 ##############################
 
 ### Load the VCF filtering data
-df <- read.csv("final_variants.metrics.csv.gz", sep = ",", header = F)
+df <- read.csv("./qual_plots/final_variants.metrics.csv.gz", sep = ",", header = F)
 
 names(df) <- c("CHROM", "POS", "QUAL", "AN", "MQ", "DP","QD")
 

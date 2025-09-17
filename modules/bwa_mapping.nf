@@ -13,7 +13,7 @@ process bwaMap {
     tuple val(sample_id), path(trimmed_reads)
 
     output:
-    path "${sample_id}.sam"
+    tuple val(sample_id), path("${sample_id}.sam"), emit: sam
 
     script:
     // Build bwa-mem input dynamically

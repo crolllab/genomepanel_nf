@@ -1,5 +1,6 @@
 process RSummarizingBWA {
     tag "Summarizing BWA step with R"
+    cpus 1
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

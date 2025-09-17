@@ -3,18 +3,18 @@
 Pipeline to variant call large genome panels
 ========================================
 
-The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP calling and quality checks. The pipeline accepts either paired-end Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome for improved parallelization. 
+The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP calling and quality checks. The pipeline accepts either locally stored Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome for improved parallelization. 
 
 Implemented steps:
-- `sratools`: download SRA files (optional, see below)
+- `entrez-direct`: query NCBI SRA for metadata (optional)
+- `sratools`: download SRA files (optional)
 - `fastp`: quality control
 - `bwa-mem2`: read mapping
 - `samtools`: sorting, indexing, and merging
 - `picard`: mark duplicates
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
-- `bcftools`: Producing a high-quality variants file
-- `vcftools`: A basic population genetics VCF file
+- `vcftools`: VCF filtering and subsetting
 
 Current limitations:
 - If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
@@ -50,6 +50,10 @@ Alternatively, you can pull the images directly from the Galaxy Project depot.
 ```bash
 mkdir -p singularity
 cd singularity
+# entrez-direct
+singularity pull https://depot.galaxyproject.org/singularity/entrez-direct:24.0--he881be0_0
+# sratools
+singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
 # fastp
 singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
 # bwa
@@ -86,16 +90,17 @@ Available parameters
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
-- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, etc. If you specificy a group of samples (i.e. `SRP...`), all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
+- `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, `PRNJ...`, etc. If the accession includes multiple `SRR...` runs, all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
 
   Important:
-  - Avoid empty lines in the file.
   - Accepts only paired-end reads locally. Both SE and PE are accepted from SRA.
-  - Some accessions may produce errors (e.g. `ERROR ~ Cannot invoke method split() on null object` or `fastp` errors due to incomplete downloads). Try to remove these accessions from the list. An alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
+  - If the download from SRA produces errors (connection reset, etc.), an alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
 ## Step 3: Run `genomepanel_nf` - example options
+
+The below example is based on the _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
 
 ### Obtain the _Zymoseptoria tritici_ IPO323 reference genome
 
@@ -105,22 +110,26 @@ wget http://ftp.ensemblgenomes.org/pub/fungi/release-61/fasta/zymoseptoria_triti
 gunzip Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
 mv Zymoseptoria_tritici.MG2.dna.toplevel.fa IPO323.fasta
 
-# From local LEGserv
+# From local file server (LEGserv)
 cp /legserv/NGS_data/Zymoseptoria/Zt_Reference_genomes/19Pangenome_genomes/IPO323/Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa .
 mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
 ```
 
 ### Select sets of local fastq file pairs
 
+The following examples show different ways to select paired-end fastq files. The `--reads` option must be bracketed by single quotes `'`. The examples assume that the read files are named according to the Illumina convention, i.e. ending with `_1.fq.gz` and `_2.fq.gz` or `_R1.fq.gz` and `_R2.fq.gz`. Adjust the patterns according to your own naming conventions.
+
+Note the use of `
+
 ```bash
 # Option 1 - select all fastq files ending with _1.fq.gz and _2.fq.gz
 --reads '/path/to/reads/*{1,2}.fq.gz'
 
-# Option 2 - select all fastq files ending with _1.fq.gz and _2.fq.gz, including all subdirectories (** instead of *)
+# Option 2 - select all fastq files ending with _1.fq.gz and _2.fq.gz, including all subdirectories (** instead of *)!
 --reads '/path/to/reads/**{1,2}.fq.gz'
 
 # Option 3 - select all files ending with _1.fq.gz and _2.fq.gz OR ending with _R1.fq.gz and _R2.fq.gz
---reads './*_{,R}{1,2}.fq.gz'
+--reads '/path/to/reads/*_{,R}{1,2}.fq.gz'
 
 # Option 4 - select all files (including all subdirectories), with optional variation in fq/fastq, 1/R1 (2/R2), optional _001 or _001_ additions
 --reads '/path/to/reads/**_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
@@ -182,13 +191,26 @@ VCF including all identified variants, quality flags according to GATK VariantFi
 ```bash
 final_variants.vcf.gz
 ```
-
 VCF including only variants passing the GATK VariantFiltration criteria.
 ```bash
 final_variants.clean.vcf.gz
 ```
 
-Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
+Text files listing the SRR accessions used for single-end and paired-end reads, respectively.
+```
+se_srr_accessions.txt
+pe_srr_accessions.txt
+```
+
+TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
+```
+fastp_summary.tsv
+bwa_summary.tsv
+```
+
+Additional output folders:
+
+- `qual_plots`: Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
 ```bash
 final_variants.metrics.csv.gz
 final_variants.plots.AN.pdf
@@ -200,8 +222,8 @@ final_variants.plots.QUAL.pdf
 
 ## Description of pipeline steps
 
-1. `fastp` is run with default settings
-2. `bwa-mem2` is run with default settings
+1. `fastp` is run with default settings, a summary tsv file is produced at the end.
+2. `bwa-mem2` is run with default settings, a summary tsv file is produced at the end.
 3. `gatk` Haplotypecaller emits GVCF, you need to set `--sample-ploidy` (see above)
 4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0 | >2.0`, `MQRankSum <-2.0 | >2.0` and `BaseQRankSum <-2.0 | >2.0`. No filtering based on `QUAL` values as these are sample size dependent.
 5. `bcftools` is used to produce a high-quality variants file including only variants passing the GATK VariantFiltration criteria.
@@ -210,12 +232,10 @@ final_variants.plots.QUAL.pdf
 
 
 ## Features to consider / bug fixes
-- Some SRA / ENA downloads fail with the error `ERROR ~ Cannot invoke method split() on null object`. You can circumvent this by removing the problematic accessions from the `--SRA_index` file and download the files manually first (see above).
 - include GATK CNV calling
-- `vcftools` producing files for population genetics analyses (e.g. MAF filter)
-- run basic pop gen analyses
+- run basic pop gen analyses (e.g. PCA, admixture)
 - include sample renaming step as an option
-- allow for multiple SRA accessions or fastq pairs per sample
+- allow for multiple SRA accessions or fastq pairs per sample name
 
 ## Utilities
 

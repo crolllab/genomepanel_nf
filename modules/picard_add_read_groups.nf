@@ -5,15 +5,21 @@ process addRG {
     memory '16GB'
     
     input:
-    tuple val(sample_id), path(sorted_bam)
-
+    tuple val(sample_id), path(sorted_bam), path(sorted_bai)
+    
     output:
-    path "${sorted_bam[0].baseName}_RG.bam"
- 
+    tuple val(sample_id), path("${sample_id}_RG.bam"), emit: bam
+    
     script:
-    def id = sorted_bam[0].baseName.replaceFirst(/_sorted$/, '')
     """
-    picard AddOrReplaceReadGroups -INPUT ${sorted_bam[0]} -OUTPUT ${sorted_bam[0].baseName}_RG.bam -RGID ${id} -RGLB ${id}_LB -RGPL ILLUMINA -RGPU unit1 -RGSM ${id} --VALIDATION_STRINGENCY SILENT
-    #rm "\$(readlink -f "${sorted_bam[0]})"
+    picard AddOrReplaceReadGroups \
+        -INPUT $sorted_bam \
+        -OUTPUT ${sample_id}_RG.bam \
+        -RGID ${sample_id} \
+        -RGLB ${sample_id}_LB \
+        -RGPL ILLUMINA \
+        -RGPU unit1 \
+        -RGSM ${sample_id} \
+        --VALIDATION_STRINGENCY SILENT
     """
 }

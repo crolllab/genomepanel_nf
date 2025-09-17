@@ -3,6 +3,9 @@ nextflow.enable.dsl=2
 // ---------------------
 // Module includes
 // ---------------------
+include { SRAresolve } from '../modules/resolve_SRA'
+include { SRAdownloadPE } from '../modules/download_SRA'
+include { SRAdownloadSE } from '../modules/download_SRA'
 include { trimSequencesPE } from '../modules/fastp_trimming'
 include { trimSequencesSE } from '../modules/fastp_trimming'
 include { bwaIndex } from '../modules/bwa_index'
@@ -42,20 +45,31 @@ workflow variant_calling {
     }
     
     // ---------------------
-    // SRA reads
+    // SRA metadata + downloads
     // ---------------------
     if (params.SRA_index) {
 
-        // First get and process IDs
-        sra_list = file(params.SRA_index).readLines()
-        read_pairs_sra_ch = Channel.fromSRA(sra_list, 
-            apiKey: params.NCBI_API_key, 
-            cache: true, 
-            retryPolicy: [jitter: 0.25, maxAttempts: 10, delay: '30s', maxDelay: '10m'],
-            protocol: 'ftp')
+    // Input SRA index file
+    // Step 0: Make a channel from the SRA index file
+    sra_file_ch = Channel.fromPath(params.SRA_index)
+    
+    // First run SRAresolve
+    SRAresolve(sra_file_ch)
 
-   //     read_pairs_sra_ch.view()
-       }
+    // Then use its outputs to create channels for download processes
+    pe_ids = SRAresolve.out.pe_file
+        .splitText()
+        .map { it.trim() }
+
+    se_ids = SRAresolve.out.se_file
+        .splitText()
+        .map { it.trim() }
+
+    // Now run downloads - these will wait for SRAresolve to complete
+    SRAdownloadPE(pe_ids)
+    SRAdownloadSE(se_ids)
+
+    }
 
     // ---------------------
     // Local FASTQ reads
@@ -63,62 +77,50 @@ workflow variant_calling {
     if (params.reads) {
         read_pairs_local_ch = Channel.fromFilePairs(
             params.reads,
-            checkIfExists: true,   // make sure files exist
-            flat: false             // keeps paired R1/R2 in a tuple
+            checkIfExists: true,
+            flat: false  // keeps paired R1/R2 in a tuple
         )
-    }
-    // ---------------------
-    // Merge reads channels
-    // ---------------------
-    // Filter out empty entries first
-    // def filtered_sra_ch = read_pairs_sra_ch.filter { it != null && it.size() > 0 }
-    // def filtered_local_ch = read_pairs_local_ch.filter { it != null && it.size() > 0 }
-
-  
-    if (params.reads && params.SRA_index) {
-        read_pairs_ch = read_pairs_sra_ch.mix(read_pairs_local_ch)
-    } else if (params.reads) {
-        read_pairs_ch = read_pairs_local_ch
     } else {
-        read_pairs_ch = read_pairs_sra_ch
-    }   
+        read_pairs_local_ch = Channel.empty()
+    }
 
+    local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
+        [sample_id, reads_list[0], reads_list[1]]
+        }
+    sra_pe_formatted = SRAdownloadPE.out.map { sample_id, read1, read2 -> 
+        [sample_id, read1, read2]
+        }
+    combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
+
+/*
+
+*/
     // ---------------------
-    // Trim reads (separate for SE and PE)
+    // Read trimming, reporting
     // ---------------------
 
-read_se_ch = read_pairs_ch.filter { sample_id, reads ->
-    reads instanceof String        // SE: reads is a single path
-}
+    // Connect SRA downloads directly to trimming processes
+    trimSequencesPE(combined_pe_ch)
 
-read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
-    reads instanceof List          // PE: reads is a list of 2 paths
-}
-//    read_se_ch = read_pairs_ch.filter { it.size() == 2 }
-//    read_pe_ch = read_pairs_ch.filter { it.size() == 3 }
-
-//    trimmed_se_ch = trimSequencesSE(read_se_ch)[0]
+    trimSequencesSE(SRAdownloadSE.out)
     
-//    trimmed_pe_ch = trimSequencesPE(read_pe_ch)[0]
-//    fastp_json_ch = trimSequencesPE(read_pe_ch)[1]
-    
-    // Merge if you want a unified channel of trimmed outputs
-//
-//     trimmed_ch = trimmed_se_ch.mix(trimmed_pe_ch)
-
-    // Trim SE + PE reads
-    trimmed_se_ch = trimSequencesSE(read_se_ch)
-    trimmed_pe_ch = trimSequencesPE(read_pe_ch)
+    // Access trimmed outputs
+    pe_trimmed = trimSequencesPE.out.reads
+    se_trimmed = trimSequencesSE.out.reads
+    pe_reports = trimSequencesPE.out.report
+    se_reports = trimSequencesSE.out.report
 
     // Collect the JSON reports (second output channel, `emit: report`)
-    se_reports_ch = trimmed_se_ch[1].collect()
-    pe_reports_ch = trimmed_pe_ch[1].collect()
+    se_reports_ch = se_reports.collect()
+    pe_reports_ch = pe_reports.collect()
 
     // Merge SE + PE reports into one channel
-    fastp_json_ch = se_reports_ch.mix(pe_reports_ch)
+    fastp_json_ch = se_reports_ch.concat(pe_reports_ch).collect()  // waits for both
+
 
     // Merge SE + PE trimmed reads into one channel
-    trimmed_ch = trimmed_se_ch[0].mix(trimmed_pe_ch[0])
+    trimmed_ch = se_trimmed.mix(pe_trimmed)
+
 
     // ---------------------
     // Reference indexes
@@ -126,30 +128,29 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     bwa_index   = bwaIndex(params.reference)
     gatk_index  = gatkIndex(params.reference)
     fai_index   = fastaIndex(params.reference)
-
     // ---------------------
     // Mapping
     // ---------------------
-    mapped_sam = bwaMap(params.reference, bwa_index, trimmed_ch)
+    bwaMap(params.reference, bwa_index, trimmed_ch)
+
 
     // ---------------------
     // Post-processing BAM
     // ---------------------
-    sorted_bam = samtoolsSort(mapped_sam)
-    bam_reports_ch = sorted_bam[1].collect()
 
-    rg_bam     = addRG(sorted_bam[0])
+    samtoolsSort(bwaMap.out)
+    bam_sorted = samtoolsSort.out.bam
 
-    dedup_bams = dupRemoval(rg_bam)
+    bam_reports = samtoolsSort.out.report
+    bam_reports_ch = bam_reports.collect()
 
-    // ---------------------
-    // Transform BAM tuples to include sample ID
-    // ---------------------
-    dedup_with_index = dedup_bams
-        .map { bam, bai ->
-            def sample_id = bam.baseName.replaceFirst(/_RG_dedup$/, '')
-            tuple(sample_id, bam, bai)
-        }
+//    addRG(bam_sorted)
+//    dedup_bams = dupRemoval(addRG.out)
+
+    // Updated workflow
+    addRG(bam_sorted)
+    dedup_bams = dupRemoval(addRG.out.bam)
+    dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
 
     // ---------------------
     // GATK HaplotypeCaller
@@ -166,6 +167,8 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     // ---------------------
     // Combine, genotype, filter VCFs
     // ---------------------
+
+    // Run CombineGVCFs
     gvcf_ch = gvcf.collect()
     cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
@@ -173,8 +176,9 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     cgvcf_ch = cgvcf.collect()
     vcf = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
+
     // ---------------------
-    // Run FilterVCFs
+    // Run FilterVCFs based on hard filters
     // ---------------------
     vcf_ch = vcf.collect()
     fvcf = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
@@ -186,6 +190,8 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     clean_vcf = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
     clean_vcf_ch = clean_vcf.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
+
+    // Use clean VCF to produce a MAF, thinned VCF for e.g. PCA/clustering analyses
     PopGenVCF(concat_clean_vcf)
 
     // ---------------------
@@ -200,4 +206,5 @@ read_pe_ch = read_pairs_ch.filter { sample_id, reads ->
     // ---------------------
     RSummarizingFASTP(fastp_json_ch)
     RSummarizingBWA(bam_reports_ch)    
+
 }
