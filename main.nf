@@ -16,18 +16,19 @@ log.info """
    ===========================================
 
     Steps:
-     1. Fastp filtering
-     2. BWA alignment
-     3. GATK HaplotypeCaller
-     4. GATK VariantFiltration
-     5. Variant quality plotting
-     6. PLINK IBS/PCA analyses   
+     1. SRA query and download
+     2. Fastp filtering
+     3. BWA alignment
+     4. GATK HaplotypeCaller
+     5. GATK VariantFiltration
+     6. Variant quality plotting, read and mapping stats   
    
    Configuration:
      outdir       : ${params.outdir}
      reference    : ${params.reference}
-     local fastq  : ${params.reads}
-     SRA ids      : ${params.SRA_index}
+     local files  : ${params.reads}
+     SRA ids file : ${params.SRA_index}
+     NCBI API key : ${params.NCBI_API_key}
      ploidy       : ${params.ploidy}
     """
 
