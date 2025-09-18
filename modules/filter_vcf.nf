@@ -1,5 +1,5 @@
 process FilterVCFs {
-    tag "GATK Filter VCF"
+    tag "GATK apply VCF filter flags"
     cpus 1
     memory '16GB'
 

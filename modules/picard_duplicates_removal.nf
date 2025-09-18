@@ -1,5 +1,5 @@
 process dupRemoval {
-    tag "PICARD marking duplicates in BAM files for $sample_id"
+    tag "PICARD marking duplicates in BAM files"
     errorStrategy 'ignore'
     cpus 1
     memory '16GB'

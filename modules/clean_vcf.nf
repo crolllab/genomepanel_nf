@@ -1,5 +1,5 @@
 process CleanVCFs {
-    tag "Clean VCFs"
+    tag "Remove low-qual SNPs"
     errorStrategy 'ignore'
     cpus 1
     memory '16GB'

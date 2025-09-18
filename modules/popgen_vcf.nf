@@ -1,5 +1,5 @@
 process PopGenVCF {
-    tag "Generating pop gen VCF"
+    tag "Generating VCF for pop. gen."
     cpus 1
     memory '4GB'
     errorStrategy 'ignore'

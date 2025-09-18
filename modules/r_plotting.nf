@@ -1,5 +1,5 @@
 process RQualPlotting {
-    tag "Plotting with R"
+    tag "Plotting qual metrics with R"
     errorStrategy 'ignore'
     cpus 1
     memory '16GB'

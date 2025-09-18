@@ -1,5 +1,5 @@
 process samtoolsSort {
-    tag "Sorting BAM files for $sample_id"
+    tag "Sorting BAM files"
     memory '16GB'
     errorStrategy 'ignore'
     cpus 1

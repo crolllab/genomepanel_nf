@@ -2,7 +2,7 @@
 process SRAdownloadPE {
     cpus 1
     memory '4GB'
-    tag "$srr (PE)"
+    tag "Querying $accessions_file (PE) for SRR ids"
     
     input:
     val srr
