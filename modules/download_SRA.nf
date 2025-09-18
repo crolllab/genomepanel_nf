@@ -1,5 +1,7 @@
 // Separate processes for PE and SE downloads
 process SRAdownloadPE {
+    cpus 1
+    memory '4GB'
     tag "$srr (PE)"
     
     input:

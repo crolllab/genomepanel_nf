@@ -1,5 +1,7 @@
 process SRAresolve {
     tag "$accessions_file"
+    cpus 1
+    memory '4GB'
     publishDir "${params.outdir}", mode: 'copy'
     
     input:
