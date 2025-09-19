@@ -8,17 +8,17 @@ process SRAresolve {
     path accessions_file
     
     output:
-    path "pe_srr_accessions.txt", emit: pe_file
-    path "se_srr_accessions.txt", emit: se_file
-    
+    path "NCBI_SRR_PE_accessions.txt", emit: pe_file
+    path "NCBI_SRR_SE_accessions.txt", emit: se_file
+
     script:
     """
     #!/bin/bash
     
     # Clear output files
-    > pe_srr_accessions.txt
-    > se_srr_accessions.txt
-    
+    > NCBI_SRR_PE_accessions.txt
+    > NCBI_SRR_SE_accessions.txt
+
     # Read all accessions into array
     accessions=( \$(grep -v '^\\s*\$' ${accessions_file}) )
     
@@ -38,10 +38,10 @@ process SRAresolve {
             
             # Check if layout field contains "PAIRED" or "SINGLE"
             if [[ "\$layout" == "PAIRED" ]]; then
-                echo "\$run_id" >> pe_srr_accessions.txt
+                echo "\$run_id" >> NCBI_SRR_PE_accessions.txt
                 echo "Added \$run_id to PE file" >&2
             elif [[ "\$layout" == "SINGLE" ]]; then
-                echo "\$run_id" >> se_srr_accessions.txt
+                echo "\$run_id" >> NCBI_SRR_SE_accessions.txt
                 echo "Added \$run_id to SE file" >&2
             else
                 echo "Warning: Unknown layout '\$layout' for \$run_id" >&2
@@ -50,11 +50,11 @@ process SRAresolve {
     done
     
     # Report results
-    pe_count=\$(wc -l < pe_srr_accessions.txt)
-    se_count=\$(wc -l < se_srr_accessions.txt)
-    
+    pe_count=\$(wc -l < NCBI_SRR_PE_accessions.txt)
+    se_count=\$(wc -l < NCBI_SRR_SE_accessions.txt)
+
     echo "Done! Found \$pe_count paired-end and \$se_count single-end SRR accessions"
-    echo "PE accessions saved in pe_srr_accessions.txt"
-    echo "SE accessions saved in se_srr_accessions.txt"
+    echo "PE accessions saved in NCBI_SRR_PE_accessions.txt"
+    echo "SE accessions saved in NCBI_SRR_SE_accessions.txt"
     """
 }
