@@ -23,7 +23,9 @@ process SRAdownloadPE {
 }
 
 process SRAdownloadSE {
-    tag "$srr (SE)"
+    cpus 1
+    memory '4GB'
+    tag "Downloading $srr from NCBI SRA"
     
     input:
     val srr

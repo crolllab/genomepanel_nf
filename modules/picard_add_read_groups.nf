@@ -21,5 +21,9 @@ process addRG {
         -RGPU unit1 \
         -RGSM ${sample_id} \
         --VALIDATION_STRINGENCY SILENT
+    
+    # Delete the sorted BAM and BAI files (resolve symlinks to actual files)
+    rm "\$(readlink -f "$sorted_bam")"
+    rm "\$(readlink -f "$sorted_bai")"
     """
 }

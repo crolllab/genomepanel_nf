@@ -6,6 +6,7 @@ params.reads = ""
 params.SRA_index = ""
 params.ploidy = ""
 params.NCBI_API_key = ""
+params.keep_bam_gvcf = "false"  // or "true"
 
 include { variant_calling } from './workflows/variant_calling_wf'
 
@@ -24,12 +25,13 @@ log.info """
      6. Variant quality plotting, read and mapping stats   
    
    Configuration:
-     outdir       : ${params.outdir}
-     reference    : ${params.reference}
-     local files  : ${params.reads}
-     SRA ids file : ${params.SRA_index}
-     NCBI API key : ${params.NCBI_API_key}
-     ploidy       : ${params.ploidy}
+     outdir         : ${params.outdir}
+     reference      : ${params.reference}
+     local files    : ${params.reads}
+     SRA ids file   : ${params.SRA_index}
+     NCBI API key   : ${params.NCBI_API_key}
+     ploidy         : ${params.ploidy}
+     keep BAM/gvcf  : ${params.keep_bam_gvcf}
     """
 
 

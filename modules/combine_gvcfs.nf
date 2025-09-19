@@ -11,13 +11,19 @@ process CombineGVCFs {
     path "${reference.baseName}.dict"
 
     output:
-    path "combined.*.g.vcf.gz"
+    path "combined.${chr}.g.vcf.gz*"
 
     script:
-    """   
-        printf "${gvcf_ch}" > file
-        sed 's/ /\\n/g' file > gvcfs.list.tmp
-        grep -v "tbi" gvcfs.list.tmp > gvcfs.list
-        gatk --java-options "-Xmx4g" CombineGVCFs -R $reference -L $chr -V gvcfs.list -output combined.${chr}.g.vcf.gz
+    """
+    printf "${gvcf_ch}" > file
+    sed 's/ /\\n/g' file > gvcfs.list.tmp
+    grep -v "tbi" gvcfs.list.tmp > gvcfs.list
+
+    gatk --java-options "-Xmx4g" \
+        CombineGVCFs \
+        -R $reference \
+        -L $chr \
+        -V gvcfs.list \
+        -output combined.${chr}.g.vcf.gz
     """
 }

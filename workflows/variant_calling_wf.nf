@@ -74,36 +74,42 @@ workflow variant_calling {
     // ---------------------
     // Local FASTQ reads
     // ---------------------
-    if (params.reads) {
-        read_pairs_local_ch = Channel.fromFilePairs(
-            params.reads,
-            checkIfExists: true,
-            flat: false  // keeps paired R1/R2 in a tuple
-        )
-    } else {
-        read_pairs_local_ch = Channel.empty()
-    }
-
+if (params.reads) {
+    read_pairs_local_ch = Channel.fromFilePairs(
+        params.reads,
+        checkIfExists: true,
+        flat: false // keeps paired R1/R2 in a tuple
+    )
     local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
         [sample_id, reads_list[0], reads_list[1]]
-        }
-    sra_pe_formatted = SRAdownloadPE.out.map { sample_id, read1, read2 -> 
+    }
+} else {
+    local_pe_formatted = Channel.empty()
+}
+
+// Only create SRA channel if SRA processing was enabled
+if (params.SRA_index) {
+    sra_pe_formatted = SRAdownloadPE.out.map { sample_id, read1, read2 ->
         [sample_id, read1, read2]
-        }
-    combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
+    }
+} else {
+    sra_pe_formatted = Channel.empty()
+}
 
-/*
+combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
 
-*/
-    // ---------------------
-    // Read trimming, reporting
-    // ---------------------
+// ---------------------
+// Read trimming, reporting
+// ---------------------
+// Connect channels to trimming processes
+trimSequencesPE(combined_pe_ch)
 
-    // Connect SRA downloads directly to trimming processes
-    trimSequencesPE(combined_pe_ch)
-
+// Handle SE trimming conditionally
+if (params.SRA_index) {
     trimSequencesSE(SRAdownloadSE.out)
-    
+} else {
+    trimSequencesSE(Channel.empty())
+}
     // Access trimmed outputs
     pe_trimmed = trimSequencesPE.out.reads
     se_trimmed = trimSequencesSE.out.reads
@@ -199,7 +205,7 @@ workflow variant_calling {
     // ---------------------
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
-    RQualPlotting(R_script, concat_vcf)
+    RQualPlotting(concat_vcf)
 
     // ---------------------
     // Summarize FASTP and BWA steps with R

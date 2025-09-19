@@ -16,7 +16,8 @@ process GenotypeGVCFs {
 
     script:
     """   
-        gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
-        gatk --java-options "-Xmx4g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
+    gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
+    gatk --java-options "-Xmx4g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
+    rm "\$(readlink -f "combined.${chr}.g.vcf.gz")"
     """
 }
