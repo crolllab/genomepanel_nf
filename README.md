@@ -211,8 +211,8 @@ final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz
 
 Text files listing the SRR accessions used for single-end and paired-end reads, respectively.
 ```
-se_srr_accessions.txt
-pe_srr_accessions.txt
+NCBI_SRR_PE_accessions.txt
+NCBI_SRR_SE_accessions.txt
 ```
 
 TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
@@ -227,6 +227,7 @@ Additional output folders:
 - `fastp_stats/`: Per-sample `fastp` quality control statistics in JSON format.
 - `bwa_stats/`: Per-sample `bwa-mem2` mapping statistics in JSON format.
 - `qual_plots/`: Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
+
 ```bash
 final_variants.metrics.csv.gz
 final_variants.plots.AN.pdf
