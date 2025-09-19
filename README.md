@@ -225,7 +225,7 @@ Additional output folders:
 - `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
 - `gvcf_files/`: If `--keep_bam_gvcf true` is set, contains per-sample GVCF files.
 - `fastp_stats/`: Per-sample `fastp` quality control statistics in JSON format.
-- `bwa_stats/`: Per-sample `bwa-mem2` mapping statistics in text format.
+- `bwa_stats/`: Per-sample `bwa-mem2` mapping statistics in JSON format.
 - `qual_plots/`: Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
 ```bash
 final_variants.metrics.csv.gz
