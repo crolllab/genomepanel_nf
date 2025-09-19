@@ -3,7 +3,8 @@ process SRAresolve {
     cpus 1
     memory '4GB'
     publishDir "${params.outdir}", mode: 'copy'
-    
+    errorStrategy 'ignore'
+
     input:
     path accessions_file
     

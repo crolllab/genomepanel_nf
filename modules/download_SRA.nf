@@ -3,7 +3,8 @@ process SRAdownloadPE {
     cpus 1
     memory '4GB'
     tag "Downloading $srr from NCBI SRA"
-    
+    errorStrategy 'ignore'
+
     input:
     val srr
     
