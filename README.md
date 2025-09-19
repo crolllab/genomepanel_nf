@@ -215,25 +215,17 @@ se_srr_accessions.txt
 pe_srr_accessions.txt
 ```
 
-Subfolders for per-sample `fastp` and `bwa-mem2` statistics.
-```
-fastp_stats/
-bwa_stats/
-```
-
 TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
 ```
 fastp_summary.tsv
 bwa_summary.tsv
 
-If `--keep_bam_gvcf true` is set, the following subfolders will be created, containing per-sample BAM and GVCF files, respectively.:
-bam_files/
-gvcf_files/
-```
-
 Additional output folders:
-
-- `qual_plots`: Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
+- `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
+- `gvcf_files/`: If `--keep_bam_gvcf true` is set, contains per-sample GVCF files.
+- `fastp_stats/`: Per-sample `fastp` quality control statistics in JSON format.
+- `bwa_stats/`: Per-sample `bwa-mem2` mapping statistics in text format.
+- `qual_plots/`: Analysis of variant quality metrics of all identified variants, including plots for `AN` (samples genotyped), `DP` (read depth), `MQ` (mapping quality), `QD` (quality by depth), and `QUAL` (global quality score). The metrics are saved in a compressed CSV file and the plots in PDF format.
 ```bash
 final_variants.metrics.csv.gz
 final_variants.plots.AN.pdf
@@ -298,3 +290,4 @@ oldname2 newname2
 oldname3 newname3
 oldname4 newname4
 ```
+
