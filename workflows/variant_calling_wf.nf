@@ -6,6 +6,7 @@ nextflow.enable.dsl=2
 include { SRAresolve } from '../modules/resolve_SRA'
 include { SRAdownloadPE } from '../modules/download_SRA'
 include { SRAdownloadSE } from '../modules/download_SRA'
+include { CollectFailedDownloads } from '../modules/download_SRA'
 include { trimSequencesPE } from '../modules/fastp_trimming'
 include { trimSequencesSE } from '../modules/fastp_trimming'
 include { bwaIndex } from '../modules/bwa_index'
@@ -69,6 +70,13 @@ workflow variant_calling {
     SRAdownloadPE(pe_ids)
     SRAdownloadSE(se_ids)
 
+    // Collect failure reports
+    pe_failures = SRAdownloadPE.out[1].collect()
+    se_failures = SRAdownloadSE.out[1].collect()
+    all_failures = pe_failures.mix(se_failures).collect()
+
+    CollectFailedDownloads(all_failures)
+
     }
 
     // ---------------------
@@ -89,7 +97,7 @@ if (params.reads) {
 
 // Only create SRA channel if SRA processing was enabled
 if (params.SRA_index) {
-    sra_pe_formatted = SRAdownloadPE.out.map { sample_id, read1, read2 ->
+    sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, read1, read2 ->
         [sample_id, read1, read2]
     }
 } else {
@@ -106,7 +114,7 @@ trimSequencesPE(combined_pe_ch)
 
 // Handle SE trimming conditionally
 if (params.SRA_index) {
-    trimSequencesSE(SRAdownloadSE.out)
+    trimSequencesSE(SRAdownloadSE.out[0])
 } else {
     trimSequencesSE(Channel.empty())
 }
