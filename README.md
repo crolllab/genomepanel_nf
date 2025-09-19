@@ -80,6 +80,8 @@ Available parameters
 
 - `--outdir`: Optional. Folder to save final output files. Default: `./nf_output`.
 
+- `--keep_bam_gvcf`: If set to `true`, per sample BAM and GVCF files will be saved to the output directory. Default: `false`.
+
 - `-work-dir`: Optional. Defines where to store temporary files (often many TB). Consider `/scratch/work` for large datasets. Default: `./work`. 
 
 - `-resume`: Optional. If set, the pipeline will resume from the last completed step, skipping already completed steps. The `work-dir` needs to be intact for this.
@@ -176,12 +178,17 @@ NCBI_API_KEY=abcdef1234567890
 # activate conda environment
 micromamba activate nf_gp_env
 # run nextflow pipeline
-nextflow run main.nf -config nextflow.config -profile slurm -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --NCBI_API_key $NCBI_API_KEY --reference $REF --reads $READS --SRA_index './SRA_accessions.txt' --ploidy 1
+nextflow run main.nf -config nextflow.config -profile slurm \
+  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --keep_bam_gvcf false \
+  --NCBI_API_key $NCBI_API_KEY \
+  --reference $REF --ploidy 1 \
+  --reads $READS \
+  --SRA_index './SRA_accessions.txt' \
 ```
 
 Notes on the exection:
-- Before executing the `nextflow ...` command, enter e.g. a `tmux` session. The session needs to remain active until the end of the pipeline (even if you specify the `slurm` option)
-- In `local` and `local_highCPU` modes, the pipeline will run on the server you are logged into. Please be considerate and check how heavy usage is. If you are in doubt, use the `slurm` option to spread the load to all nodes.
+- Before executing the `nextflow` command, enter e.g. a `tmux` or `screen` session. The session needs to remain active until the end of the pipeline (even if you specify the `slurm` option)
+- In `local` and `local_highCPU` modes, the pipeline will run on the local machine. Use the `slurm` option to spread the load to all available nodes (requires SLURM).
   
 ## Step 5: Pipeline output
 
@@ -191,9 +198,15 @@ VCF including all identified variants, quality flags according to GATK VariantFi
 ```bash
 final_variants.vcf.gz
 ```
+
 VCF including only variants passing the GATK VariantFiltration criteria.
 ```bash
 final_variants.clean.vcf.gz
+```
+
+Thinned VCF (1 SNP per kb), MAF > 0.05 and high genotyping rate (> 90 genotyping rate).
+```bash
+final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz
 ```
 
 Text files listing the SRR accessions used for single-end and paired-end reads, respectively.
@@ -202,10 +215,20 @@ se_srr_accessions.txt
 pe_srr_accessions.txt
 ```
 
+Subfolders for per-sample `fastp` and `bwa-mem2` statistics.
+```
+fastp_stats/
+bwa_stats/
+```
+
 TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
 ```
 fastp_summary.tsv
 bwa_summary.tsv
+
+If `--keep_bam_gvcf true` is set, the following subfolders will be created, containing per-sample BAM and GVCF files, respectively.:
+bam_files/
+gvcf_files/
 ```
 
 Additional output folders:

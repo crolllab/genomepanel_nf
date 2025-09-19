@@ -3,7 +3,12 @@ process GATKHC {
     errorStrategy 'ignore'
     cpus 1
     memory '20GB'
-
+    publishDir "${params.outdir}/gvcf_files",
+        mode: 'copy',
+        pattern: "*.g.vcf.gz*",
+        enabled: params.keep_bam_gvcf
+    
+    
     input:
     path reference
     file "${reference.baseName}.fasta.fai"
@@ -14,12 +19,21 @@ process GATKHC {
     file "${reference.baseName}.fasta.pac"
     file "${reference.baseName}.fasta.0123"
     tuple val(sample_id), path(dedup_bam), path(dedup_bai)
-
+    
     output:
     path "${sample_id}.g.vcf.gz*"
-
+    
     script:
     """
-    gatk --java-options "-Xmx4g" HaplotypeCaller -R $reference --sample-ploidy $params.ploidy -input ${dedup_bam} -output ${sample_id}.g.vcf.gz -ERC GVCF --create-output-variant-index
+    gatk --java-options "-Xmx4g" HaplotypeCaller \
+        -R $reference \
+        --sample-ploidy $params.ploidy \
+        -input ${dedup_bam} \
+        -output ${sample_id}.g.vcf.gz \
+        -ERC GVCF \
+        --create-output-variant-index
+    
+    rm "\$(readlink -f "$dedup_bam")"
+    rm "\$(readlink -f "$dedup_bai")"
     """
 }

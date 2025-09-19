@@ -1,6 +1,5 @@
 process SRAresolve {
     tag "Querying $accessions_file for SRR ids"
-
     cpus 1
     memory '4GB'
     publishDir "${params.outdir}", mode: 'copy'
