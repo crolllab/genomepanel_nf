@@ -219,6 +219,7 @@ TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
 ```
 fastp_summary.tsv
 bwa_summary.tsv
+```
 
 Additional output folders:
 - `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
