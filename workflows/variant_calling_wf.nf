@@ -95,10 +95,11 @@ if (params.reads) {
     local_pe_formatted = Channel.empty()
 }
 
+
 // Only create SRA channel if SRA processing was enabled
 if (params.SRA_index) {
-    sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, read1, read2 ->
-        [sample_id, read1, read2]
+    sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, reads ->
+        [sample_id, reads[0], reads[1]]
     }
 } else {
     sra_pe_formatted = Channel.empty()
