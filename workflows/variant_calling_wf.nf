@@ -82,43 +82,41 @@ workflow variant_calling {
     // ---------------------
     // Local FASTQ reads
     // ---------------------
-if (params.reads) {
-    read_pairs_local_ch = Channel.fromFilePairs(
-        params.reads,
-        checkIfExists: true,
-        flat: false // keeps paired R1/R2 in a tuple
-    )
-    local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
-        [sample_id, reads_list[0], reads_list[1]]
+    if (params.reads) {
+        read_pairs_local_ch = Channel.fromFilePairs(
+            params.reads,
+            checkIfExists: true,
+            flat: false // keeps paired R1/R2 in a tuple
+        )
+        local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
+            [sample_id, reads_list[0], reads_list[1]]
+        }
+    } else {
+        local_pe_formatted = Channel.empty()
     }
-} else {
-    local_pe_formatted = Channel.empty()
-}
 
 
-// Only create SRA channel if SRA processing was enabled
-if (params.SRA_index) {
-    sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, reads ->
-        [sample_id, reads[0], reads[1]]
+    // Only create SRA channel if SRA processing was enabled
+    if (params.SRA_index) {
+        sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, reads ->
+            [sample_id, reads[0], reads[1]]
+        }
+        sra_se_formatted = SRAdownloadSE.out[0]
+    } else {
+        sra_pe_formatted = Channel.empty()
+        sra_se_formatted = Channel.empty()
     }
-} else {
-    sra_pe_formatted = Channel.empty()
-}
 
-combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
+    combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
 
-// ---------------------
-// Read trimming, reporting
-// ---------------------
-// Connect channels to trimming processes
-trimSequencesPE(combined_pe_ch)
+    // ---------------------
+    // Read trimming, reporting
+    // ---------------------
+    // Connect channels to trimming processes
+    trimSequencesSE(sra_se_formatted)
+    trimSequencesPE(combined_pe_ch)
 
-// Handle SE trimming conditionally
-if (params.SRA_index) {
-    trimSequencesSE(SRAdownloadSE.out[0])
-} else {
-    trimSequencesSE(Channel.empty())
-}
+
     // Access trimmed outputs
     pe_trimmed = trimSequencesPE.out.reads
     se_trimmed = trimSequencesSE.out.reads
@@ -126,15 +124,15 @@ if (params.SRA_index) {
     se_reports = trimSequencesSE.out.report
 
     // Collect the JSON reports (second output channel, `emit: report`)
-    se_reports_ch = se_reports.collect()
     pe_reports_ch = pe_reports.collect()
+    se_reports_ch = se_reports.collect()
 
     // Merge SE + PE reports into one channel
     fastp_json_ch = se_reports_ch.concat(pe_reports_ch).collect()  // waits for both
 
 
     // Merge SE + PE trimmed reads into one channel
-    trimmed_ch = se_trimmed.mix(pe_trimmed)
+    trimmed_ch = pe_trimmed.mix(se_trimmed)
 
 
     // ---------------------

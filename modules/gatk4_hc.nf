@@ -2,7 +2,7 @@ process GATKHC {
     tag "GATK4 HaplotypeCaller"
     errorStrategy 'ignore'
     cpus 1
-    memory '20GB'
+    memory '8GB'
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
@@ -25,7 +25,7 @@ process GATKHC {
     
     script:
     """
-    gatk --java-options "-Xmx4g" HaplotypeCaller \
+    gatk --java-options "-Xmx8g" HaplotypeCaller \
         -R $reference \
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \

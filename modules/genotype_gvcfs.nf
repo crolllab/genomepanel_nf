@@ -2,7 +2,7 @@ process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
     errorStrategy 'ignore'
     cpus 1
-    time '72h'
+    memory '48GB'
 
     input:
     path cgvcf
@@ -17,7 +17,7 @@ process GenotypeGVCFs {
     script:
     """   
     gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
-    gatk --java-options "-Xmx4g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
+    gatk --java-options "-Xmx48g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
     rm "\$(readlink -f "combined.${chr}.g.vcf.gz")"
     """
 }

@@ -11,7 +11,7 @@ process SRAdownloadPE {
     output:
     tuple val(srr), path("${srr}_*.fastq"), optional: true
     path "failed_${srr}.txt", optional: true
-    
+
     script:
     """
     # Try to download the files
@@ -38,7 +38,7 @@ process SRAdownloadSE {
     val srr
     
     output:
-    tuple val(srr), path("${srr}_*.fastq"), optional: true
+    tuple val(srr), path("${srr}.fastq"), optional: true
     path "failed_${srr}.txt", optional: true
     
     script:
@@ -61,7 +61,8 @@ process SRAdownloadSE {
 process CollectFailedDownloads {
     tag "Collecting failed download reports"
     publishDir "${params.outdir}", mode: 'copy'
-    
+    errorStrategy 'ignore'
+
     input:
     path failed_files
     

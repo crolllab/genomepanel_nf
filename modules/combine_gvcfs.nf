@@ -1,7 +1,7 @@
 process CombineGVCFs {
     tag "GATK4 Combine GVCFs"
     cpus 1
-    memory '16GB'
+    memory '64GB'
 
     input:
     path gvcf_ch
@@ -19,7 +19,7 @@ process CombineGVCFs {
     sed 's/ /\\n/g' file > gvcfs.list.tmp
     grep -v "tbi" gvcfs.list.tmp > gvcfs.list
 
-    gatk --java-options "-Xmx4g" \
+    gatk --java-options "-Xmx64g" \
         CombineGVCFs \
         -R $reference \
         -L $chr \

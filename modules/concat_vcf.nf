@@ -1,7 +1,7 @@
 process ConcatVCFs {
     tag "BCFtools concat VCFs + qual metrics"
     cpus 1
-    memory '16GB'
+    memory '48GB'
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

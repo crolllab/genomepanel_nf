@@ -2,7 +2,7 @@ process CleanVCFs {
     tag "Remove low-qual SNPs"
     errorStrategy 'ignore'
     cpus 1
-    memory '16GB'
+    memory '48GB'
 
     input:
     path fvcf_ch

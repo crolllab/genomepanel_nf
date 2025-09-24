@@ -1,7 +1,7 @@
 process ConcatCleanVCFs {
     tag "BCFtools concat clean VCFs"
     cpus 1
-    memory '16GB'
+    memory '48GB'
     publishDir params.outdir, mode: 'copy'
 
 
