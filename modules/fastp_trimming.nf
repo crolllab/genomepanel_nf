@@ -43,8 +43,8 @@ process trimSequencesSE {
     errorStrategy 'ignore'
     memory '4GB'
     cpus 4
-    publishDir "${params.outdir}/fastp", mode: 'copy', pattern: "*.json"
-    
+    publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
+
     input:
     tuple val(sample_id), path(r1)
     
