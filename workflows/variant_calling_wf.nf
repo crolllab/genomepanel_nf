@@ -113,8 +113,8 @@ workflow variant_calling {
     // Read trimming, reporting
     // ---------------------
     // Connect channels to trimming processes
-    trimSequencesSE(sra_se_formatted)
     trimSequencesPE(combined_pe_ch)
+    trimSequencesSE(sra_se_formatted)
 
 
     // Access trimmed outputs

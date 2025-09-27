@@ -1,9 +1,10 @@
-// Simplified processes for PE and SE downloads with basic failure tracking
+// Simple SRA download process using prefetch, then fasterq-dump
 process SRAdownloadPE {
     cpus 1
     memory '4GB'
     tag "Downloading $srr from NCBI SRA"
-    errorStrategy 'ignore'
+    errorStrategy 'retry'
+    maxRetries 3
     
     input:
     val srr
@@ -11,16 +12,74 @@ process SRAdownloadPE {
     output:
     tuple val(srr), path("${srr}_*.fastq"), optional: true
     path "failed_${srr}.txt", optional: true
-
+    
     script:
     """
-    # Try to download the files
-    if fasterq-dump $srr --split-files -O . 1>/dev/null 2>&1; then
-        # Success - no failure file needed
-        echo "Download successful for $srr"
+    # Function to attempt download with prefetch + fasterq-dump
+    attempt_download() {
+        local attempt=\$1
+        echo "Attempt \$attempt: Downloading $srr with prefetch"
+        
+        # Clean up any partial files from previous attempts
+        rm -f ${srr}_*.fastq
+        rm -rf ${srr}/
+        rm -f ${srr}.sra
+        
+        # Step 1: Use prefetch
+        echo "Step 1: Using prefetch for $srr"
+        if prefetch  $srr 1>/dev/null 2>error.log; then
+            echo "Prefetch successful for $srr"
+            
+            # Step 2: Convert SRA to FASTQ using fasterq-dump
+            echo "Step 2: Converting SRA to FASTQ for $srr"
+            if fasterq-dump $srr --split-files -O . 1>/dev/null 2>>error.log; then
+                # Check if we actually got files
+                if ls ${srr}_*.fastq 1> /dev/null 2>&1; then
+                    echo "Complete download successful for $srr on attempt \$attempt"
+                    # Clean up SRA file to save space
+                    rm -rf ${srr}/
+                    rm -f ${srr}.sra
+                    return 0
+                else
+                    echo "fasterq-dump succeeded but no FASTQ files created for $srr on attempt \$attempt" >&2
+                    cat error.log >&2
+                    return 1
+                fi
+            else
+                echo "fasterq-dump failed for $srr on attempt \$attempt" >&2
+                cat error.log >&2
+                return 1
+            fi
+        else
+            echo "Prefetch failed for $srr on attempt \$attempt" >&2
+            cat error.log >&2
+            return 1
+        fi
+    }
+    
+    # Try download with retries
+    success=false
+    for attempt in 1 2 3; do
+        if attempt_download \$attempt; then
+            success=true
+            break
+        else
+            if [ \$attempt -lt 3 ]; then
+                echo "Waiting 60 seconds before retry..."
+                sleep 60
+            fi
+        fi
+    done
+    
+    # Handle final result
+    if [ "\$success" = true ]; then
+        echo "Successfully downloaded $srr"
+        rm -f error.log
+        # Create empty failure file to satisfy optional output
+        touch failed_${srr}.txt
     else
-        echo "ERROR: fasterq-dump failed for $srr" >&2
-        echo -e "$srr\tPE\tfasterq-dump failed" > failed_${srr}.txt
+        echo "ERROR: All download attempts failed for $srr" >&2
+        echo -e "$srr\tPE\tPrefetch failed after 3 attempts" > failed_${srr}.txt
         # Create dummy output files to satisfy the tuple output
         touch ${srr}_1.fastq
         exit 1
@@ -32,7 +91,8 @@ process SRAdownloadSE {
     cpus 1
     memory '4GB'
     tag "Downloading $srr from NCBI SRA"
-    errorStrategy 'ignore'
+    errorStrategy 'retry'
+    maxRetries 3
     
     input:
     val srr
@@ -43,19 +103,78 @@ process SRAdownloadSE {
     
     script:
     """
-    # Try to download the file
-    if fasterq-dump $srr --split-files -O . 1>/dev/null 2>&1; then
-        # Success - no failure file needed
-        echo "Download successful for $srr"
+    # Function to attempt download with prefetch + fasterq-dump
+    attempt_download() {
+        local attempt=\$1
+        echo "Attempt \$attempt: Downloading $srr with prefetch"
+
+        # Clean up any partial files from previous attempts
+        rm -f ${srr}.fastq
+        rm -rf ${srr}/
+        rm -f ${srr}.sra
+        
+        # Step 1: Use prefetch
+        echo "Step 1: Using prefetch for $srr"
+        if prefetch $srr 1>/dev/null 2>error.log; then
+            echo "Prefetch successful for $srr"
+            
+            # Step 2: Convert SRA to FASTQ using fasterq-dump
+            echo "Step 2: Converting SRA to FASTQ for $srr"
+            if fasterq-dump $srr --split-files -O . 1>/dev/null 2>>error.log; then
+                # Check if we actually got files
+                if ls ${srr}.fastq 1> /dev/null 2>&1; then
+                    echo "Complete download successful for $srr on attempt \$attempt"
+                    # Clean up SRA file to save space
+                    rm -rf ${srr}/
+                    rm -f ${srr}.sra
+                    return 0
+                else
+                    echo "fasterq-dump succeeded but no FASTQ files created for $srr on attempt \$attempt" >&2
+                    cat error.log >&2
+                    return 1
+                fi
+            else
+                echo "fasterq-dump failed for $srr on attempt \$attempt" >&2
+                cat error.log >&2
+                return 1
+            fi
+        else
+            echo "Prefetch failed for $srr on attempt \$attempt" >&2
+            cat error.log >&2
+            return 1
+        fi
+    }
+    
+    # Try download with retries
+    success=false
+    for attempt in 1 2 3; do
+        if attempt_download \$attempt; then
+            success=true
+            break
+        else
+            if [ \$attempt -lt 3 ]; then
+                echo "Waiting 60 seconds before retry..."
+                sleep 60
+            fi
+        fi
+    done
+    
+    # Handle final result
+    if [ "\$success" = true ]; then
+        echo "Successfully downloaded $srr"
+        rm -f error.log
+        # Create empty failure file to satisfy optional output
+        touch failed_${srr}.txt
     else
-        echo "ERROR: fasterq-dump failed for $srr" >&2
-        echo -e "$srr\tSE\tfasterq-dump failed" > failed_${srr}.txt
-        # Create dummy output file to satisfy the tuple output
+        echo "ERROR: All download attempts failed for $srr" >&2
+        echo -e "$srr\tSE\tPrefetch failed after 3 attempts" > failed_${srr}.txt
+        # Create dummy output files to satisfy the tuple output
         touch ${srr}.fastq
         exit 1
     fi
     """
 }
+
 
 // Process to collect all failure reports
 process CollectFailedDownloads {
