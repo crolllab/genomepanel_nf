@@ -1,13 +1,13 @@
 process GATKHC {
     tag "GATK4 HaplotypeCaller"
-    errorStrategy 'retry'
-    maxRetries 3
+    errorStrategy 'ignore'
     cpus 1
     memory '8GB'
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
         enabled: params.keep_bam_gvcf
+    
     
     input:
     path reference
@@ -25,7 +25,6 @@ process GATKHC {
     
     script:
     """
-    # Run GATK HaplotypeCaller
     gatk --java-options "-Xmx8g" HaplotypeCaller \
         -R $reference \
         --sample-ploidy $params.ploidy \
@@ -34,14 +33,7 @@ process GATKHC {
         -ERC GVCF \
         --create-output-variant-index
     
-    # Only delete files if GATK completed successfully
-    if [ \$? -eq 0 ]; then
-        echo "GATK HaplotypeCaller completed successfully for ${sample_id}, cleaning up input files"
-        rm "\$(readlink -f "$dedup_bam")" 2>/dev/null || echo "Could not delete $dedup_bam"
-        rm "\$(readlink -f "$dedup_bai")" 2>/dev/null || echo "Could not delete $dedup_bai"
-    else
-        echo "GATK HaplotypeCaller failed for ${sample_id}, preserving input files"
-        exit 1
-    fi
+    rm "\$(readlink -f "$dedup_bam")"
+    rm "\$(readlink -f "$dedup_bai")"
     """
 }
