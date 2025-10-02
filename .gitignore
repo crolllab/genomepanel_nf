@@ -1,2 +1,7 @@
 .DS_Store
-
+nf_output
+.nextflow*
+IPO323.fasta
+singularity
+run.sh
+SRA_fullZymo.txt
