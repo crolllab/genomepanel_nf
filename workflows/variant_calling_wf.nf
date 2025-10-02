@@ -70,9 +70,9 @@ workflow variant_calling {
     SRAdownloadPE(pe_ids)
     SRAdownloadSE(se_ids)
 
-    // Collect failure reports
-    pe_failures = SRAdownloadPE.out[1].collect()
-    se_failures = SRAdownloadSE.out[1].collect()
+    // Collect failure reports (using named outputs)
+    pe_failures = SRAdownloadPE.out.failures.collect()
+    se_failures = SRAdownloadSE.out.failures.collect()
     all_failures = pe_failures.mix(se_failures).collect()
 
     CollectFailedDownloads(all_failures)
@@ -98,10 +98,10 @@ workflow variant_calling {
 
     // Only create SRA channel if SRA processing was enabled
     if (params.SRA_index) {
-        sra_pe_formatted = SRAdownloadPE.out[0].map { sample_id, reads ->
+        sra_pe_formatted = SRAdownloadPE.out.reads.map { sample_id, reads ->
             [sample_id, reads[0], reads[1]]
         }
-        sra_se_formatted = SRAdownloadSE.out[0]
+        sra_se_formatted = SRAdownloadSE.out.reads
     } else {
         sra_pe_formatted = Channel.empty()
         sra_se_formatted = Channel.empty()
