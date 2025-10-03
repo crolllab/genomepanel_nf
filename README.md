@@ -1,4 +1,4 @@
-![alt text](https://github.com/nextflow-io/nextflow/raw/master/docs/_static/nextflow-logo-bg-light.png)
+![alt text](https://github.com/crolllab/genomepanel_nf/.nextflow/genomepanel_logo.png)
 
 Pipeline to variant call large genome panels
 ========================================
