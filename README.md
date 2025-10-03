@@ -1,4 +1,4 @@
-![alt text](https://github.com/crolllab/genomepanel_nf/blob/main/.nextflow/genomepanel_logo.png?raw=true "Logo")
+![alt text](https://github.com/crolllab/genomepanel_nf/blob/main/logo.png?raw=true)
 
 Pipeline to variant call large genome panels
 ========================================
