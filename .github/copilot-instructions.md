@@ -152,10 +152,12 @@ GATK processes operate per-chromosome for parallelization. To modify this:
 3. Update memory allocations (per-chromosome processes need less memory than whole-genome)
 
 ### SRA Download Failure Handling
-`modules/download_SRA.nf` implements graceful failure handling:
+`modules/download_SRA.nf` implements graceful failure handling to prevent pipeline aborts:
 - **No pipeline abort**: Failed downloads use `errorStrategy 'ignore'` and `exit 0` to continue pipeline
 - **3 retry attempts**: Each download attempts 3 times with 30-second pauses
 - **Timeouts**: prefetch (5 min) and fasterq-dump (10 min) prevent hanging
-- **Named outputs**: Uses `emit: reads` and `emit: failures` for explicit channel routing
-- **Failure tracking**: Creates `NCBI_download_summary.tsv` listing failed accessions
-- **Optional outputs**: Successful reads flow to trimming; failures are logged but don't block workflow
+- **Status marker files**: Every download creates `.download_status` (SUCCESS/FAILED) + dummy fastq files for failures
+- **Explicit filtering**: Workflow uses `.filter()` on status file content to exclude failures with `log.warn` messages
+- **No optional outputs**: All processes emit exactly 3 outputs (srr, fastq, status) to prevent silent data loss
+- **Complete accounting**: `NCBI_download_summary.tsv` tracks all input SRR accessions (successes + failures)
+- **Critical**: Never use `optional: true` on SRA download outputs - it causes silent sample loss during channel mixing

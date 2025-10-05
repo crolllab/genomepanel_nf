@@ -70,13 +70,6 @@ workflow variant_calling {
     SRAdownloadPE(pe_ids)
     SRAdownloadSE(se_ids)
 
-    // Collect failure reports (using named outputs)
-    pe_failures = SRAdownloadPE.out.failures.collect()
-    se_failures = SRAdownloadSE.out.failures.collect()
-    all_failures = pe_failures.mix(se_failures).collect()
-
-    CollectFailedDownloads(all_failures)
-
     }
 
     // ---------------------
@@ -98,10 +91,49 @@ workflow variant_calling {
 
     // Only create SRA channel if SRA processing was enabled
     if (params.SRA_index) {
-        sra_pe_formatted = SRAdownloadPE.out.reads.map { sample_id, reads ->
-            [sample_id, reads[0], reads[1]]
-        }
-        sra_se_formatted = SRAdownloadSE.out.reads
+        // Filter out failed downloads explicitly using status files
+        sra_pe_filtered = SRAdownloadPE.out.reads
+            .filter { srr, fastq_files, status_file ->
+                // Check if download succeeded by reading status file
+                def status_content = status_file.text.trim()
+                def is_success = status_content.startsWith("SUCCESS")
+                
+                if (!is_success) {
+                    log.warn "Excluding failed PE download: ${srr}"
+                }
+                
+                return is_success
+            }
+            .map { srr, fastq_files, status_file -> 
+                [srr, fastq_files[0], fastq_files[1]]
+            }
+        
+        sra_se_filtered = SRAdownloadSE.out.reads
+            .filter { srr, fastq_file, status_file ->
+                def status_content = status_file.text.trim()
+                def is_success = status_content.startsWith("SUCCESS")
+                
+                if (!is_success) {
+                    log.warn "Excluding failed SE download: ${srr}"
+                }
+                
+                return is_success
+            }
+            .map { srr, fastq_file, status_file -> 
+                tuple(srr, fastq_file)
+            }
+        
+        // Collect all status files for summary report
+        all_status_files = SRAdownloadPE.out.reads
+            .map { srr, fastq, status -> status }
+            .mix(SRAdownloadSE.out.reads.map { srr, fastq, status -> status })
+            .collect()
+        
+        CollectFailedDownloads(all_status_files)
+        
+        // Use filtered channels
+        sra_pe_formatted = sra_pe_filtered
+        sra_se_formatted = sra_se_filtered
     } else {
         sra_pe_formatted = Channel.empty()
         sra_se_formatted = Channel.empty()

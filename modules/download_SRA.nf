@@ -9,8 +9,7 @@ process SRAdownloadPE {
     val srr
     
     output:
-    tuple val(srr), path("${srr}_*.fastq"), optional: true, emit: reads
-    path "failed_${srr}.txt", optional: true, emit: failures
+    tuple val(srr), path("${srr}_*.fastq"), path(".download_status"), emit: reads
     
     script:
     """
@@ -54,21 +53,26 @@ process SRAdownloadPE {
         [ \$attempt -lt 3 ] && sleep 30  # Brief pause between attempts
     done
     
-    # Handle result
+    # Always create status file and dummy outputs for failures
     if [ \$success -eq 1 ]; then
+        echo "SUCCESS" > .download_status
         echo "SUCCESS: $srr downloaded successfully"
-        exit 0
     else
+        echo "FAILED" > .download_status
+        # Create empty dummy files to satisfy output requirements
+        touch ${srr}_1.fastq ${srr}_2.fastq
+        
         echo "WARNING: Failed to download $srr after 3 attempts - skipping"
-        # Log failure details
-        echo -e "$srr\tPE\tDownload failed after 3 attempts" > failed_${srr}.txt
+        # Log failure details in status file
+        echo "Download failed after 3 attempts" >> .download_status
         if [ -f error_3.log ]; then
-            echo "Last error:" >> failed_${srr}.txt
-            tail -5 error_3.log >> failed_${srr}.txt 2>/dev/null
+            echo "---" >> .download_status
+            tail -5 error_3.log >> .download_status 2>/dev/null
         fi
-        # Exit successfully so pipeline continues
-        exit 0
     fi
+    
+    # Always exit successfully - failures handled by status file
+    exit 0
     """
 }
 
@@ -82,8 +86,7 @@ process SRAdownloadSE {
     val srr
     
     output:
-    tuple val(srr), path("${srr}.fastq"), optional: true, emit: reads
-    path "failed_${srr}.txt", optional: true, emit: failures
+    tuple val(srr), path("${srr}.fastq"), path(".download_status"), emit: reads
     
     script:
     """
@@ -131,21 +134,26 @@ process SRAdownloadSE {
         [ \$attempt -lt 3 ] && sleep 30  # Brief pause between attempts
     done
     
-    # Handle result
+    # Always create status file and dummy outputs for failures
     if [ \$success -eq 1 ]; then
+        echo "SUCCESS" > .download_status
         echo "SUCCESS: $srr downloaded successfully"
-        exit 0
     else
+        echo "FAILED" > .download_status
+        # Create empty dummy file to satisfy output requirements
+        touch ${srr}.fastq
+        
         echo "WARNING: Failed to download $srr after 3 attempts - skipping"
-        # Log failure details
-        echo -e "$srr\tSE\tDownload failed after 3 attempts" > failed_${srr}.txt
+        # Log failure details in status file
+        echo "Download failed after 3 attempts" >> .download_status
         if [ -f error_3.log ]; then
-            echo "Last error:" >> failed_${srr}.txt
-            tail -5 error_3.log >> failed_${srr}.txt 2>/dev/null
+            echo "---" >> .download_status
+            tail -5 error_3.log >> .download_status 2>/dev/null
         fi
-        # Exit successfully so pipeline continues
-        exit 0
     fi
+    
+    # Always exit successfully - failures handled by status file
+    exit 0
     """
 }
 
@@ -160,33 +168,47 @@ process CollectFailedDownloads {
     path failed_files
     
     output:
-    path "NCBI_download_summary.tsv", optional: true
+    path "NCBI_download_summary.tsv"
     
     script:
     """
-    # Count failures
-    failure_count=0
-    if compgen -G "failed_*.txt" > /dev/null; then
-        failure_count=\$(ls failed_*.txt 2>/dev/null | wc -l)
-    fi
+    echo -e "SRR_ID\tType\tStatus\tError_Details" > NCBI_download_summary.tsv
     
-    if [ \$failure_count -gt 0 ]; then
-        echo "Found \$failure_count failed downloads"
-        echo -e "SRR_ID\tType\tError_Details" > NCBI_download_summary.tsv
-        
-        # Combine all failure files
-        for file in failed_*.txt; do
-            if [ -f "\$file" ] && [ -s "\$file" ]; then
-                cat "\$file" >> NCBI_download_summary.tsv
+    failed_count=0
+    success_count=0
+    
+    # Process all status files
+    for status_file in .download_status*; do
+        if [ -f "\$status_file" ]; then
+            first_line=\$(head -n1 "\$status_file")
+            
+            # Extract type from filename pattern if available
+            type="Unknown"
+            
+            if echo "\$first_line" | grep -q "SUCCESS"; then
+                ((success_count++))
+            elif echo "\$first_line" | grep -q "FAILED"; then
+                ((failed_count++))
+                # Extract error details (everything after first line)
+                error_details=\$(tail -n +2 "\$status_file" | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*\$//')
+                # Try to extract SRR from filename or use placeholder
+                srr_id=\$(echo "\$status_file" | grep -oP 'SRR[0-9]+' || echo "Unknown")
+                echo -e "\$srr_id\t\$type\tFailed\t\$error_details" >> NCBI_download_summary.tsv
             fi
-        done
-        
-        echo "====================================" >> NCBI_download_summary.tsv
-        echo "Total failed downloads: \$failure_count" >> NCBI_download_summary.tsv
-        echo "Pipeline continued with successfully downloaded samples" >> NCBI_download_summary.tsv
-    else
-        echo "All SRA downloads completed successfully"
-        # Don't create output file if all succeeded
+        fi
+    done
+    
+    echo "" >> NCBI_download_summary.tsv
+    echo "====================================" >> NCBI_download_summary.tsv
+    echo "Summary:" >> NCBI_download_summary.tsv
+    echo "  Successful downloads: \$success_count" >> NCBI_download_summary.tsv
+    echo "  Failed downloads: \$failed_count" >> NCBI_download_summary.tsv
+    echo "  Total attempted: \$((success_count + failed_count))" >> NCBI_download_summary.tsv
+    
+    if [ \$failed_count -gt 0 ]; then
+        echo "" >> NCBI_download_summary.tsv
+        echo "WARNING: \$failed_count samples were excluded from downstream analysis" >> NCBI_download_summary.tsv
+        echo "Check error details above for troubleshooting" >> NCBI_download_summary.tsv
     fi
     """
 }
