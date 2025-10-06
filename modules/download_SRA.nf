@@ -1,214 +1,133 @@
-// Robust SRA download process that gracefully handles failures
+// Hybrid download for paired-end reads: tries ENA URL first, falls back to NCBI
 process SRAdownloadPE {
     cpus 1
     memory '4GB'
-    tag "Downloading $srr from NCBI SRA (PE)"
-    errorStrategy 'ignore'  // Don't fail pipeline on download errors
+    tag "Downloading PE: $srr"
+    errorStrategy 'ignore'
     
     input:
-    val srr
+    tuple val(srr), val(url1), val(url2), val(source)
     
     output:
-    tuple val(srr), path("${srr}_*.fastq"), path(".download_status"), emit: reads
+    tuple val(srr), path("${srr}_1.fastq*"), path("${srr}_2.fastq*")
     
     script:
     """
-    set +e  # Don't exit on command failures
+    #!/bin/bash
+    set -e
     
-    # Function to attempt download
-    attempt_download() {
-        local attempt=\$1
-        echo "[Attempt \$attempt/3] Downloading $srr (PE)"
+    echo "Downloading $srr from $source"
+    
+    # Try ENA direct download if URLs are available
+    if [[ -n "$url1" && -n "$url2" && "$source" == "ENA" ]]; then
+        echo "Attempting ENA direct download..."
         
-        # Clean up any partial files
-        rm -rf ${srr}/ ${srr}.sra ${srr}_*.fastq 2>/dev/null
-        
-        # Try prefetch (with timeout)
-        if timeout 300 prefetch $srr 2>error_\${attempt}.log; then
-            # Try fasterq-dump (with timeout)
-            if timeout 600 fasterq-dump $srr --split-files -O . 2>>error_\${attempt}.log; then
-                # Verify files exist and are not empty
-                if compgen -G "${srr}_*.fastq" > /dev/null; then
-                    local file_count=\$(ls ${srr}_*.fastq 2>/dev/null | wc -l)
-                    if [ "\$file_count" -ge 2 ]; then
-                        echo "✓ Successfully downloaded $srr (PE) on attempt \$attempt"
-                        rm -rf ${srr}/ ${srr}.sra error_*.log 2>/dev/null
-                        return 0
-                    fi
-                fi
+        if wget -q -O ${srr}_1.fastq.gz "$url1" && wget -q -O ${srr}_2.fastq.gz "$url2"; then
+            # Verify files are not empty
+            if [ -s "${srr}_1.fastq.gz" ] && [ -s "${srr}_2.fastq.gz" ]; then
+                echo "✓ Successfully downloaded from ENA"
+                exit 0
+            else
+                echo "⚠ ENA files empty, falling back to NCBI"
+                rm -f ${srr}_*.fastq.gz
             fi
-        fi
-        
-        echo "✗ Attempt \$attempt failed for $srr"
-        return 1
-    }
-    
-    # Try download up to 3 times
-    success=0
-    for attempt in 1 2 3; do
-        if attempt_download \$attempt; then
-            success=1
-            break
-        fi
-        [ \$attempt -lt 3 ] && sleep 30  # Brief pause between attempts
-    done
-    
-    # Always create status file and dummy outputs for failures
-    if [ \$success -eq 1 ]; then
-        echo "SUCCESS" > .download_status
-        echo "SUCCESS: $srr downloaded successfully"
-    else
-        echo "FAILED" > .download_status
-        # Create empty dummy files to satisfy output requirements
-        touch ${srr}_1.fastq ${srr}_2.fastq
-        
-        echo "WARNING: Failed to download $srr after 3 attempts - skipping"
-        # Log failure details in status file
-        echo "Download failed after 3 attempts" >> .download_status
-        if [ -f error_3.log ]; then
-            echo "---" >> .download_status
-            tail -5 error_3.log >> .download_status 2>/dev/null
+        else
+            echo "⚠ ENA download failed, falling back to NCBI"
+            rm -f ${srr}_*.fastq.gz
         fi
     fi
     
-    # Always exit successfully - failures handled by status file
-    exit 0
+    # Fallback to NCBI prefetch/fasterq-dump
+    echo "Downloading from NCBI..."
+    
+    prefetch $srr
+    fasterq-dump $srr --split-files -O .
+    
+    # Verify we got paired-end files
+    if [ ! -f "${srr}_1.fastq" ] || [ ! -f "${srr}_2.fastq" ]; then
+        echo "ERROR: Expected PE files not found for $srr"
+        exit 1
+    fi
+    
+    # Check files are not empty
+    if [ ! -s "${srr}_1.fastq" ] || [ ! -s "${srr}_2.fastq" ]; then
+        echo "ERROR: Empty fastq files for $srr"
+        exit 1
+    fi
+    
+    # Clean up SRA file
+    rm -rf ${srr}/ ${srr}.sra
+    
+    echo "✓ Successfully downloaded from NCBI"
     """
 }
 
+// Hybrid download for single-end reads: tries ENA URL first, falls back to NCBI
 process SRAdownloadSE {
     cpus 1
     memory '4GB'
-    tag "Downloading $srr from NCBI SRA (SE)"
-    errorStrategy 'ignore'  // Don't fail pipeline on download errors
-    
-    input:
-    val srr
-    
-    output:
-    tuple val(srr), path("${srr}.fastq"), path(".download_status"), emit: reads
-    
-    script:
-    """
-    set +e  # Don't exit on command failures
-    
-    # Function to attempt download
-    attempt_download() {
-        local attempt=\$1
-        echo "[Attempt \$attempt/3] Downloading $srr (SE)"
-        
-        # Clean up any partial files
-        rm -rf ${srr}/ ${srr}.sra ${srr}.fastq ${srr}_*.fastq 2>/dev/null
-        
-        # Try prefetch (with timeout)
-        if timeout 300 prefetch $srr 2>error_\${attempt}.log; then
-            # Try fasterq-dump (with timeout)
-            if timeout 600 fasterq-dump $srr --split-files -O . 2>>error_\${attempt}.log; then
-                # For SE, the file might be named ${srr}.fastq or ${srr}_1.fastq
-                if [ -f "${srr}.fastq" ] && [ -s "${srr}.fastq" ]; then
-                    echo "✓ Successfully downloaded $srr (SE) on attempt \$attempt"
-                    rm -rf ${srr}/ ${srr}.sra error_*.log 2>/dev/null
-                    return 0
-                elif [ -f "${srr}_1.fastq" ] && [ -s "${srr}_1.fastq" ]; then
-                    # Rename to standard SE format
-                    mv ${srr}_1.fastq ${srr}.fastq
-                    rm -f ${srr}_2.fastq 2>/dev/null  # Remove unexpected second file
-                    echo "✓ Successfully downloaded $srr (SE) on attempt \$attempt"
-                    rm -rf ${srr}/ ${srr}.sra error_*.log 2>/dev/null
-                    return 0
-                fi
-            fi
-        fi
-        
-        echo "✗ Attempt \$attempt failed for $srr"
-        return 1
-    }
-    
-    # Try download up to 3 times
-    success=0
-    for attempt in 1 2 3; do
-        if attempt_download \$attempt; then
-            success=1
-            break
-        fi
-        [ \$attempt -lt 3 ] && sleep 30  # Brief pause between attempts
-    done
-    
-    # Always create status file and dummy outputs for failures
-    if [ \$success -eq 1 ]; then
-        echo "SUCCESS" > .download_status
-        echo "SUCCESS: $srr downloaded successfully"
-    else
-        echo "FAILED" > .download_status
-        # Create empty dummy file to satisfy output requirements
-        touch ${srr}.fastq
-        
-        echo "WARNING: Failed to download $srr after 3 attempts - skipping"
-        # Log failure details in status file
-        echo "Download failed after 3 attempts" >> .download_status
-        if [ -f error_3.log ]; then
-            echo "---" >> .download_status
-            tail -5 error_3.log >> .download_status 2>/dev/null
-        fi
-    fi
-    
-    # Always exit successfully - failures handled by status file
-    exit 0
-    """
-}
-
-
-// Process to collect and summarize all failure reports
-process CollectFailedDownloads {
-    tag "Summarizing download results"
-    publishDir "${params.outdir}", mode: 'copy'
+    tag "Downloading SE: $srr"
     errorStrategy 'ignore'
-
+    
     input:
-    path failed_files
+    tuple val(srr), val(url1), val(source)
     
     output:
-    path "NCBI_download_summary.tsv"
+    tuple val(srr), path("${srr}.fastq*")
     
     script:
     """
-    echo -e "SRR_ID\tType\tStatus\tError_Details" > NCBI_download_summary.tsv
+    #!/bin/bash
+    set -e
     
-    failed_count=0
-    success_count=0
+    echo "Downloading $srr from $source"
     
-    # Process all status files
-    for status_file in .download_status*; do
-        if [ -f "\$status_file" ]; then
-            first_line=\$(head -n1 "\$status_file")
-            
-            # Extract type from filename pattern if available
-            type="Unknown"
-            
-            if echo "\$first_line" | grep -q "SUCCESS"; then
-                ((success_count++))
-            elif echo "\$first_line" | grep -q "FAILED"; then
-                ((failed_count++))
-                # Extract error details (everything after first line)
-                error_details=\$(tail -n +2 "\$status_file" | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*\$//')
-                # Try to extract SRR from filename or use placeholder
-                srr_id=\$(echo "\$status_file" | grep -oP 'SRR[0-9]+' || echo "Unknown")
-                echo -e "\$srr_id\t\$type\tFailed\t\$error_details" >> NCBI_download_summary.tsv
+    # Try ENA direct download if URL is available
+    if [[ -n "$url1" && "$source" == "ENA" ]]; then
+        echo "Attempting ENA direct download..."
+        
+        if wget -q -O ${srr}.fastq.gz "$url1"; then
+            # Verify file is not empty
+            if [ -s "${srr}.fastq.gz" ]; then
+                echo "✓ Successfully downloaded from ENA"
+                exit 0
+            else
+                echo "⚠ ENA file empty, falling back to NCBI"
+                rm -f ${srr}.fastq.gz
             fi
+        else
+            echo "⚠ ENA download failed, falling back to NCBI"
+            rm -f ${srr}.fastq.gz
         fi
-    done
-    
-    echo "" >> NCBI_download_summary.tsv
-    echo "====================================" >> NCBI_download_summary.tsv
-    echo "Summary:" >> NCBI_download_summary.tsv
-    echo "  Successful downloads: \$success_count" >> NCBI_download_summary.tsv
-    echo "  Failed downloads: \$failed_count" >> NCBI_download_summary.tsv
-    echo "  Total attempted: \$((success_count + failed_count))" >> NCBI_download_summary.tsv
-    
-    if [ \$failed_count -gt 0 ]; then
-        echo "" >> NCBI_download_summary.tsv
-        echo "WARNING: \$failed_count samples were excluded from downstream analysis" >> NCBI_download_summary.tsv
-        echo "Check error details above for troubleshooting" >> NCBI_download_summary.tsv
     fi
+    
+    # Fallback to NCBI prefetch/fasterq-dump
+    echo "Downloading from NCBI..."
+    
+    prefetch $srr
+    fasterq-dump $srr --split-files -O .
+    
+    # Handle SE naming variations (might be .fastq or _1.fastq)
+    if [ -f "${srr}.fastq" ]; then
+        echo "Found ${srr}.fastq"
+    elif [ -f "${srr}_1.fastq" ]; then
+        echo "Found ${srr}_1.fastq, renaming to ${srr}.fastq"
+        mv ${srr}_1.fastq ${srr}.fastq
+        rm -f ${srr}_2.fastq 2>/dev/null || true
+    else
+        echo "ERROR: No fastq file found for $srr"
+        exit 1
+    fi
+    
+    # Check file is not empty
+    if [ ! -s "${srr}.fastq" ]; then
+        echo "ERROR: Empty fastq file for $srr"
+        exit 1
+    fi
+    
+    # Clean up SRA file
+    rm -rf ${srr}/ ${srr}.sra
+    
+    echo "✓ Successfully downloaded from NCBI"
     """
 }

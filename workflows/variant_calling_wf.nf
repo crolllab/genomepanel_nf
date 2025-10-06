@@ -6,7 +6,6 @@ nextflow.enable.dsl=2
 include { SRAresolve } from '../modules/resolve_SRA'
 include { SRAdownloadPE } from '../modules/download_SRA'
 include { SRAdownloadSE } from '../modules/download_SRA'
-include { CollectFailedDownloads } from '../modules/download_SRA'
 include { trimSequencesPE } from '../modules/fastp_trimming'
 include { trimSequencesSE } from '../modules/fastp_trimming'
 include { bwaIndex } from '../modules/bwa_index'
@@ -54,21 +53,25 @@ workflow variant_calling {
     // Step 0: Make a channel from the SRA index file
     sra_file_ch = Channel.fromPath(params.SRA_index)
     
-    // First run SRAresolve
+    // First run SRAresolve to get SRR IDs and URLs
     SRAresolve(sra_file_ch)
 
-    // Then use its outputs to create channels for download processes
-    pe_ids = SRAresolve.out.pe_file
-        .splitText()
-        .map { it.trim() }
+    // Parse the URL file to create download channels with ENA URLs
+    url_data = SRAresolve.out.url_file
+        .splitCsv(sep: '\t', header: true)
+    
+    // Split into PE and SE channels with URL information
+    pe_with_urls = url_data
+        .filter { it.Layout == 'PE' }
+        .map { tuple(it.SRR_ID, it.URL_1 ?: "", it.URL_2 ?: "", it.Source ?: "NCBI") }
+    
+    se_with_urls = url_data
+        .filter { it.Layout == 'SE' }
+        .map { tuple(it.SRR_ID, it.URL_1 ?: "", it.Source ?: "NCBI") }
 
-    se_ids = SRAresolve.out.se_file
-        .splitText()
-        .map { it.trim() }
-
-    // Now run downloads - these will wait for SRAresolve to complete
-    SRAdownloadPE(pe_ids)
-    SRAdownloadSE(se_ids)
+    // Now run downloads with URL information for hybrid approach
+    SRAdownloadPE(pe_with_urls)
+    SRAdownloadSE(se_with_urls)
 
     }
 
@@ -91,49 +94,10 @@ workflow variant_calling {
 
     // Only create SRA channel if SRA processing was enabled
     if (params.SRA_index) {
-        // Filter out failed downloads explicitly using status files
-        sra_pe_filtered = SRAdownloadPE.out.reads
-            .filter { srr, fastq_files, status_file ->
-                // Check if download succeeded by reading status file
-                def status_content = status_file.text.trim()
-                def is_success = status_content.startsWith("SUCCESS")
-                
-                if (!is_success) {
-                    log.warn "Excluding failed PE download: ${srr}"
-                }
-                
-                return is_success
-            }
-            .map { srr, fastq_files, status_file -> 
-                [srr, fastq_files[0], fastq_files[1]]
-            }
-        
-        sra_se_filtered = SRAdownloadSE.out.reads
-            .filter { srr, fastq_file, status_file ->
-                def status_content = status_file.text.trim()
-                def is_success = status_content.startsWith("SUCCESS")
-                
-                if (!is_success) {
-                    log.warn "Excluding failed SE download: ${srr}"
-                }
-                
-                return is_success
-            }
-            .map { srr, fastq_file, status_file -> 
-                tuple(srr, fastq_file)
-            }
-        
-        // Collect all status files for summary report
-        all_status_files = SRAdownloadPE.out.reads
-            .map { srr, fastq, status -> status }
-            .mix(SRAdownloadSE.out.reads.map { srr, fastq, status -> status })
-            .collect()
-        
-        CollectFailedDownloads(all_status_files)
-        
-        // Use filtered channels
-        sra_pe_formatted = sra_pe_filtered
-        sra_se_formatted = sra_se_filtered
+        // Simple channel formatting - downloads that succeed will have outputs
+        // Downloads that fail will not emit anything due to errorStrategy 'ignore'
+        sra_pe_formatted = SRAdownloadPE.out
+        sra_se_formatted = SRAdownloadSE.out
     } else {
         sra_pe_formatted = Channel.empty()
         sra_se_formatted = Channel.empty()
