@@ -1,7 +1,6 @@
 process GATKHC {
     tag "GATK4 HaplotypeCaller"
-    errorStrategy 'retry'
-    maxRetries 3
+    errorStrategy 'ignore'
     cpus 1
     memory '8GB'
     publishDir "${params.outdir}/gvcf_files",
