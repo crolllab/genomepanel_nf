@@ -34,7 +34,10 @@ process GATKHC {
         -ERC GVCF \
         --create-output-variant-index
     
-    rm "\$(readlink -f "$dedup_bam")"
-    rm "\$(readlink -f "$dedup_bai")"
+    # Safe cleanup - handle concurrent deletion gracefully
+    bam_target="\$(readlink -f "$dedup_bam")"
+    bai_target="\$(readlink -f "$dedup_bai")"
+    [ -n "\$bam_target" ] && [ -f "\$bam_target" ] && rm "\$bam_target" || true
+    [ -n "\$bai_target" ] && [ -f "\$bai_target" ] && rm "\$bai_target" || true
     """
 }

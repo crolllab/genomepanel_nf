@@ -23,7 +23,9 @@ process addRG {
         --VALIDATION_STRINGENCY SILENT
     
     # Delete the sorted BAM and BAI files (resolve symlinks to actual files)
-    rm "\$(readlink -f "$sorted_bam")"
-    rm "\$(readlink -f "$sorted_bai")"
+    bam_target="\$(readlink -f "$sorted_bam")"
+    bai_target="\$(readlink -f "$sorted_bai")"
+    [ -n "\$bam_target" ] && [ -f "\$bam_target" ] && rm "\$bam_target" || true
+    [ -n "\$bai_target" ] && [ -f "\$bai_target" ] && rm "\$bai_target" || true
     """
 }

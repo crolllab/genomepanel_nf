@@ -18,6 +18,9 @@ process GenotypeGVCFs {
     """   
     gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
     gatk --java-options "-Xmx48g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
-    rm "\$(readlink -f "combined.${chr}.g.vcf.gz")"
+    
+    # Delete the combined GVCF (resolve symlink to actual file)
+    cgvcf_target="\$(readlink -f "combined.${chr}.g.vcf.gz")"
+    [ -n "\$cgvcf_target" ] && [ -f "\$cgvcf_target" ] && rm "\$cgvcf_target" || true
     """
 }

@@ -54,8 +54,19 @@ process SRAresolve {
                 ena_urls=\$(echo "\$ena_response" | cut -f2)
                 
                 if [[ -n "\$ena_urls" && "\$ena_urls" != "fastq_ftp" ]]; then
-                    url1=\$(echo "\$ena_urls" | cut -d';' -f1)
-                    url2=\$(echo "\$ena_urls" | cut -d';' -f2)
+                    # Count how many files ENA returned
+                    url_count=\$(echo "\$ena_urls" | tr ';' '\n' | wc -l)
+                    
+                    if [[ \$url_count -eq 3 ]]; then
+                        # 3 files: orphaned + _1 + _2; use files 2 and 3 for PE
+                        echo "Found 3 files for \$run_id (orphaned + PE), using _1 and _2" >&2
+                        url1=\$(echo "\$ena_urls" | cut -d';' -f2)
+                        url2=\$(echo "\$ena_urls" | cut -d';' -f3)
+                    else
+                        # 2 or 1 files: standard case
+                        url1=\$(echo "\$ena_urls" | cut -d';' -f1)
+                        url2=\$(echo "\$ena_urls" | cut -d';' -f2)
+                    fi
                     
                     # Convert FTP to HTTP for better reliability
                     if [[ -n "\$url1" ]]; then

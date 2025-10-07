@@ -20,6 +20,7 @@ process samtoolsSort {
     samtools index ${sample_id}_sorted.bam
     
     # Delete the SAM file (resolve symlink to actual file)
-    rm "\$(readlink -f "$sample_sam")"
+    sam_target="\$(readlink -f "$sample_sam")"
+    [ -n "\$sam_target" ] && [ -f "\$sam_target" ] && rm "\$sam_target" || true
     """
 }

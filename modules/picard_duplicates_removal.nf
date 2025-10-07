@@ -32,6 +32,7 @@ process dupRemoval {
         -OUTPUT ${sample_id}_RG_dedup.bam.bai
 
     # Delete the RG BAM file (resolve symlink to actual file)
-    rm "\$(readlink -f "$rg_bam")"
+    rg_target="\$(readlink -f "$rg_bam")"
+    [ -n "\$rg_target" ] && [ -f "\$rg_target" ] && rm "\$rg_target" || true
     """
 }
