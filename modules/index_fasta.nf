@@ -1,7 +1,7 @@
 process fastaIndex {
     tag "Reference FASTA index building"    
     cpus 1
-    memory '4GB'
+    memory '32GB'
     
     input:
     path reference

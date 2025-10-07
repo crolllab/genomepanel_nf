@@ -3,6 +3,8 @@
 ## Project Overview
 `genomepanel_nf` is a Nextflow DSL2 pipeline for variant calling on large genome panels. It processes Illumina paired-end/single-end reads from local files or NCBI SRA, performs BWA mapping, GATK HaplotypeCaller variant calling, and quality filtering. The pipeline is optimized for fungal genomes (specifically _Zymoseptoria tritici_) and supports both local and SLURM execution.
 
+**Key Technology Stack**: Nextflow DSL2, Singularity containers, SLURM/local execution, Bash scripting within processes
+
 ## Architecture & Data Flow
 
 ### Modular Structure
@@ -48,19 +50,31 @@ The pipeline splits by chromosome after GVCF creation (step 5). The `fai_index` 
 - **Error handling**: Critical processes use `errorStrategy 'retry', maxRetries 3`; non-critical use `errorStrategy 'ignore'`
 - **Conditional publishing**: Uses `enabled: params.keep_bam_gvcf` to optionally save BAM/GVCF files
 - **Resource cleanup**: Processes actively delete input files after processing via `rm "\$(readlink -f "$file")"` to manage disk space during large runs
+  - **Critical**: The `readlink -f` resolves Nextflow symlinks to actual work files before deletion
+  - **Example**: `rm "\$(readlink -f "$dedup_bam")"` in `gatk4_hc.nf` cleans up input BAM after GVCF creation
+  - **Do not remove**: These cleanup commands prevent multi-TB work directory bloat
 - **Container binding**: Each process has a `withName:ProcessName` block in `nextflow.config` specifying its Singularity container
+- **Bash scripting**: Process scripts use `#!/bin/bash` with `set -e` for immediate error exit on command failures
+- **maxForks directive**: Download processes limit concurrency (e.g., `maxForks = 20` for SRA downloads)
 
 ### File Naming Convention
 - Processes output files named `${sample_id}_suffix.ext` (e.g., `${sample_id}.g.vcf.gz`)
 - Index files follow the pattern `${reference.baseName}.fasta.fai`, `${reference.baseName}.dict`
+- **Critical**: Reference must have `.fasta` extension (not `.fa`) due to hardcoded `${reference.baseName}.fasta.*` patterns throughout
 
 ## Key Parameters & Usage
 
 ### Required Parameters
-- `--reference`: Path to reference genome (.fasta extension required, not .fa)
+- `--reference`: Path to reference genome (`.fasta` extension required, not `.fa`)
 - `--ploidy`: Numeric value (1 for haploid, 2 for diploid)
 - `--NCBI_API_key`: Required only if using `--SRA_index`
 - One of: `--reads` (local fastq glob pattern) OR `--SRA_index` (file with SRA accessions)
+
+### Optional Parameters
+- `--outdir`: Output directory (default: `./nf_output/`)
+- `--keep_bam_gvcf`: Set to `"true"` to save per-sample BAM/GVCF files (default: `"false"`)
+- `-work-dir`: Temporary work directory (default: `./work`; use `/scratch/...` for large runs)
+- `-resume`: Resume from last completed step (requires intact work directory)
 
 ### Glob Pattern for Local Reads
 Use single quotes with complex brace expansions:
@@ -122,10 +136,17 @@ Alternative: Pull from Galaxy Project depot (see README.md)
 ### Custom Container Bindings
 `nextflow.config` includes:
 ```groovy
-runOptions = "-B /tmp/$USER:/tmp/$USER"
+runOptions = "-B /tmp:/tmp"
 envWhitelist = 'APPTAINERENV_NXF_TASK_WORKDIR,SINGULARITYENV_NXF_TASK_WORKDIR'
 ```
 Mount additional paths if processes need access to external data.
+
+### beforeScript Pattern
+All processes set `TMPDIR` via `beforeScript` in `nextflow.config`:
+```groovy
+beforeScript = "export TMPDIR=/tmp/$USER/nxf_tmp"
+```
+This ensures consistent temporary directory usage across processes.
 
 ## Output Files
 
@@ -154,12 +175,12 @@ GATK processes operate per-chromosome for parallelization. To modify this:
 ### SRA Download - Hybrid Approach (ENA + NCBI)
 `modules/resolve_SRA.nf` + `modules/download_SRA.nf` implement a two-tier download strategy:
 
-**Resolution Phase:**
+**Resolution Phase (`resolve_SRA.nf`):**
 - Queries NCBI for PE/SE layout via `esearch`/`efetch`
 - Queries ENA API for direct FASTQ HTTP URLs
 - Outputs `NCBI_download_urls.tsv` with URLs and source info
 
-**Download Phase (automatic fallback):**
+**Download Phase (`download_SRA.nf` - automatic fallback):**
 1. **Try ENA first** (if URL available): `wget` direct FASTQ (fast, produces `.fastq.gz`)
 2. **Fallback to NCBI**: `prefetch` + `fasterq-dump` if ENA fails (produces `.fastq`)
 3. **Both handled**: Fastp accepts both compressed and uncompressed formats

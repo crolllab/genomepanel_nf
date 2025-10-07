@@ -1,7 +1,7 @@
 process bwaIndex {
     tag "Reference BWA index building"    
     cpus 1
-    memory '4GB'
+    memory '64GB'
 
     input:
     path reference
@@ -15,6 +15,6 @@ process bwaIndex {
 
     script:
     """
-    bwa-mem2 index $reference 
+    bwa-mem2 index -a bwtsw $reference 
     """
 }
