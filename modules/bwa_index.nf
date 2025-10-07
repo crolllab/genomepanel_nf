@@ -15,6 +15,6 @@ process bwaIndex {
 
     script:
     """
-    bwa-mem2 index -a bwtsw $reference 
+    bwa-mem2 index $reference 
     """
 }
