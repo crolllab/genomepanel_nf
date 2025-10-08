@@ -12,3 +12,6 @@ SRA_TEMP_FIX.md
 .gitignore
 FASTP_FAILURE_FIX.md
 COMPLETE_SAFETY_AUDIT.md
+IMPLEMENTATION_SUMMARY.md
+SRA_FALLBACK_FIX.md
+.github/copilot-instructions.md

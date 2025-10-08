@@ -50,9 +50,19 @@ EOF
     # Fallback to NCBI prefetch/fasterq-dump
     echo "Downloading from NCBI..."
     
-    # Use --temp option to specify temp directory in current location
-    prefetch $srr --output-directory .
-    fasterq-dump $srr --split-files -O . --temp .
+    # Create explicit download directory to avoid /tmp/ quota issues
+    # prefetch creates subdirectory, so we control the parent location
+    mkdir -p ncbi_download
+    
+    # Use explicit output file path (not --output-directory which creates subdirs)
+    # This ensures download happens in work directory, not /tmp/
+    prefetch $srr --output-file ncbi_download/${srr}.sra
+    
+    # Decompress with explicit temp directory in work location
+    fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp .
+    
+    # Clean up SRA file immediately to save space
+    rm -rf ncbi_download
     
     # Verify we got paired-end files
     if [ ! -f "${srr}_1.fastq" ] || [ ! -f "${srr}_2.fastq" ]; then
@@ -65,9 +75,6 @@ EOF
         echo "ERROR: Empty fastq files for $srr"
         exit 1
     fi
-    
-    # Clean up SRA file
-    rm -rf ${srr}/ ${srr}.sra
     
     echo "✓ Successfully downloaded from NCBI"
     """
@@ -125,9 +132,17 @@ EOF
     # Fallback to NCBI prefetch/fasterq-dump
     echo "Downloading from NCBI..."
     
-    # Use --temp option to specify temp directory in current location
-    prefetch $srr --output-directory .
-    fasterq-dump $srr --split-files -O . --temp .
+    # Create explicit download directory to avoid /tmp/ quota issues
+    mkdir -p ncbi_download
+    
+    # Use explicit output file path to ensure download in work directory
+    prefetch $srr --output-file ncbi_download/${srr}.sra
+    
+    # Decompress with explicit temp directory in work location
+    fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp .
+    
+    # Clean up SRA file immediately
+    rm -rf ncbi_download
     
     # Handle SE naming variations (might be .fastq or _1.fastq)
     if [ -f "${srr}.fastq" ]; then
@@ -146,9 +161,6 @@ EOF
         echo "ERROR: Empty fastq file for $srr"
         exit 1
     fi
-    
-    # Clean up SRA file
-    rm -rf ${srr}/ ${srr}.sra
     
     echo "✓ Successfully downloaded from NCBI"
     """
