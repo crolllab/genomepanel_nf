@@ -15,4 +15,5 @@ COMPLETE_SAFETY_AUDIT.md
 IMPLEMENTATION_SUMMARY.md
 SRA_FALLBACK_FIX.md
 .github/copilot-instructions.md
-.github/copilot-instructions.md
+DOWNLOAD_CRC_VALIDATION.md
+FASTP_CRC_CORRUPTION.md
