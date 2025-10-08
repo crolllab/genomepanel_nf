@@ -184,7 +184,7 @@ workflow variant_calling {
     // ---------------------
     // GATK HaplotypeCaller
     // ---------------------
-    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
+    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index_ch, dedup_with_index)
 
     // ---------------------
     // Parallel SNP calling by chromosome
