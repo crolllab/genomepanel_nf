@@ -2,7 +2,6 @@ process trimSequencesPE {
     tag "FASTP PE trimming"
     errorStrategy 'ignore'
     memory '4GB'
-    cpus 4
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
     
     input:
