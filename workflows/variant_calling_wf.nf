@@ -134,13 +134,33 @@ workflow variant_calling {
     // ---------------------
     // Reference indexes
     // ---------------------
-    bwa_index   = bwaIndex(params.reference)
+    // Conditionally build or use provided BWA index
+    if (params.bwa_index) {
+        // Use provided BWA index files
+        bwa_index_ch = Channel.fromPath("${params.bwa_index}*.{amb,ann,bwt.2bit.64,pac,0123}")
+            .collect()
+            .map { files ->
+                // Return files in the expected order
+                [
+                    files.find { it.name.endsWith('.amb') },
+                    files.find { it.name.endsWith('.ann') },
+                    files.find { it.name.endsWith('.bwt.2bit.64') },
+                    files.find { it.name.endsWith('.pac') },
+                    files.find { it.name.endsWith('.0123') }
+                ]
+            }
+            .flatMap()
+    } else {
+        // Build BWA index from reference
+        bwa_index_ch = bwaIndex(params.reference)
+    }
+    
     gatk_index  = gatkIndex(params.reference)
     fai_index   = fastaIndex(params.reference)
     // ---------------------
     // Mapping
     // ---------------------
-    bwaMap(params.reference, bwa_index, trimmed_ch)
+    bwaMap(params.reference, bwa_index_ch, trimmed_ch)
 
 
     // ---------------------

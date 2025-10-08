@@ -90,6 +90,8 @@ Available parameters
 
 - `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa` or `.fas`).
 
+- `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). Useful when the reference genome is very large and indexing takes a long time.
+
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
 - `--SRA_index`: Optional. Instead of local fastq files, you can provide a file listing NCBI SRA accessions (or ENA, etc.) with one accession per line including `SRR...`, `SRP...`, `SRX...`, `PRNJ...`, etc. If the accession includes multiple `SRR...` runs, all included runs are processed. You can use the [SRA Explorer](https://sra-explorer.info) to collect accession ids. 
@@ -183,7 +185,18 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --NCBI_API_key $NCBI_API_KEY \
   --reference $REF --ploidy 1 \
   --reads $READS \
-  --SRA_index './SRA_accessions.txt' \
+  --SRA_index './SRA_accessions.txt'
+```
+
+If you have pre-built BWA index files (from a previous run or pre-computed), you can skip the indexing step:
+
+```bash
+# run with pre-built BWA index (saves time and resources)
+nextflow run main.nf -config nextflow.config -profile slurm \
+  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --keep_bam_gvcf false \
+  --reference $REF --ploidy 1 \
+  --bwa_index $REF \
+  --reads $READS
 ```
 
 Notes on the exection:

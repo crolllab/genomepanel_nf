@@ -7,6 +7,7 @@ params.SRA_index = ""
 params.ploidy = ""
 params.NCBI_API_key = ""
 params.keep_bam_gvcf = "false"  // or "true"
+params.bwa_index = ""  // Optional: path to pre-built BWA index files
 
 include { variant_calling } from './workflows/variant_calling_wf'
 
@@ -32,6 +33,7 @@ log.info """
      NCBI API key   : ${params.NCBI_API_key}
      ploidy         : ${params.ploidy}
      keep BAM/gvcf  : ${params.keep_bam_gvcf}
+     bwa_index      : ${params.bwa_index}
     """
 
 

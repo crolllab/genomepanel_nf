@@ -82,6 +82,7 @@ This channel feeds parallel GATK processes (CombineGVCFs, GenotypeGVCFs, etc.) a
 ### Optional Parameters
 - `--outdir`: Output directory (default: `./nf_output/`)
 - `--keep_bam_gvcf`: Set to `"true"` to save per-sample BAM/GVCF files (default: `"false"`)
+- `--bwa_index`: Path prefix to pre-built BWA index files (skips indexing step if provided)
 - `-work-dir`: Temporary work directory (default: `./work`; use `/scratch/...` for large runs)
 - `-resume`: Resume from last completed step (requires intact work directory)
 
@@ -100,6 +101,13 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --reference ref.fasta --ploidy 1 \
   --reads '/path/**_{1,2}.fq.gz' \
   --NCBI_API_key $KEY --SRA_index accessions.txt
+
+# With pre-built BWA index (skips indexing step)
+nextflow run main.nf -config nextflow.config -profile slurm \
+  -work-dir '/scratch/nf_tmp' --outdir './output' \
+  --reference ref.fasta --ploidy 1 \
+  --bwa_index '/path/to/ref.fasta' \
+  --reads '/path/**_{1,2}.fq.gz'
 ```
 
 ### Common Gotchas
