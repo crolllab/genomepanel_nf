@@ -8,7 +8,7 @@ process trimSequencesPE {
     tuple val(sample_id), path(read1), path(read2)
     
     output:
-    tuple val(sample_id), path("${sample_id}_{1,2}_trimmed.fastq.gz"), emit: reads
+    tuple val(sample_id), path("${sample_id}_*_trimmed.fastq.gz"), emit: reads
     path "${sample_id}_fastp.json", emit: report
     
     script:
