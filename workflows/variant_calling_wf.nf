@@ -137,22 +137,15 @@ workflow variant_calling {
     // Conditionally build or use provided BWA index
     if (params.bwa_index) {
         // Use provided BWA index files
-        bwa_index_ch = Channel.fromPath("${params.bwa_index}*.{amb,ann,bwt.2bit.64,pac,0123}")
-            .collect()
-            .map { files ->
-                // Return files in the expected order
-                [
-                    files.find { it.name.endsWith('.amb') },
-                    files.find { it.name.endsWith('.ann') },
-                    files.find { it.name.endsWith('.bwt.2bit.64') },
-                    files.find { it.name.endsWith('.pac') },
-                    files.find { it.name.endsWith('.0123') }
-                ]
-            }
-            .flatMap()
+        // Create separate channels for each index file in the expected order
+        bwa_amb = Channel.fromPath("${params.bwa_index}.amb")
+        bwa_ann = Channel.fromPath("${params.bwa_index}.ann")
+        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64")
+        bwa_pac = Channel.fromPath("${params.bwa_index}.pac")
+        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123")
     } else {
-        // Build BWA index from reference
-        bwa_index_ch = bwaIndex(params.reference)
+        // Build BWA index from reference - returns 5 separate outputs
+        bwa_index = bwaIndex(params.reference)
     }
     
     gatk_index  = gatkIndex(params.reference)
@@ -160,7 +153,11 @@ workflow variant_calling {
     // ---------------------
     // Mapping
     // ---------------------
-    bwaMap(params.reference, bwa_index_ch, trimmed_ch)
+    if (params.bwa_index) {
+        bwaMap(params.reference, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
+    } else {
+        bwaMap(params.reference, bwa_index, trimmed_ch)
+    }
 
 
     // ---------------------
@@ -184,7 +181,11 @@ workflow variant_calling {
     // ---------------------
     // GATK HaplotypeCaller
     // ---------------------
-    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index_ch, dedup_with_index)
+    if (params.bwa_index) {
+        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_with_index)
+    } else {
+        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
+    }
 
     // ---------------------
     // Parallel SNP calling by chromosome
