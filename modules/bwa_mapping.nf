@@ -1,6 +1,6 @@
 process bwaMap {
     tag "BWA-mem mapping"
-    memory '4GB'
+    memory '24GB'
     errorStrategy 'ignore'
     
     input:
