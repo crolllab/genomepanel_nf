@@ -137,12 +137,12 @@ workflow variant_calling {
     // Conditionally build or use provided BWA index
     if (params.bwa_index) {
         // Use provided BWA index files
-        // Create separate channels for each index file in the expected order
-        bwa_amb = Channel.fromPath("${params.bwa_index}.amb")
-        bwa_ann = Channel.fromPath("${params.bwa_index}.ann")
-        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64")
-        bwa_pac = Channel.fromPath("${params.bwa_index}.pac")
-        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123")
+        // Collect into value channels that can be reused for each sample
+        bwa_amb = Channel.fromPath("${params.bwa_index}.amb").collect()
+        bwa_ann = Channel.fromPath("${params.bwa_index}.ann").collect()
+        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64").collect()
+        bwa_pac = Channel.fromPath("${params.bwa_index}.pac").collect()
+        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
     } else {
         // Build BWA index from reference - returns 5 separate outputs
         bwa_index = bwaIndex(params.reference)
