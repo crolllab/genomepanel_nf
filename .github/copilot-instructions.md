@@ -216,12 +216,21 @@ GATK processes operate per-chromosome for parallelization. To modify this:
 2. **Fallback to NCBI**: `prefetch` + `fasterq-dump` if ENA fails (produces `.fastq`)
 3. **Both handled**: Fastp accepts both compressed and uncompressed formats
 
-**Critical: prefetch temp directory issue**
-- **Must use `--output-file`** not `--output-directory` to avoid `/tmp/` quota issues
+**Critical: prefetch and fasterq-dump temp directory issues**
+- **Must use `--output-file`** not `--output-directory` for prefetch to avoid `/tmp/` quota issues
+- **Must set `TMPDIR` environment variable** for fasterq-dump to override system temp location
 - Nextflow processes execute in `/tmp/nxf.*/` temporary directories
 - Using `prefetch $srr --output-directory .` writes to `/tmp/`, hitting disk quota (122 error)
-- **Solution**: `prefetch $srr --output-file ncbi_download/${srr}.sra` explicitly places file in work directory
-- This was the cause of 13 download failures (0.5%) in production runs until fixed Oct 2025
+- Using `fasterq-dump --temp .` alone is insufficient - tool still uses system TMPDIR for buffers
+- **Solution**: 
+  ```bash
+  mkdir -p ncbi_download fasterq_tmp
+  prefetch $srr --output-file ncbi_download/${srr}.sra
+  export TMPDIR="$PWD/fasterq_tmp"
+  fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp fasterq_tmp
+  rm -rf ncbi_download fasterq_tmp
+  ```
+- This was the cause of 15 download failures (0.6%) in production runs until fully fixed Oct 2025
 
 **Error handling:**
 - **`errorStrategy 'ignore'`**: Failed downloads don't abort pipeline (allows partial success on large runs)
