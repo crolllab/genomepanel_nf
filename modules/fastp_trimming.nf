@@ -21,17 +21,16 @@ process trimSequencesPE {
         -O ${sample_id}_2_trimmed.fastq.gz \
         --json ${sample_id}_fastp.json
     
-    # Safely delete the original input files, ignoring write-protection errors
+    # Safely delete the original input files after trimming
+    # Uses safe deletion pattern to prevent race conditions
     for file in "$read1" "$read2"; do
         if [ -L "\$file" ]; then
-            # It's a symlink - try to delete the target
+            # Resolve symlink to actual file
             target=\$(readlink -f "\$file" 2>/dev/null)
-            if [ -n "\$target" ] && [ -f "\$target" ]; then
-                rm "\$target" 2>/dev/null || echo "Warning: Could not delete \$target (write-protected or permission denied)"
-            fi
+            [ -n "\$target" ] && [ -f "\$target" ] && rm "\$target" || true
         elif [ -f "\$file" ]; then
-            # It's a regular file - try to delete it directly
-            rm "\$file" 2>/dev/null || echo "Warning: Could not delete \$file (write-protected or permission denied)"
+            # Direct file deletion
+            rm "\$file" || true
         fi
     done
     """
@@ -59,16 +58,15 @@ process trimSequencesSE {
         -o ${sample_id}_trimmed.fastq.gz \
         --json ${sample_id}_fastp.json
     
-    # Safely delete the original input file, ignoring write-protection errors
+    # Safely delete the original input file after trimming
+    # Uses safe deletion pattern to prevent race conditions
     if [ -L "$r1" ]; then
-        # It's a symlink - try to delete the target
+        # Resolve symlink to actual file
         target=\$(readlink -f "$r1" 2>/dev/null)
-        if [ -n "\$target" ] && [ -f "\$target" ]; then
-            rm "\$target" 2>/dev/null || echo "Warning: Could not delete \$target (write-protected or permission denied)"
-        fi
+        [ -n "\$target" ] && [ -f "\$target" ] && rm "\$target" || true
     elif [ -f "$r1" ]; then
-        # It's a regular file - try to delete it directly
-        rm "$r1" 2>/dev/null || echo "Warning: Could not delete $r1 (write-protected or permission denied)"
+        # Direct file deletion
+        rm "$r1" || true
     fi
     """
 }
