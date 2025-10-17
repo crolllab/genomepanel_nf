@@ -2,7 +2,7 @@ process SRAresolve {
     tag "Querying $accessions_file for SRR ids and ENA URLs"
     cpus 1
     memory '4GB'
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true
     errorStrategy 'ignore'
 
     input:

@@ -3,7 +3,7 @@ process trimSequencesPE {
     errorStrategy 'ignore'
     memory '4GB'
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
-    
+        
     input:
     tuple val(sample_id), path(read1), path(read2)
     
@@ -42,6 +42,11 @@ process trimSequencesSE {
     memory '4GB'
     cpus 4
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
+
+    beforeScript """
+        mkdir -p "\$PWD/tmp"
+        export TMPDIR="\$PWD/tmp"
+    """
 
     input:
     tuple val(sample_id), path(r1)

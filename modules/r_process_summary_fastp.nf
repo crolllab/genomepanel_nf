@@ -3,6 +3,7 @@ process RSummarizingFASTP {
     cpus 1
     publishDir "${params.outdir}", mode: 'copy'
 
+
     input:
     path json_files
 

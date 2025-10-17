@@ -4,7 +4,6 @@ process ConcatCleanVCFs {
     memory '48GB'
     publishDir params.outdir, mode: 'copy'
 
-
     input:
     path clean_vcf_ch
  

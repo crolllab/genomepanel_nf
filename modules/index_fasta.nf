@@ -3,6 +3,11 @@ process fastaIndex {
     cpus 1
     memory '32GB'
     
+    beforeScript """
+        mkdir -p "\$PWD/tmp"
+        export TMPDIR="\$PWD/tmp"
+    """
+    
     input:
     path reference
 

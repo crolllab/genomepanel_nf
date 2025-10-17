@@ -3,7 +3,7 @@ process addRG {
     errorStrategy 'ignore'
     cpus 1
     memory '16GB'
-    
+       
     input:
     tuple val(sample_id), path(sorted_bam), path(sorted_bai)
     

@@ -1,245 +1,72 @@
-# Nextflow Genomics Pipeline Instructions
+— end
+<!-- genomepanel_nf: AI Coding Agent Instructions -->
+# AI Contributor Guide for genomepanel_nf
 
-## Project Overview
-`genomepanel_nf` is a Nextflow DSL2 pipeline for variant calling on large genome panels (tested with 2,400+ samples). It processes Illumina paired-end/single-end reads from local files or NCBI SRA, performs BWA mapping, GATK HaplotypeCaller variant calling, and quality filtering. The pipeline is optimized for fungal genomes (specifically _Zymoseptoria tritici_) and supports both local and SLURM execution.
-
-**Key Technology Stack**: Nextflow DSL2, Singularity containers, SLURM/local execution, Bash scripting within processes
+This repo is a modular Nextflow DSL2 pipeline for large-scale variant calling, optimized for fungal genomes. Follow these conventions for safe, productive contributions:
 
 ## Architecture & Data Flow
+- **Entry:** `main.nf` → orchestrates `workflows/variant_calling_wf.nf`
+- **Processes:** Each step is a separate file in `modules/*.nf` (e.g., `bwa_mapping.nf`, `gatk4_hc.nf`).
+- **Containers:** Singularity images in `singularity/`, mapped in `nextflow.config` via `withName:ProcessName` blocks. Always update both if renaming processes/images.
+- **Reference:** Must use `.fasta` extension (not `.fa`). Many input patterns depend on `${reference.baseName}.fasta.*`.
+- **Parallelization:** Joint genotyping splits by chromosome using the `.fai` index and a `chromosomes_ch` channel. See `workflows/variant_calling_wf.nf` for this pattern.
 
-### Modular Structure
-- **Main entry**: `main.nf` → `workflows/variant_calling_wf.nf`
-- **Process modules**: `modules/*.nf` (22 separate process definitions)
-- **Container config**: `nextflow.config` binds each process to a Singularity container
-- **Execution profiles**: `local` (4 CPUs), `local_highCPU` (24 CPUs), `slurm` (8 CPUs per task)
-
-### Pipeline Stages (Sequential)
-1. **SRA Resolution & Download** (optional) → PE/SE fastq files
-2. **Fastp Trimming** → trimmed fastq pairs
-3. **BWA-mem2 Mapping** → SAM files
-4. **Samtools Sort + Picard (AddRG → MarkDuplicates)** → deduplicated BAM files
-5. **GATK HaplotypeCaller** → per-sample GVCF files
-6. **Chromosome-parallel Variant Calling**:
-   - CombineGVCFs → per-chromosome combined GVCF
-   - GenotypeGVCFs → per-chromosome VCF
-   - FilterVCFs → per-chromosome filtered VCF
-   - CleanVCFs → per-chromosome clean VCF
-7. **BCFtools Concat** → final VCFs (`final_variants.vcf.gz`, `final_variants.clean.vcf.gz`)
-8. **VCFtools** → thinned/MAF-filtered VCF for population genetics
-9. **R Reporting** → quality plots and summary tables
-
-### Critical Parallelization Pattern
-The pipeline splits by chromosome after GVCF creation (step 5). The `.fai` index is parsed line-by-line to create `chromosomes_ch`:
-```groovy
-chromosomes_ch = fai_index.splitCsv(sep: '\t').map { it[0] }
-```
-This channel feeds parallel GATK processes (CombineGVCFs, GenotypeGVCFs, etc.) and is the primary scalability mechanism for large cohorts.
-
-## Nextflow DSL2 Conventions
-
-### Channel Patterns
-- **Input mixing**: Local + SRA reads are merged using `.mix()` before trimming
-  ```groovy
-  combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
-  ```
-- **Collect before chromosome split**: GVCFs are collected with `.collect()` before splitting by chromosome
-  ```groovy
-  gvcf_ch = gvcf.collect()
-  cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, ...)
-  ```
-- **Tuple format**: Processes use `tuple val(sample_id), path(files)` for sample tracking
-
-### Process Conventions
-- **Tag directive**: Always includes descriptive names (e.g., `tag "GATK4 HaplotypeCaller"`)
-- **Error handling**: Critical processes use `errorStrategy 'retry', maxRetries 3`; non-critical use `errorStrategy 'ignore'`
-- **Conditional publishing**: Uses `enabled: params.keep_bam_gvcf` to optionally save BAM/GVCF files
-- **Resource cleanup**: Processes actively delete input files after processing to manage disk space during large runs (work directories can reach multi-TB)
-  - **Critical safe deletion pattern** (use this for ALL new cleanup code):
-    ```bash
-    target="$(readlink -f "$file")"
-    [ -n "$target" ] && [ -f "$target" ] && rm "$target" || true
-    ```
-  - **Why**: Prevents race conditions when multiple processes share upstream files; `|| true` ensures cleanup errors never fail the process
-  - **Example**: `gatk4_hc.nf` cleans up BAM files after GVCF creation
-  - **Do not remove**: These cleanup commands prevent multi-TB work directory bloat
-- **Container binding**: Each process has a `withName:ProcessName` block in `nextflow.config` specifying its Singularity container
-- **Bash scripting**: Process scripts use `#!/bin/bash` with `set -e` for immediate error exit on command failures
-- **maxForks directive**: Download processes limit concurrency (e.g., `maxForks = 20` for SRA downloads) to avoid overwhelming NCBI/ENA servers
-
-### File Naming Convention
-- Processes output files named `${sample_id}_suffix.ext` (e.g., `${sample_id}.g.vcf.gz`)
-- Index files follow the pattern `${reference.baseName}.fasta.fai`, `${reference.baseName}.dict`
-- **Critical**: Reference must have `.fasta` extension (not `.fa`) due to hardcoded `${reference.baseName}.fasta.*` patterns throughout all process inputs
-
-## Key Parameters & Usage
-
-### Required Parameters
-- `--reference`: Path to reference genome (`.fasta` extension required, not `.fa`)
-- `--ploidy`: Numeric value (1 for haploid, 2 for diploid)
-- `--NCBI_API_key`: Required only if using `--SRA_index` (get from NCBI account settings)
-- One of: `--reads` (local fastq glob pattern) OR `--SRA_index` (file with SRA accessions)
-
-### Optional Parameters
-- `--outdir`: Output directory (default: `./nf_output/`)
-- `--keep_bam_gvcf`: Set to `"true"` to save per-sample BAM/GVCF files (default: `"false"`)
-- `--bwa_index`: Path prefix to pre-built BWA index files (skips indexing step if provided)
-- `-work-dir`: Temporary work directory (default: `./work`; use `/scratch/...` for large runs)
-- `-resume`: Resume from last completed step (requires intact work directory)
-
-### Glob Pattern for Local Reads
-Use single quotes with complex brace expansions to match Illumina naming variations:
-```bash
---reads '/path/**_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
-```
-This matches: `*_1.fq.gz`, `*_R1.fastq.gz`, `*_R1_001.fastq.gz`, etc.
-
-### Critical Execution Patterns
-```bash
-# Standard SLURM execution (use tmux/screen!)
-nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './output' \
-  --reference ref.fasta --ploidy 1 \
-  --reads '/path/**_{1,2}.fq.gz' \
-  --NCBI_API_key $KEY --SRA_index accessions.txt
-
-# With pre-built BWA index (skips indexing step)
-nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './output' \
-  --reference ref.fasta --ploidy 1 \
-  --bwa_index '/path/to/ref.fasta' \
-  --reads '/path/**_{1,2}.fq.gz'
-```
-
-### Common Gotchas
-- **Screen/tmux required**: Nextflow orchestrator must stay alive even with SLURM (it manages job submission, not just submits and exits)
-- **Reference file extension**: Must be `.fasta` (not `.fa`) due to hardcoded index file references
-- **Temp directory**: Use `-work-dir '/scratch/...'` for large datasets; work directory can be multi-TB with aggressive cleanup
-- **Resume behavior**: `-resume` requires intact work directory; deleted work files break resumption
-- **Failed downloads don't abort**: `errorStrategy 'ignore'` on SRA downloads means some samples may silently fail - check `.nextflow.log` with `grep "Ignored process"`
-
-## Development Patterns
-
-### Adding New Processes
-1. Create `modules/new_process.nf` with process definition
-2. Add container config in `nextflow.config`:
-   ```groovy
-   withName:NewProcess {
-       container = './singularity/tool%3Aversion--hash'
-   }
-   ```
-3. Include in `workflows/variant_calling_wf.nf`: `include { NewProcess } from '../modules/new_process'`
-4. Call process in workflow, respecting channel types (use `.collect()` to gather parallel outputs before downstream steps)
-
-### Safe File Cleanup Pattern (REQUIRED)
-When adding cleanup code to delete upstream files, **always** use this pattern to prevent race conditions:
-```bash
-# Safe deletion - prevents race conditions and permission errors
-target="$(readlink -f "$file")"
-[ -n "$target" ] && [ -f "$target" ] && rm "$target" || true
-```
-**Never use**: `rm "$(readlink -f "$file")"` (causes exit code 1 if file already deleted)
-
-### Testing Local Changes
-Use `-profile local_highCPU` with small dataset:
-```bash
-nextflow run main.nf -profile local_highCPU -work-dir '/tmp/nf_test' \
-  --reference small_ref.fasta --ploidy 1 --reads 'test/*_{1,2}.fq.gz'
-```
-
-### Debugging Failed Processes
-- Check `.nextflow.log` for high-level errors and ignored processes
-- Inspect `work/<hash>/` directories for process-specific logs (`.command.log`, `.command.err`)
-- Enable debug mode: `process.debug = true` in `nextflow.config`
-- For SRA failures: `grep "Ignored process > SRAdownloadPE" .nextflow.log`
-- For successful BWA but no output: Check cleanup script failed (exit code 1 in `.command.log`)
-
-## Container Management
-
-### Singularity Image Naming
-Images use URL-encoded names: `tool%3Aversion--hash` (`:` encoded as `%3A`)
-
-### Sourcing Images
-Preferred: Copy from `/legserv/Temp/Shared/genomepanel_nf/singularity`
-Alternative: Pull from Galaxy Project depot (see README.md for commands)
-
-### Custom Container Bindings
-`nextflow.config` includes:
-```groovy
-runOptions = "-B /tmp:/tmp"
-envWhitelist = 'APPTAINERENV_NXF_TASK_WORKDIR,SINGULARITYENV_NXF_TASK_WORKDIR'
-```
-Mount additional paths if processes need access to external data.
-
-### beforeScript Pattern
-All processes set `TMPDIR` via `beforeScript` in `nextflow.config`:
-```groovy
-beforeScript = "export TMPDIR=/tmp/$USER/nxf_tmp"
-```
-This ensures consistent temporary directory usage across processes and prevents home directory quota issues.
-
-## Output Files
-
-### Primary Outputs (in `--outdir`)
-- `final_variants.vcf.gz`: All variants with GATK filter flags
-- `final_variants.clean.vcf.gz`: Only PASS variants
-- `final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz`: Thinned for population genetics
-- `fastp_summary.tsv`, `bwa_summary.tsv`: Aggregate QC metrics
-- `qual_plots/`: PDF plots for variant quality metrics (AN, DP, MQ, QD, QUAL)
-- `NCBI_download_urls.tsv`: SRA download metadata (shows ENA vs NCBI source)
-
-### Conditional Outputs (if `--keep_bam_gvcf true`)
-- `bam_files/`: Per-sample deduplicated BAMs
-- `gvcf_files/`: Per-sample GVCFs
-
-## Special Considerations
-
-### Memory Management
-Large runs use aggressive file cleanup to avoid filling work directories. The safe deletion pattern prevents race conditions when multiple processes share upstream files. Do not remove these cleanup commands without adding equivalent disk management.
-
-### Chromosome Splitting
-GATK processes operate per-chromosome for parallelization. To modify this:
-1. Change how `chromosomes_ch` is created in `workflows/variant_calling_wf.nf` (currently parses `.fai` by line)
-2. Ensure downstream processes handle the new granularity
-3. Update memory allocations (per-chromosome processes need less memory than whole-genome)
-
-### SRA Download - Hybrid Approach (ENA + NCBI)
-`modules/resolve_SRA.nf` + `modules/download_SRA.nf` implement a two-tier download strategy optimized for reliability and speed:
-
-**Resolution Phase (`resolve_SRA.nf`):**
-- Queries NCBI for PE/SE layout via `esearch`/`efetch`
-- Queries ENA API for direct FASTQ HTTP URLs
-- Outputs `NCBI_download_urls.tsv` with URLs and source info
-- **Special case**: Detects 3-file ENA responses (orphaned + _1 + _2) and uses only _1/_2 files
-
-**Download Phase (`download_SRA.nf` - automatic fallback):**
-1. **Try ENA first** (if URL available): `wget` direct FASTQ (3-5x faster, produces `.fastq.gz`)
-2. **Fallback to NCBI**: `prefetch` + `fasterq-dump` if ENA fails (produces `.fastq`)
-3. **Both handled**: Fastp accepts both compressed and uncompressed formats
-
-**Critical: prefetch and fasterq-dump temp directory issues**
-- **Must use `--output-file`** not `--output-directory` for prefetch to avoid `/tmp/` quota issues
-- **Must set `TMPDIR` environment variable** for fasterq-dump to override system temp location
-- Nextflow processes execute in `/tmp/nxf.*/` temporary directories
-- Using `prefetch $srr --output-directory .` writes to `/tmp/`, hitting disk quota (122 error)
-- Using `fasterq-dump --temp .` alone is insufficient - tool still uses system TMPDIR for buffers
-- **Solution**: 
+## Key Patterns & Conventions
+- **Safe file cleanup:** Always use this pattern to delete files in process scripts:
   ```bash
-  mkdir -p ncbi_download fasterq_tmp
-  prefetch $srr --output-file ncbi_download/${srr}.sra
-  export TMPDIR="$PWD/fasterq_tmp"
-  fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp fasterq_tmp
-  rm -rf ncbi_download fasterq_tmp
+  target="$(readlink -f "$file")"
+  [ -n "$target" ] && [ -f "$target" ] && rm "$target" || true
   ```
-- This was the cause of 15 download failures (0.6%) in production runs until fully fixed Oct 2025
+  (Prevents race conditions; see `gatk4_hc.nf` for examples.)
+- **Temp directory handling:** CRITICAL - Use `./gatk_tmp` (relative path) for GATK `--tmp-dir`, NOT `$PWD/tmp`. Nextflow creates `NXF_SCRATCH` in `/tmp/nxf.XXXXX` and cd's there, making `$PWD` unreliable. Relative paths work because the scratch dir is bind-mounted into containers.
+- **Scratch directory:** `process.scratch = false` in config to avoid `/tmp` space issues. GATK processes generate large outputs that can fill `/tmp`, causing write errors. Running directly in work directory (on `/scratch`) is safer.
+  - **Root cause diagnosis:** When `process.scratch = true`, Nextflow creates temporary execution directories in `/tmp/nxf.XXXXX/`. GATK HaplotypeCaller runs successfully for ~53 minutes, processes entire BAM file, but fails at the final write step when attempting to write the compressed GVCF to `/tmp/nxf.XXXXX/sample.g.vcf.gz`. The error is `htsjdk.samtools.util.RuntimeIOException: Write error; BinaryCodec in writemode; file: file:///tmp/nxf.XXXXX/*.g.vcf.gz`. This occurs because the final GVCF (often 50-200MB compressed) cannot be written to `/tmp`, despite `/tmp` having available space (disk not full). The issue appears to be related to NFS-backed `/tmp` write semantics or quota limitations not visible to `df`. Additionally, JVM performance monitoring files (`/tmp/hsperfdata_daniel/*`) can experience locking conflicts when multiple concurrent processes use `/tmp`.
+  - **Why retries fail:** Nextflow's retry mechanism (`errorStrategy 'retry', maxRetries 3`) re-executes the task in a new `/tmp/nxf.YYYYY/` directory, but the underlying `/tmp` write issue persists, causing all 3 retries to fail with identical errors after re-processing the entire BAM (~53 minutes each). Solution: `process.scratch = false` forces execution in the work directory (`/scratch/daniel_tmp/XX/YYYYYY/`), avoiding `/tmp` entirely.
+- **Error handling:**
+  - SRA downloads and long-running steps: `errorStrategy 'ignore'` (allows partial success)
+  - Critical steps: `errorStrategy 'retry', maxRetries 3`
+- **Channel usage:**
+  - Mix local/SRA reads with `.mix()`
+  <!-- genomepanel_nf: AI coding agent instructions (concise) -->
+  # AI Contributor Guide — genomepanel_nf (short)
 
-**Error handling:**
-- **`errorStrategy 'ignore'`**: Failed downloads don't abort pipeline (allows partial success on large runs)
-- **Bash `set -e`**: Any error causes immediate exit, caught by Nextflow
-- **Finding failures**: `grep "Ignored process > SRAdownloadPE" .nextflow.log`
-- **Common error**: `Disk quota exceeded(122)` indicates `/tmp/` usage - check prefetch output path
+  Purpose: quick, actionable rules for automated coding agents working on this Nextflow DSL2 pipeline.
 
-**Benefits:**
-- 3-5x faster for ENA-available accessions (~95% of SRA data)
-- ~96%+ success rate across 2,400+ samples (dual source redundancy)
-- Automatic source selection, transparent to user
-- Disk-space efficient (uses work directory, not `/tmp/` or home)
+  - Entry point: `main.nf` → `workflows/variant_calling_wf.nf`. Most orchestration lives in the workflow file.
+  - Process modules: one process per file under `modules/` (e.g. `gatk4_hc.nf`, `download_SRA.nf`). Keep this modularity.
+  - Containers: all Singularity images live in `singularity/` and are mapped to processes in `nextflow.config` using `withName:ProcessName` blocks — never hardcode image paths in modules.
+
+  - Reference requirement: the reference must use a `.fasta` extension (not `.fa`). Many inputs expect `${reference.baseName}.fasta.*` (fai, dict).
+  - Chromosome splitting: pipeline parallelizes by chromosome. See `workflows/variant_calling_wf.nf` for the `chromosomes_ch = fai_index.splitCsv(sep: '\t').map { it[0] }` pattern — collect GVCFs before splitting.
+
+  - Critical cleanup pattern (use in process scripts):
+    target="$(readlink -f "$file")" && [ -n "$target" ] && [ -f "$target" ] && rm "$target" || true
+    Reason: prevents race conditions and avoids failing processes if files are already removed. See `modules/gatk4_hc.nf`.
+
+  - GATK / tmp rules (must-follow):
+    - Use relative tmp dirs for GATK (e.g. `--tmp-dir ./gatk_tmp`) — do NOT rely on `$PWD/tmp` or system `/tmp`.
+    - `process.scratch = false` is used to avoid writing large outputs into NFS-backed `/tmp` (see `nextflow.config`).
+
+  - SRA download specifics (implemented in `modules/resolve_SRA.nf` + `modules/download_SRA.nf`):
+    - Try ENA direct URLs first (fast, `.fastq.gz`), fallback to NCBI `prefetch` + `fasterq-dump`.
+    - When using `prefetch`, use `--output-file` (not `--output-directory`). For `fasterq-dump`, set `TMPDIR` and use `-t` for temp dir. Example pattern is in repo docs and `download_SRA.nf`.
+
+  - Process conventions:
+    - Use `tag` with descriptive text (e.g., `tag "GATK4 HaplotypeCaller"`).
+    - Critical processes: `errorStrategy 'retry', maxRetries 3`. Non-critical (long downloads): `errorStrategy 'ignore'`.
+    - Use `tuple val(sample_id), path(files)` for tracking samples through channels.
+
+  - Adding a new process: create `modules/my_process.nf`, add a `withName:MyProcess` block in `nextflow.config`, and `include { MyProcess } from '../modules/my_process'` in `workflows/variant_calling_wf.nf`.
+
+  - Quick run examples:
+    - Local test: `nextflow run main.nf -profile local_highCPU -work-dir /tmp/nf_test --reference IPO323.fasta --ploidy 1 --reads 'test/*_{1,2}.fq.gz'`
+    - Production (SLURM): `NCBI_API_KEY=... nextflow run main.nf -config nextflow.config -profile slurm -work-dir /scratch/nf_tmp --outdir ./output --reference ref.fasta --ploidy 1 --reads '/path/**_{1,2}.fq.gz' --SRA_index SRA_accessions.txt`
+
+  - Debugging pointers:
+    - Check `.nextflow.log` for orchestration messages. Search for `Ignored process` to find downloads that failed.
+    - Inspect `work/<hash>/` for `.command.log` and `.command.err` for process-level failures.
+
+  - Key files to read when making code changes: `main.nf`, `workflows/variant_calling_wf.nf`, `nextflow.config`, `modules/download_SRA.nf`, `modules/gatk4_hc.nf`.
+
+  If anything here is unclear or you want more examples (e.g., exact `fasterq-dump` invocation used), tell me which section to expand and I will iterate.
+

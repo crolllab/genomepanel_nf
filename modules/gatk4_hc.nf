@@ -1,13 +1,14 @@
 process GATKHC {
     tag "GATK4 HaplotypeCaller"
-    errorStrategy 'ignore'
     cpus 1
     memory '8GB'
+    maxForks 15  // Limit concurrency to reduce NFS load
+    errorStrategy { sleep(120 * 60 * 1000); return 'retry' }
+    maxRetries 3
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
         enabled: params.keep_bam_gvcf
-    
     
     input:
     path reference
@@ -25,7 +26,13 @@ process GATKHC {
     
     script:
     """
+    set -e  # Exit immediately on error - prevents cleanup if command fails
+    
+    # Create tmp directory in current location (NXF_SCRATCH, which is bind-mounted)
+    mkdir -p ./gatk_tmp
+    
     gatk --java-options "-Xmx8g" HaplotypeCaller \
+        --tmp-dir ./gatk_tmp \
         -R $reference \
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \
@@ -33,7 +40,7 @@ process GATKHC {
         -ERC GVCF \
         --create-output-variant-index
     
-    # Safe cleanup - handle concurrent deletion gracefully
+    # Only reached if GATK succeeded - cleanup input files
     bam_target="\$(readlink -f "$dedup_bam")"
     bai_target="\$(readlink -f "$dedup_bai")"
     [ -n "\$bam_target" ] && [ -f "\$bam_target" ] && rm "\$bam_target" || true

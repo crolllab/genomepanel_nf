@@ -15,12 +15,15 @@ process CombineGVCFs {
 
     script:
     """
+    mkdir -p ./gatk_tmp
+    
     printf "${gvcf_ch}" > file
     sed 's/ /\\n/g' file > gvcfs.list.tmp
     grep -v "tbi" gvcfs.list.tmp > gvcfs.list
 
     gatk --java-options "-Xmx64g" \
         CombineGVCFs \
+        --tmp-dir ./gatk_tmp \
         -R $reference \
         -L $chr \
         -V gvcfs.list \

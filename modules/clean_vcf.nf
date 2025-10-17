@@ -16,8 +16,15 @@ process CleanVCFs {
 
     script:
 
-    """   
+    """
+    mkdir -p ./gatk_tmp
+       
     gatk IndexFeatureFile -I filtered.${chr}.vcf.gz
-    gatk --java-options "-Xmx4g" SelectVariants -R $reference -V filtered.${chr}.vcf.gz  -O clean.${chr}.vcf.gz --exclude-filtered --exclude-non-variants --remove-unused-alternates
+    gatk --java-options "-Xmx4g" SelectVariants \
+        --tmp-dir ./gatk_tmp \
+        -R $reference \
+        -V filtered.${chr}.vcf.gz \
+        -O clean.${chr}.vcf.gz \
+        --exclude-filtered --exclude-non-variants --remove-unused-alternates
     """
 }

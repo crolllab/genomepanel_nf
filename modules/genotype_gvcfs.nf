@@ -15,9 +15,15 @@ process GenotypeGVCFs {
     path "genotyped.*.vcf.gz"
 
     script:
-    """   
+    """
+    mkdir -p ./gatk_tmp
+       
     gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
-    gatk --java-options "-Xmx48g" GenotypeGVCFs -R $reference -V combined.${chr}.g.vcf.gz -output genotyped.${chr}.vcf.gz
+    gatk --java-options "-Xmx48g" GenotypeGVCFs \
+        --tmp-dir ./gatk_tmp \
+        -R $reference \
+        -V combined.${chr}.g.vcf.gz \
+        -output genotyped.${chr}.vcf.gz
     
     # Delete the combined GVCF (resolve symlink to actual file)
     cgvcf_target="\$(readlink -f "combined.${chr}.g.vcf.gz")"

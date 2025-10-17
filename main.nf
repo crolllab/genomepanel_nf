@@ -26,14 +26,18 @@ log.info """
      6. Variant quality plotting, read and mapping stats   
    
    Configuration:
-     outdir         : ${params.outdir}
-     reference      : ${params.reference}
-     local files    : ${params.reads}
-     SRA ids file   : ${params.SRA_index}
+     working dir    : ${params.workdir}
      NCBI API key   : ${params.NCBI_API_key}
      ploidy         : ${params.ploidy}
-     keep BAM/gvcf  : ${params.keep_bam_gvcf}
+
+     reference      : ${params.reference}
      bwa_index      : ${params.bwa_index}
+
+     local files    : ${params.reads}
+     SRA ids file   : ${params.SRA_index}
+
+     outdir         : ${params.outdir}
+     keep BAM/gvcf  : ${params.keep_bam_gvcf}
     """
 
 
