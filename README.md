@@ -228,7 +228,7 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --reads $READS
 ```
 
-Notes on the exection:
+### Notes on the exection:
 - Before executing the `nextflow` command, enter e.g. a `tmux` or `screen` session. The session needs to remain active until the end of the pipeline (even if you specify the `slurm` option)
 - In `local` and `local_highCPU` modes, the pipeline will run on the local machine. Use the `slurm` option to spread the load to all available nodes (requires SLURM).
 
@@ -288,7 +288,7 @@ BWA Mapping                    2,415      3m 28s           19s - 16m28s
 GATK HaplotypeCaller           2,415     52m 04s          45m12s - 63m28s
 ```
 
-Additional output folders:
+### Additional output folders:
 - `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
 - `gvcf_files/`: If `--keep_bam_gvcf true` is set, contains per-sample GVCF files.
 - `fastp_stats/`: Per-sample `fastp` quality control statistics in JSON format.
