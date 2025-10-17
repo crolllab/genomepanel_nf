@@ -27,6 +27,7 @@ include { RQualPlotting } from '../modules/r_plotting'
 include { PopGenVCF } from '../modules/popgen_vcf'
 include { RSummarizingBWA } from '../modules/r_process_summary_bwa'
 include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
+include { PipelineStatistics } from '../modules/pipeline_statistics'
 
 // ---------------------
 // Main workflow
@@ -236,5 +237,12 @@ workflow variant_calling {
     // ---------------------
     RSummarizingFASTP(fastp_json_ch)
     RSummarizingBWA(bam_reports_ch)    
+
+    // ---------------------
+    // Generate pipeline execution statistics
+    // ---------------------
+    // Mix all final outputs to create a single ready signal
+    all_done = concat_clean_vcf.mix(concat_vcf).mix(RSummarizingFASTP.out).mix(RSummarizingBWA.out).collect()
+    PipelineStatistics(all_done)
 
 }

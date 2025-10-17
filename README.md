@@ -3,9 +3,31 @@
 Pipeline to variant call large genome panels
 ========================================
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Step 1: Repository, singularity and nextflow environment](#step-1-repository-singularity-containers-and-nextflow-environment)
+   - [Singularity images](#get-singularity-images)
+3. [Step 2: Configure genomepanel_nf options](#step-2-configure-genomepanel_nf-options)
+4. [Step 3: Run genomepanel_nf - example options](#step-3-run-genomepanel_nf---example-options)
+   - [Obtain the reference genome](#obtain-the-zymoseptoria-tritici-ipo323-reference-genome)
+   - [Select local fastq files](#select-sets-of-local-fastq-file-pairs)
+   - [Define SRA/ENA accessions](#define-ncbi-sra-accessions)
+5. [Step 4: genomepanel_nf run example](#step-4-genomepanel_nf-run-example)
+6. [Step 5: Pipeline output](#step-5-pipeline-output)
+7. [Description of pipeline steps](#description-of-pipeline-steps)
+8. [Features to consider / bug fixes](#features-to-consider--bug-fixes)
+9. [Utilities](#utilities)
+   - [Download SRA files manually](#download-sra-files-manually)
+   - [Rename samples in final vcf](#rename-samples-in-final-vcf)
+
+---
+
+## Overview
+
 The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP calling and quality checks. The pipeline accepts either locally stored Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome for improved parallelization. 
 
-Implemented steps:
+**Implemented steps:**
 - `entrez-direct`: query NCBI SRA for metadata (optional)
 - `sratools`: download SRA files (optional)
 - `fastp`: quality control
@@ -15,12 +37,13 @@ Implemented steps:
 - `gatk`: HaplotypeCaller and joint genotyping
 - `gatk`: VariantFiltration and quality score plotting
 - `vcftools`: VCF filtering and subsetting
+- Pipeline statistics: automatic execution time analysis for all process types
 
-Current limitations:
+**Current limitations:**
 - If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
-- The pipeline will use the Illumina read name or NCBI SRA accession numbers for sample/project identification. See below how to make further changes.
+---
 
-## Step 1: Repository, singularity containers and nextflow environment
+## Step 1: Repository, singularity and nextflow environment
 
 Cloning the repository, 
 ```bash
@@ -36,7 +59,7 @@ micromamba activate nf_gp_env
 micromamba install -c bioconda nextflow
 ```
 
-### Get singularity images  
+### Singularity images
 The `singularity` folder must be in the same directory as the `main.nf` file.
 
 A copy of the compatible images is on LEGserv.
@@ -72,6 +95,8 @@ singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
 singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--pl5321h077b44d_0
 ```
 
+---
+
 ## Step 2: Configure `genomepanel_nf` options  
 
 Available parameters
@@ -102,11 +127,13 @@ Available parameters
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
+---
+
 ## Step 3: Run `genomepanel_nf` - example options
 
 The below example is based on the _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
 
-### Obtain the _Zymoseptoria tritici_ IPO323 reference genome
+### Obtain the reference genome
 
 ```bash
 # General option - from Ensembl Fungi
@@ -119,7 +146,7 @@ cp /legserv/NGS_data/Zymoseptoria/Zt_Reference_genomes/19Pangenome_genomes/IPO32
 mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
 ```
 
-### Select sets of local fastq file pairs
+### Select local fastq files
 
 The following examples show different ways to select paired-end fastq files. The `--reads` option must be bracketed by single quotes `'`. The examples assume that the read files are named according to the Illumina convention, i.e. ending with `_1.fq.gz` and `_2.fq.gz` or `_R1.fq.gz` and `_R2.fq.gz`. Adjust the patterns according to your own naming conventions.
 
@@ -148,7 +175,7 @@ ST01IR_A26b.cleanData_R1_001.fastq.gz and ST01IR_A26b.cleanData_R2_001.fastq.gz
 J9_L2_R1_001_18ku2CAeFgfk.fastq.gz and J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
 ```
 
-### Define NCBI SRA accessions
+### Define SRA/ENA accessions
 
 Example file to provide for the `--SRA_index ...` option. 
 
@@ -159,6 +186,8 @@ ERR13824499
 ```
 
 Save the text file e.g. as `SRA_accessions.txt`. The repository includes an example file.
+
+---
 
 ## Step 4: `genomepanel_nf` run example
 
@@ -202,6 +231,8 @@ nextflow run main.nf -config nextflow.config -profile slurm \
 Notes on the exection:
 - Before executing the `nextflow` command, enter e.g. a `tmux` or `screen` session. The session needs to remain active until the end of the pipeline (even if you specify the `slurm` option)
 - In `local` and `local_highCPU` modes, the pipeline will run on the local machine. Use the `slurm` option to spread the load to all available nodes (requires SLURM).
+
+---
   
 ## Step 5: Pipeline output
 
@@ -234,6 +265,29 @@ fastp_summary.tsv
 bwa_summary.tsv
 ```
 
+Pipeline execution statistics with completion times for all process types.
+```
+pipeline_execution_stats.txt       # Human-readable formatted report
+pipeline_execution_stats.tsv       # Machine-readable tab-separated format
+```
+
+The pipeline statistics files include:
+- Process name and description (e.g., "BWA Mapping", "GATK HaplotypeCaller")
+- Complete task counts for each process type
+- Average execution time (wall-clock duration)
+- Minimum and maximum execution times
+- Useful for identifying bottlenecks, optimizing resources, and documenting pipeline performance
+
+Example output:
+```
+Process                        Count    Average Time      Range (Min - Max)
+---------------------------------------------------------------------------------
+SRA Download (PE)              2,415      2m 02s           24s - 9m28s
+FASTP Trimming (PE)            2,415         41s            9s - 4m12s
+BWA Mapping                    2,415      3m 28s           19s - 16m28s
+GATK HaplotypeCaller           2,415     52m 04s          45m12s - 63m28s
+```
+
 Additional output folders:
 - `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
 - `gvcf_files/`: If `--keep_bam_gvcf true` is set, contains per-sample GVCF files.
@@ -250,6 +304,8 @@ final_variants.plots.QD.pdf
 final_variants.plots.QUAL.pdf
 ```
 
+---
+
 ## Description of pipeline steps
 
 1. `fastp` is run with default settings, a summary tsv file is produced at the end.
@@ -260,12 +316,15 @@ final_variants.plots.QUAL.pdf
 6. Variant quality metrics are plotted using an R script.
 7. `vcftools` is used to produce a a thinned (1 SNP per kb), MAF > 0.05 and high genotyping rate (> 90 genotyping rate) VCF file.
 
+---
 
 ## Features to consider / bug fixes
 - include GATK CNV calling
 - run basic pop gen analyses (e.g. PCA, admixture)
 - include sample renaming step as an option
 - allow for multiple SRA accessions or fastq pairs per sample name
+
+---
 
 ## Utilities
 
