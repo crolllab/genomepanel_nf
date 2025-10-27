@@ -199,26 +199,24 @@ workflow variant_calling {
     // Combine, genotype, filter VCFs
     // ---------------------
 
-    // Run CombineGVCFs
+    // Run CombineGVCFs - collect all GVCFs, process per chromosome
     gvcf_ch = gvcf.collect()
     cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
-    // Run GenotypeGVCF
-    cgvcf_ch = cgvcf.collect()
-    vcf = GenotypeGVCFs(cgvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
-
+    // Run GenotypeGVCF - process each chromosome independently (no collect)
+    vcf = GenotypeGVCFs(cgvcf, chromosomes_ch, params.reference, fai_index, gatk_index)
 
     // ---------------------
-    // Run FilterVCFs based on hard filters
+    // Run FilterVCFs based on hard filters - process each chromosome independently
     // ---------------------
-    vcf_ch = vcf.collect()
-    fvcf = FilterVCFs(vcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    fvcf = FilterVCFs(vcf, chromosomes_ch, params.reference, fai_index, gatk_index)
 
    // ---------------------
-   // Clean + concat clean VCFs
+   // Clean + concat clean VCFs - process each chromosome independently
    // ---------------------
-    fvcf_ch = fvcf.collect()
-    clean_vcf = CleanVCFs(fvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    clean_vcf = CleanVCFs(fvcf, chromosomes_ch, params.reference, fai_index, gatk_index)
+    
+    // Only collect all chromosomes for final concatenation
     clean_vcf_ch = clean_vcf.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
@@ -228,6 +226,7 @@ workflow variant_calling {
     // ---------------------
     // Concat all variants (incl. low qual) + R plotting
     // ---------------------
+    fvcf_ch = fvcf.collect()  // Collect filtered VCFs for concatenation
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
     RQualPlotting(concat_vcf)
