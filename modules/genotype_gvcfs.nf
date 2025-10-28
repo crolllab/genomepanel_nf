@@ -2,7 +2,7 @@ process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
     errorStrategy 'ignore'
     cpus 1
-    memory '48GB'
+    memory '16GB'
 
     input:
     path cgvcf
@@ -19,7 +19,7 @@ process GenotypeGVCFs {
     mkdir -p ./gatk_tmp
        
     gatk IndexFeatureFile -I combined.${chr}.g.vcf.gz
-    gatk --java-options "-Xmx48g" GenotypeGVCFs \
+    gatk --java-options "-Xmx16g" GenotypeGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V combined.${chr}.g.vcf.gz \
