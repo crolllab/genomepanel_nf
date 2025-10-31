@@ -20,6 +20,6 @@ process PopGenVCF {
         --max-missing 0.9 \
         --maf 0.05 \
         --recode \
-        --recode -c | gzip -c > ${concat_clean_vcf.baseName}_thin1000_maf0.05_maxm0.9.recode.vcf.gz
+        --stdout | gzip -c > ${concat_clean_vcf.baseName}_thin1000_maf0.05_maxm0.9.recode.vcf.gz
     """
 }

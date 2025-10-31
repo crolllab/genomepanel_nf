@@ -21,3 +21,7 @@ SRA_FASTERQ_TMP_FIX.md
 VALIDATION_SUMMARY.md
 .github/copilot-instructions.md
 BWA_INDEX_FIX.md
+modules/popgen_vcf.nf
+out.log
+.gitignore
+plink_pca.sh
