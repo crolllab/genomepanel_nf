@@ -12,7 +12,9 @@ process ConcatCleanVCFs {
 
     script:
 
-    """   
-    bcftools concat ${clean_vcf_ch} -Oz > final_variants.clean.vcf.gz
+    """
+    # Sort VCF files by chromosome order (natural sort for numeric chromosomes)
+    ls clean.*.vcf.gz | sort -V > vcf_list.txt
+    bcftools concat -f vcf_list.txt -Oz > final_variants.clean.vcf.gz
     """
 }
