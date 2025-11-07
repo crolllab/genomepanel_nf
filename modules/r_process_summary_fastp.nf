@@ -13,8 +13,8 @@ process RSummarizingFASTP {
     script:
     """
     cat > summarize.R << 'EOF'
-    # Collect input files
-    files <- list.files(pattern = "_fastp.json\$")
+    # Collect input files (both PE and SE patterns)
+    files <- list.files(pattern = "_(PE|SE)_fastp.json\$")
 
     data_list <- list()
 
@@ -47,7 +47,8 @@ process RSummarizingFASTP {
 
     df <- do.call(cbind, data_list)
     rownames(df) <- names(data_list[[1]])
-    colnames(df) <- sub('_fastp.json', '', files)
+    # Strip both _PE_fastp.json and _SE_fastp.json suffixes
+    colnames(df) <- sub('_(PE|SE)_fastp.json', '', files)
 
     write.table(df, file='fastp_summary.tsv', sep="\\t", quote=FALSE, col.names=NA)
     EOF

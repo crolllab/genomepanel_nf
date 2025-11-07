@@ -21,9 +21,10 @@ process SRAresolve {
     > NCBI_SRR_PE_accessions.txt
     > NCBI_SRR_SE_accessions.txt
     > NCBI_download_urls.tsv
+    > NCBI_download_urls_tmp.tsv
     
     # Header for URL file
-    echo -e "SRR_ID\tLayout\tURL_1\tURL_2\tSource" > NCBI_download_urls.tsv
+    echo -e "SRR_ID\tLayout\tURL_1\tURL_2\tSource" > NCBI_download_urls_tmp.tsv
 
     # Read all accessions into array
     accessions=( \$(grep -v '^\\s*\$' ${accessions_file}) )
@@ -81,14 +82,12 @@ process SRAresolve {
                 fi
             fi
             
-            # Classify by layout and save
+            # Classify by layout and save to temporary file
             if [[ "\$layout" == "PAIRED" ]]; then
-                echo "\$run_id" >> NCBI_SRR_PE_accessions.txt
-                echo -e "\$run_id\tPE\t\$url1\t\$url2\t\$source" >> NCBI_download_urls.tsv
+                echo -e "\$run_id\tPE\t\$url1\t\$url2\t\$source" >> NCBI_download_urls_tmp.tsv
                 echo "Added \$run_id to PE file (source: \$source)" >&2
             elif [[ "\$layout" == "SINGLE" ]]; then
-                echo "\$run_id" >> NCBI_SRR_SE_accessions.txt
-                echo -e "\$run_id\tSE\t\$url1\t\t\$source" >> NCBI_download_urls.tsv
+                echo -e "\$run_id\tSE\t\$url1\t\t\$source" >> NCBI_download_urls_tmp.tsv
                 echo "Added \$run_id to SE file (source: \$source)" >&2
             else
                 echo "Warning: Unknown layout '\$layout' for \$run_id" >&2
@@ -96,12 +95,20 @@ process SRAresolve {
         done
     done
     
+    # Deduplicate entries - keep first occurrence of each SRR_ID
+    # Sort by SRR_ID and layout, then use awk to keep only the first occurrence
+    (head -n 1 NCBI_download_urls_tmp.tsv; tail -n +2 NCBI_download_urls_tmp.tsv | sort -k1,1 -k2,2 | awk '!seen[\$1,\$2]++') > NCBI_download_urls.tsv
+    
+    # Generate deduplicated PE and SE accession lists from the deduplicated URL file
+    tail -n +2 NCBI_download_urls.tsv | awk '\$2=="PE" {print \$1}' > NCBI_SRR_PE_accessions.txt
+    tail -n +2 NCBI_download_urls.tsv | awk '\$2=="SE" {print \$1}' > NCBI_SRR_SE_accessions.txt
+    
     # Report results
     pe_count=\$(wc -l < NCBI_SRR_PE_accessions.txt)
     se_count=\$(wc -l < NCBI_SRR_SE_accessions.txt)
     ena_count=\$(grep -c "ENA" NCBI_download_urls.tsv || echo "0")
 
-    echo "Done! Found \$pe_count paired-end and \$se_count single-end SRR accessions"
+    echo "Done! Found \$pe_count paired-end and \$se_count single-end SRR accessions (after deduplication)"
     echo "ENA URLs available for \$ena_count accessions"
     echo "PE accessions saved in NCBI_SRR_PE_accessions.txt"
     echo "SE accessions saved in NCBI_SRR_SE_accessions.txt"

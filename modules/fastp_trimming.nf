@@ -9,7 +9,7 @@ process trimSequencesPE {
     
     output:
     tuple val(sample_id), path("${sample_id}_*_trimmed.fastq.gz"), emit: reads
-    path "${sample_id}_fastp.json", emit: report
+    path "${sample_id}_PE_fastp.json", emit: report
     
     script:
     """
@@ -19,7 +19,7 @@ process trimSequencesPE {
         -I $read2 \
         -o ${sample_id}_1_trimmed.fastq.gz \
         -O ${sample_id}_2_trimmed.fastq.gz \
-        --json ${sample_id}_fastp.json
+        --json ${sample_id}_PE_fastp.json
     
     # Safely delete the original input files after trimming
     # Uses safe deletion pattern to prevent race conditions
@@ -53,7 +53,7 @@ process trimSequencesSE {
     
     output:
     tuple val(sample_id), path("${sample_id}_trimmed.fastq.gz"), emit: reads
-    path "${sample_id}_fastp.json", emit: report
+    path "${sample_id}_SE_fastp.json", emit: report
     
     script:
     """
@@ -61,7 +61,7 @@ process trimSequencesSE {
         -w $task.cpus \
         -i $r1 \
         -o ${sample_id}_trimmed.fastq.gz \
-        --json ${sample_id}_fastp.json
+        --json ${sample_id}_SE_fastp.json
     
     # Safely delete the original input file after trimming
     # Uses safe deletion pattern to prevent race conditions
