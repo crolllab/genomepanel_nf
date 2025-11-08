@@ -113,9 +113,9 @@ Available parameters
 
 - `--NCBI_API_key`: Required for querying and downloading from NCBI SRA. You can get your key by creating an [account on NCBI](https://account.ncbi.nlm.nih.gov/). After registration/login, find on the top right the link to the "Account settings". Click on "Create API key" and copy it.
 
-- `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa` or `.fas`).
+- `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa`, `.fna`or `.fas`).
 
-- `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). Useful when the reference genome is very large and indexing takes a long time.
+- `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources with very big genomes. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). 
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
@@ -253,8 +253,9 @@ Thinned VCF (1 SNP per kb), MAF > 0.05 and high genotyping rate (> 90 genotyping
 final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz
 ```
 
-Text files listing the SRR accessions used for single-end and paired-end reads, respectively.
+Text files listing the SRR accessions and NCBI/ENA download URLs used for single-end and paired-end reads, respectively.
 ```
+NCBI_download_urls.tsv
 NCBI_SRR_PE_accessions.txt
 NCBI_SRR_SE_accessions.txt
 ```
