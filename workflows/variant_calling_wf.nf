@@ -200,7 +200,18 @@ workflow variant_calling {
     // ---------------------
 
     // Run CombineGVCFs - collect all GVCFs, process per chromosome
-    gvcf_ch = gvcf.collect()
+    // BEST SOLUTION: Use collectFile operator which guarantees all inputs are processed
+    // before emitting output. This is a reliable barrier that waits for channel completion.
+    gvcf_list_file = gvcf
+        .collectFile(name: 'gvcf_list.txt', newLine: true, storeDir: "${params.outdir}")
+    
+    // Parse the list file and emit all GVCF paths as a collected channel
+    gvcf_ch = gvcf_list_file
+        .splitText()
+        .map { it.trim() }
+        .map { file(it) }
+        .collect()
+    
     cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
 
     // Run GenotypeGVCF - process each chromosome independently (no collect)

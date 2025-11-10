@@ -2,7 +2,6 @@ process GATKHC {
     tag "GATK4 HaplotypeCaller"
     cpus 1
     memory '8GB'
-    maxForks 15  // Limit concurrency to reduce NFS load
     errorStrategy { sleep(120 * 60 * 1000); return 'retry' }
     maxRetries 3
     publishDir "${params.outdir}/gvcf_files",

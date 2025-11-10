@@ -1,7 +1,6 @@
 process bwaMap {
     tag "BWA-mem mapping"
     memory '24GB'
-    maxForks 15  // Limit concurrency to reduce NFS load
     errorStrategy { sleep(120 * 60 * 1000); return 'retry' }
     maxRetries 3
         
