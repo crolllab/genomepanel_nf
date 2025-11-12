@@ -1,6 +1,6 @@
 process bwaMap {
     tag "BWA-mem mapping"
-    memory '24GB'
+    memory { 24.GB * task.attempt }
     errorStrategy { sleep(120 * 60 * 1000); return 'retry' }
     maxRetries 3
         
