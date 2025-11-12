@@ -4,14 +4,13 @@ process FilterVCFs {
     memory '16GB'
 
     input:
-    path vcf_ch
-    val chr
+    tuple val(chr), path(vcf_ch)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    path "filtered.*.vcf.gz"
+    tuple val(chr), path("filtered.${chr}.vcf.gz")
 
     script:
     def QD=20.0

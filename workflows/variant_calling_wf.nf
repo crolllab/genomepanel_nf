@@ -180,15 +180,6 @@ workflow variant_calling {
     dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
 
     // ---------------------
-    // GATK HaplotypeCaller
-    // ---------------------
-    if (params.bwa_index) {
-        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_with_index)
-    } else {
-        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_with_index)
-    }
-
-    // ---------------------
     // Parallel SNP calling by chromosome
     // ---------------------
     chromosomes_ch = fai_index
@@ -196,28 +187,52 @@ workflow variant_calling {
         .map { it[0] }
 
     // ---------------------
+    // GATK HaplotypeCaller (split by chromosome)
+    // ---------------------
+    // Combine each sample with each chromosome: [sample_id, bam, bai] × [chr] → [sample_id, bam, bai, chr]
+    dedup_chr_ch = dedup_with_index.combine(chromosomes_ch)
+    
+    if (params.bwa_index) {
+        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_chr_ch)
+    } else {
+        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_chr_ch)
+    }
+
+    // ---------------------
     // Combine, genotype, filter VCFs
     // ---------------------
 
-    // Run CombineGVCFs - collect all GVCFs, process per chromosome
-    gvcf_ch = gvcf.collect()
-    cgvcf = CombineGVCFs(gvcf_ch, chromosomes_ch, params.reference, fai_index, gatk_index)
+    // Group GVCFs by chromosome
+    // GATKHC outputs: tuple val(chromosome), path("${sample_id}_${chromosome}.g.vcf.gz*")
+    // groupTuple() creates: [chromosome, [[files_sample1], [files_sample2], ...]]
+    // We need to flatten the nested lists: [chromosome, [all_files]]
+    gvcf_grouped = gvcf
+        .groupTuple(by: 0)  // Group by first element (chromosome)
+        .map { chr, file_lists -> 
+            // file_lists is a list of lists, flatten it
+            [chr, file_lists.flatten()]
+        }
+    
+    // Run CombineGVCFs - process each chromosome independently with only its GVCFs
+    // Output: tuple val(chr), path(combined_gvcf_files)
+    cgvcf = CombineGVCFs(gvcf_grouped, params.reference, fai_index, gatk_index)
 
-    // Run GenotypeGVCF - process each chromosome independently (no collect)
-    vcf = GenotypeGVCFs(cgvcf, chromosomes_ch, params.reference, fai_index, gatk_index)
+    // Run GenotypeGVCF - processes each chromosome independently (tuple passes through)
+    vcf = GenotypeGVCFs(cgvcf, params.reference, fai_index, gatk_index)
 
     // ---------------------
     // Run FilterVCFs based on hard filters - process each chromosome independently
     // ---------------------
-    fvcf = FilterVCFs(vcf, chromosomes_ch, params.reference, fai_index, gatk_index)
+    fvcf = FilterVCFs(vcf, params.reference, fai_index, gatk_index)
 
    // ---------------------
    // Clean + concat clean VCFs - process each chromosome independently
    // ---------------------
-    clean_vcf = CleanVCFs(fvcf, chromosomes_ch, params.reference, fai_index, gatk_index)
+    clean_vcf = CleanVCFs(fvcf, params.reference, fai_index, gatk_index)
     
     // Only collect all chromosomes for final concatenation
-    clean_vcf_ch = clean_vcf.collect()
+    // Extract just the file paths from the tuples before collecting
+    clean_vcf_ch = clean_vcf.map{ chr, files -> files }.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // Use clean VCF to produce a MAF, thinned VCF for e.g. PCA/clustering analyses
@@ -226,7 +241,8 @@ workflow variant_calling {
     // ---------------------
     // Concat all variants (incl. low qual) + R plotting
     // ---------------------
-    fvcf_ch = fvcf.collect()  // Collect filtered VCFs for concatenation
+    // Extract just the file paths from the tuples before collecting
+    fvcf_ch = fvcf.map{ chr, files -> files }.collect()
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
     RQualPlotting(concat_vcf)

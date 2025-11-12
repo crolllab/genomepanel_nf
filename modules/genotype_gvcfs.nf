@@ -5,14 +5,13 @@ process GenotypeGVCFs {
     memory '16GB'
 
     input:
-    path cgvcf
-    val chr
+    tuple val(chr), path(cgvcf)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    path "genotyped.*.vcf.gz"
+    tuple val(chr), path("genotyped.${chr}.vcf.gz")
 
     script:
     """

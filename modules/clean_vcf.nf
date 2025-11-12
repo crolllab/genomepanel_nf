@@ -5,14 +5,13 @@ process CleanVCFs {
     memory '48GB'
 
     input:
-    path fvcf_ch
-    val chr
+    tuple val(chr), path(fvcf_ch)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    path "clean.*.vcf.gz"
+    tuple val(chr), path("clean.${chr}.vcf.gz")
 
     script:
 

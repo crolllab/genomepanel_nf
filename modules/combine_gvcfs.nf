@@ -4,22 +4,24 @@ process CombineGVCFs {
     memory '48GB'
 
     input:
-    path gvcf_ch
-    val chr
+    tuple val(chr), path(gvcf_files)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    path "combined.${chr}.g.vcf.gz*"
+    tuple val(chr), path("combined.${chr}.g.vcf.gz*")
 
     script:
     """
     mkdir -p ./gatk_tmp
     
-    printf "${gvcf_ch}" > file
-    sed 's/ /\\n/g' file > gvcfs.list.tmp
-    grep -v "tbi" gvcfs.list.tmp > gvcfs.list
+    # Create list of GVCF files (filter out .tbi index files)
+    for f in ${gvcf_files}; do
+        if [[ "\$f" == *.g.vcf.gz ]]; then
+            echo "\$f" >> gvcfs.list
+        fi
+    done
 
     gatk --java-options "-Xmx48g" \
         CombineGVCFs \

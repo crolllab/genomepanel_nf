@@ -18,10 +18,10 @@ process GATKHC {
     file "${reference.baseName}.fasta.bwt.2bit.64"
     file "${reference.baseName}.fasta.pac"
     file "${reference.baseName}.fasta.0123"
-    tuple val(sample_id), path(dedup_bam), path(dedup_bai)
+    tuple val(sample_id), path(dedup_bam), path(dedup_bai), val(chromosome)
     
     output:
-    path "${sample_id}.g.vcf.gz*"
+    tuple val(chromosome), path("${sample_id}_${chromosome}.g.vcf.gz*")
     
     script:
     """
@@ -33,16 +33,15 @@ process GATKHC {
     gatk --java-options "-Xmx8g" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
+        -L ${chromosome} \
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \
-        -output ${sample_id}.g.vcf.gz \
+        -output ${sample_id}_${chromosome}.g.vcf.gz \
         -ERC GVCF \
         --create-output-variant-index
     
-    # Only reached if GATK succeeded - cleanup input files
-    bam_target="\$(readlink -f "$dedup_bam")"
-    bai_target="\$(readlink -f "$dedup_bai")"
-    [ -n "\$bam_target" ] && [ -f "\$bam_target" ] && rm "\$bam_target" || true
-    [ -n "\$bai_target" ] && [ -f "\$bai_target" ] && rm "\$bai_target" || true
+    # NOTE: Do NOT delete BAM files here!
+    # When processing by chromosome, the same BAM is used by multiple GATKHC tasks.
+    # Nextflow will handle cleanup automatically after all tasks using the BAM complete.
     """
 }
