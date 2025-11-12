@@ -9,7 +9,6 @@ ANALYSIS_SUMMARY.md
 BWA_MAPPING_FAILURE_FIX.md
 SAFE_DELETION_AUDIT.md
 SRA_TEMP_FIX.md
-.gitignore
 FASTP_FAILURE_FIX.md
 COMPLETE_SAFETY_AUDIT.md
 IMPLEMENTATION_SUMMARY.md
@@ -21,7 +20,5 @@ SRA_FASTERQ_TMP_FIX.md
 VALIDATION_SUMMARY.md
 .github/copilot-instructions.md
 BWA_INDEX_FIX.md
-modules/popgen_vcf.nf
 out.log
-.gitignore
 plink_pca.sh
