@@ -1,8 +1,10 @@
 process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
-    errorStrategy 'ignore'
     cpus 1
-    memory '16GB'
+    memory { 16.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 2
+
 
     input:
     tuple val(chr), path(cgvcf)

@@ -23,3 +23,5 @@ BWA_INDEX_FIX.md
 out.log
 plink_pca.sh
 CHROMOSOME_PARALLELIZATION.md
+nf_output
+true
