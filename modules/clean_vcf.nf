@@ -5,25 +5,31 @@ process CleanVCFs {
     memory '48GB'
 
     input:
-    tuple val(chr), path(fvcf_ch)
+    tuple val(chr), val(interval), path(fvcf_ch)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    tuple val(chr), path("clean.${chr}.vcf.gz")
+    tuple val(chr), val(interval), path("clean.${interval.replaceAll('[:\\-]', '_')}.vcf.gz*")
 
     script:
-
+    def interval_safe = interval.replaceAll('[:\\-]', '_')
     """
     mkdir -p ./gatk_tmp
+    
+    input_file="filtered.${interval_safe}.vcf.gz"
+    output_file="clean.${interval_safe}.vcf.gz"
        
-    gatk IndexFeatureFile -I filtered.${chr}.vcf.gz
+    gatk IndexFeatureFile -I \${input_file}
     gatk --java-options "-Xmx4g" SelectVariants \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -V filtered.${chr}.vcf.gz \
-        -O clean.${chr}.vcf.gz \
+        -V \${input_file} \
+        -O \${output_file} \
         --exclude-filtered --exclude-non-variants --remove-unused-alternates
+    
+    # Create index for concatenation
+    gatk IndexFeatureFile -I \${output_file}
     """
 }

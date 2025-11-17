@@ -6,20 +6,23 @@ process PopGenVCF {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    path concat_clean_vcf
+    path vcf_files
 
     output:
-    path "${concat_clean_vcf.baseName}_thin1000_maf0.05_maxm0.9.recode.vcf.gz"
+    path "final_variants.clean.vcf_thin1000_maf0.05_maxm0.9.recode.vcf.gz"
 
 
     script:
     """
+    # Find the VCF file (not the index)
+    vcf_file=\$(ls *.vcf.gz | grep -v '.tbi' | head -1)
+    
     vcftools \
-        --gzvcf $concat_clean_vcf \
+        --gzvcf \${vcf_file} \
         --thin 1000 \
         --max-missing 0.9 \
         --maf 0.05 \
         --recode \
-        --stdout | gzip -c > ${concat_clean_vcf.baseName}_thin1000_maf0.05_maxm0.9.recode.vcf.gz
+        --stdout | gzip -c > final_variants.clean.vcf_thin1000_maf0.05_maxm0.9.recode.vcf.gz
     """
 }

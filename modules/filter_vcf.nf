@@ -4,13 +4,13 @@ process FilterVCFs {
     memory '16GB'
 
     input:
-    tuple val(chr), path(vcf_ch)
+    tuple val(chr), val(interval), path(vcf_ch)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    tuple val(chr), path("filtered.${chr}.vcf.gz")
+    tuple val(chr), val(interval), path("filtered.${interval.replaceAll('[:\\-]', '_')}.vcf.gz*")
 
     script:
     def QD=20.0
@@ -22,15 +22,19 @@ process FilterVCFs {
     def BaseQRankSum_lower=-2.0
     def BaseQRankSum_upper=2.0
 
+    def interval_safe = interval.replaceAll('[:\\-]', '_')
     """
     mkdir -p ./gatk_tmp
+    
+    input_file="genotyped.${interval_safe}.vcf.gz"
+    output_file="filtered.${interval_safe}.vcf.gz"
        
-    gatk IndexFeatureFile -I genotyped.${chr}.vcf.gz
+    gatk IndexFeatureFile -I \${input_file}
     gatk --java-options "-Xmx4g" VariantFiltration \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -V genotyped.${chr}.vcf.gz \
-        -output filtered.${chr}.vcf.gz \
+        -V \${input_file} \
+        -output \${output_file} \
         --filter 'QD < $QD' --filter-name 'QDFilter' \
         --filter 'MQ < $MQ' --filter-name 'MQ' \
         --filter 'ReadPosRankSum < $ReadPosRankSum_lower' --filter-name 'ReadPosRankSum' \
@@ -39,5 +43,8 @@ process FilterVCFs {
         --filter 'MQRankSum > $MQRankSum_upper' --filter-name 'MQRankSum' \
         --filter 'BaseQRankSum < $BaseQRankSum_lower' --filter-name 'BaseQRankSum' \
         --filter 'BaseQRankSum > $BaseQRankSum_upper' --filter-name 'BaseQRankSum'
+    
+    # Create index for concatenation
+    gatk IndexFeatureFile -I \${output_file}
     """
 }

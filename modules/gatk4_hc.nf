@@ -18,10 +18,10 @@ process GATKHC {
     file "${reference.baseName}.fasta.bwt.2bit.64"
     file "${reference.baseName}.fasta.pac"
     file "${reference.baseName}.fasta.0123"
-    tuple val(sample_id), path(dedup_bam), path(dedup_bai), val(chromosome)
+    tuple val(sample_id), path(dedup_bam), path(dedup_bai), val(interval), val(chr)
     
     output:
-    tuple val(chromosome), path("${sample_id}_${chromosome}.g.vcf.gz*")
+    tuple val(chr), path("${sample_id}_${interval.replaceAll('[:\\-]', '_')}.g.vcf.gz*")
     
     script:
     """
@@ -30,13 +30,16 @@ process GATKHC {
     # Create tmp directory in current location (NXF_SCRATCH, which is bind-mounted)
     mkdir -p ./gatk_tmp
     
+    # Create safe filename from interval (replace : and - with _)
+    interval_safe=\$(echo "${interval}" | tr ':-' '__')
+    
     gatk --java-options "-Xmx8g" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -L ${chromosome} \
+        -L ${interval} \
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \
-        -output ${sample_id}_${chromosome}.g.vcf.gz \
+        -output ${sample_id}_\${interval_safe}.g.vcf.gz \
         -ERC GVCF \
         --create-output-variant-index
     

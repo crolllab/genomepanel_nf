@@ -6,15 +6,16 @@ process CombineGVCFs {
     maxRetries 2
 
     input:
-    tuple val(chr), path(gvcf_files)
+    tuple val(chr), val(interval), path(gvcf_files)
     path reference
     path "${reference.baseName}.fasta.fai"
     path "${reference.baseName}.dict"
 
     output:
-    tuple val(chr), path("combined.${chr}.g.vcf.gz*")
+    tuple val(chr), val(interval), path("combined.${interval.replaceAll('[:\\-]', '_')}.g.vcf.gz*")
 
     script:
+    def interval_safe = interval.replaceAll('[:\\-]', '_')
     """
     mkdir -p ./gatk_tmp
     
@@ -29,8 +30,8 @@ process CombineGVCFs {
         CombineGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -L $chr \
+        -L ${interval} \
         -V gvcfs.list \
-        -output combined.${chr}.g.vcf.gz
+        -output combined.${interval_safe}.g.vcf.gz
     """
 }

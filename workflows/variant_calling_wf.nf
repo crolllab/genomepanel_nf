@@ -146,7 +146,7 @@ workflow variant_calling {
         bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
     } else {
         // Build BWA index from reference - returns 5 separate outputs
-        bwa_index = bwaIndex(params.reference)
+        (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(params.reference)
     }
     
     gatk_index  = gatkIndex(params.reference)
@@ -154,11 +154,7 @@ workflow variant_calling {
     // ---------------------
     // Mapping
     // ---------------------
-    if (params.bwa_index) {
-        bwaMap(params.reference, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
-    } else {
-        bwaMap(params.reference, bwa_index, trimmed_ch)
-    }
+    bwaMap(params.reference, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
 
 
     // ---------------------
@@ -180,59 +176,92 @@ workflow variant_calling {
     dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
 
     // ---------------------
-    // Parallel SNP calling by chromosome
+    // Parallel SNP calling by 1 Mb segments
     // ---------------------
-    chromosomes_ch = fai_index
-        .splitCsv(sep: '\t')
-        .map { it[0] }
-
-    // ---------------------
-    // GATK HaplotypeCaller (split by chromosome)
-    // ---------------------
-    // Combine each sample with each chromosome: [sample_id, bam, bai] × [chr] → [sample_id, bam, bai, chr]
-    dedup_chr_ch = dedup_with_index.combine(chromosomes_ch)
+    // Parse FAI file to create 1 Mb intervals
+    // FAI format: chr_name, length, offset, linebases, linewidth
+    segment_size = 1000000  // 1 Mb segments
     
-    if (params.bwa_index) {
-        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_chr_ch)
-    } else {
-        gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_index, dedup_chr_ch)
+    intervals_ch = fai_index
+        .splitCsv(sep: '\t')
+        .flatMap { row ->
+            def chr = row[0]
+            def chr_length = row[1] as Integer
+            def intervals = []
+            
+            // Generate 1 Mb segments for this chromosome
+            for (int start = 1; start <= chr_length; start += segment_size) {
+                def end = Math.min(start + segment_size - 1, chr_length)
+                def interval_name = "${chr}:${start}-${end}"
+                def interval_key = "${chr}_${start}_${end}"  // For grouping later
+                intervals.add([chr, interval_name, interval_key])
+            }
+            return intervals
+        }
+
+    // ---------------------
+    // GATK HaplotypeCaller (split by 1 Mb segments)
+    // ---------------------
+    // Combine each sample with each interval: [sample_id, bam, bai] × [chr, interval, key] → [sample_id, bam, bai, chr, interval, key]
+    dedup_interval_ch = dedup_with_index.combine(intervals_ch)
+    
+    // dedup_interval_ch structure: [sample_id, bam, bai, chr, interval_name, interval_key]
+    // GATKHC needs: [sample_id, bam, bai, interval_name, chr]
+    dedup_for_gatk = dedup_interval_ch.map { sample_id, bam, bai, chr, interval_name, interval_key ->
+        [sample_id, bam, bai, interval_name, chr]
     }
+    
+    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
 
     // ---------------------
-    // Combine, genotype, filter VCFs
+    // Combine, genotype, filter VCFs (per 1 Mb segment)
     // ---------------------
 
-    // Group GVCFs by chromosome
-    // GATKHC outputs: tuple val(chromosome), path("${sample_id}_${chromosome}.g.vcf.gz*")
-    // groupTuple() creates: [chromosome, [[files_sample1], [files_sample2], ...]]
-    // We need to flatten the nested lists: [chromosome, [all_files]]
-    gvcf_grouped = gvcf
-        .groupTuple(by: 0)  // Group by first element (chromosome)
-        .map { chr, file_lists -> 
-            // file_lists is a list of lists, flatten it
-            [chr, file_lists.flatten()]
+    // Group GVCFs by segment (collect all samples for each 1 Mb segment)
+    // GATKHC outputs: tuple val(chr), path("${sample_id}_${interval_safe}.g.vcf.gz*")
+    // We need to group by [chr, interval] to keep segments separate
+    // First, add back interval information for grouping
+    gvcf_with_interval = gvcf.combine(intervals_ch)
+        .filter { gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+            // Match GVCF files with their corresponding interval
+            // Check if any file contains the interval key
+            gvcf_chr == int_chr && gvcf_files.any { it.name.contains(int_key.replaceAll('[:\\-]', '_')) }
+        }
+        .map { gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+            // Return [interval_name, chr, files] for processing
+            [int_name, int_chr, gvcf_files]
         }
     
-    // Run CombineGVCFs - process each chromosome independently with only its GVCFs
-    // Output: tuple val(chr), path(combined_gvcf_files)
+    // Group all samples for the same segment together
+    gvcf_grouped = gvcf_with_interval
+        .groupTuple(by: 0)  // Group by interval_name (first element)
+        .map { interval, chr_list, file_lists ->
+            // Take first chr (they're all the same), flatten files
+            [chr_list[0], interval, file_lists.flatten()]
+        }
+    
+    // Run CombineGVCFs - process each 1 Mb segment independently
+    // Output: tuple val(chr), val(interval), path(combined_gvcf_file)
     cgvcf = CombineGVCFs(gvcf_grouped, params.reference, fai_index, gatk_index)
 
-    // Run GenotypeGVCF - processes each chromosome independently (tuple passes through)
+    // Run GenotypeGVCF - processes each 1 Mb segment independently
     vcf = GenotypeGVCFs(cgvcf, params.reference, fai_index, gatk_index)
 
     // ---------------------
-    // Run FilterVCFs based on hard filters - process each chromosome independently
+    // Run FilterVCFs based on hard filters - process each 1 Mb segment independently
     // ---------------------
     fvcf = FilterVCFs(vcf, params.reference, fai_index, gatk_index)
 
    // ---------------------
-   // Clean + concat clean VCFs - process each chromosome independently
+   // Clean VCFs - process each 1 Mb segment independently
    // ---------------------
     clean_vcf = CleanVCFs(fvcf, params.reference, fai_index, gatk_index)
     
-    // Only collect all chromosomes for final concatenation
-    // Extract just the file paths from the tuples before collecting
-    clean_vcf_ch = clean_vcf.map{ chr, files -> files }.collect()
+    // ---------------------
+    // Concatenate all segments to create final VCFs
+    // ---------------------
+    // Extract just the file paths from the tuples (drop chr and interval) before collecting
+    clean_vcf_ch = clean_vcf.map{ chr, interval, files -> files }.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // Use clean VCF to produce a MAF, thinned VCF for e.g. PCA/clustering analyses
@@ -242,7 +271,7 @@ workflow variant_calling {
     // Concat all variants (incl. low qual) + R plotting
     // ---------------------
     // Extract just the file paths from the tuples before collecting
-    fvcf_ch = fvcf.map{ chr, files -> files }.collect()
+    fvcf_ch = fvcf.map{ chr, interval, files -> files }.collect()
     concat_vcf = ConcatVCFs(fvcf_ch)
     R_script = file('./R_plotting.R')
     RQualPlotting(concat_vcf)
