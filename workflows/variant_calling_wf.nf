@@ -86,7 +86,7 @@ workflow variant_calling {
             flat: false // keeps paired R1/R2 in a tuple
         )
         local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
-            [sample_id, reads_list[0], reads_list[1]]
+            [sample_id, reads_list[0], reads_list[1], 'local']
         }
     } else {
         local_pe_formatted = Channel.empty()
@@ -97,8 +97,9 @@ workflow variant_calling {
     if (params.SRA_index) {
         // Simple channel formatting - downloads that succeed will have outputs
         // Downloads that fail will not emit anything due to errorStrategy 'ignore'
-        sra_pe_formatted = SRAdownloadPE.out
-        sra_se_formatted = SRAdownloadSE.out
+        // Add source tag to distinguish from local files
+        sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, 'SRA'] }
+        sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, 'SRA'] }
     } else {
         sra_pe_formatted = Channel.empty()
         sra_se_formatted = Channel.empty()
