@@ -24,10 +24,19 @@ process GenotypeGVCFs {
     output_file="genotyped.${interval_safe}.vcf.gz"
        
     gatk IndexFeatureFile -I \${combined_file}
+    
+    # Add options for invariant sites if enabled
+    if [ "${params.call_invar_sites}" = "true" ]; then
+        INVAR_OPTS="--include-non-variant-sites"
+    else
+        INVAR_OPTS=""
+    fi
+    
     gatk --java-options "-Xmx16g" GenotypeGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${combined_file} \
+        \${INVAR_OPTS} \
         -output \${output_file}
     
     # Delete the combined GVCF (resolve symlink to actual file)

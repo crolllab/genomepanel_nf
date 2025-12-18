@@ -7,7 +7,7 @@ process dupRemoval {
     publishDir "${params.outdir}/bam_files",
         mode: 'copy',
         pattern: "*_RG_dedup.bam*",
-        enabled: params.keep_bam_gvcf
+        enabled: params.keep_bam
 
     input:
     tuple val(sample_id), path(rg_bam)

@@ -105,7 +105,9 @@ Available parameters
 
 - `--outdir`: Optional. Folder to save final output files. Default: `./nf_output`.
 
-- `--keep_bam_gvcf`: If set to `true`, per sample BAM and GVCF files will be saved to the output directory. Default: `false`.
+- `--keep_bam`: If set to `true`, per-sample BAM files will be saved to the output directory. Default: `false`.
+
+- `--keep_gvcf`: If set to `true`, per-sample GVCF files will be saved to the output directory. Default: `false`.
 
 - `-work-dir`: Optional. Defines where to store temporary files (often many TB). Consider `/scratch/work` for large datasets. Default: `./work`. 
 
@@ -116,6 +118,12 @@ Available parameters
 - `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa`, `.fna`or `.fas`).
 
 - `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources with very big genomes. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). 
+
+- `--min_contig_length`: Optional. Filter reference contigs shorter than this value (in base pairs). Useful for excluding small scaffolds or contigs from variant calling. Default: `false` (no filtering).
+
+- `--call_invar_sites`: If set to `true`, GATK HaplotypeCaller will call invariant sites in addition to variant sites. This increases output file size significantly but may be useful for certain downstream analyses. Default: `false`.
+
+- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. Default: `1000000` (1 Mb).
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
@@ -195,11 +203,33 @@ Save the text file e.g. as `SRA_accessions.txt`. The repository includes an exam
 # example input reference genome (see above how to obtain it)
 REF=$PWD/IPO323.fasta
 
-# read selection example 1 (small set) - selects 9 paired-end reads from LEGserv
+# read selection example 1 (small test case) - selects 3 paired-end reads from LEGserv
+READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_{1A,3A,5A}_{1,2}.fq.gz'
+# read selection example 2 (medium set) - selects 9 paired-end reads from LEGserv
 READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_*_{1,2}.fq.gz'
-# read selection example 2 (very large set) - selects nearly all available paired-end DNA-seq datasets on LEGserv
+# read selection example 3 (very large set) - selects nearly all available paired-end DNA-seq datasets on LEGserv
 READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
 ```
+
+### Quick test run
+
+Start a minimal test run using 3 local fastq files with 1 Mb genome segments, invariant site calling, and keeping intermediate BAM/GVCF files:
+
+```bash
+# activate conda environment
+micromamba activate nf_gp_env
+# run test pipeline
+nextflow run main.nf -config nextflow.config -profile slurm \
+  -work-dir '/scratch/nf_tmp' --outdir './test_output' \
+  --reference $REF --ploidy 1 \
+  --reads '/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_{1A,3A,5A}_{1,2}.fq.gz' \
+  --reference_segments 1000000 \
+  --call_invar_sites true \
+  --keep_bam true \
+  --keep_gvcf true
+```
+
+### Full pipeline run
 
 Start the pipeline using `slurm` and processing local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `my_nf_run_output` folder. The `SRA_accessions.txt` example file is included in the repository.
 
@@ -210,7 +240,7 @@ NCBI_API_KEY=abcdef1234567890
 micromamba activate nf_gp_env
 # run nextflow pipeline
 nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --keep_bam_gvcf false \
+  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' \
   --NCBI_API_key $NCBI_API_KEY \
   --reference $REF --ploidy 1 \
   --reads $READS \

@@ -22,12 +22,20 @@ process CleanVCFs {
     output_file="clean.${interval_safe}.vcf.gz"
        
     gatk IndexFeatureFile -I \${input_file}
+    
+    # Conditionally exclude non-variants based on parameter
+    if [ "${params.call_invar_sites}" = "true" ]; then
+        NON_VAR_OPTS=""
+    else
+        NON_VAR_OPTS="--exclude-non-variants"
+    fi
+    
     gatk --java-options "-Xmx4g" SelectVariants \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${input_file} \
         -O \${output_file} \
-        --exclude-filtered --exclude-non-variants --remove-unused-alternates
+        --exclude-filtered \${NON_VAR_OPTS} --remove-unused-alternates
     
     # Create index for concatenation
     gatk IndexFeatureFile -I \${output_file}

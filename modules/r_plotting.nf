@@ -14,7 +14,14 @@ process RQualPlotting {
     script:
     """
     mkdir -p ./qual_plots
-    mv final_variants.metrics.csv.gz ./qual_plots/
+    # Check if metrics file exists before moving
+    if [ -f final_variants.metrics.csv.gz ]; then
+        cp final_variants.metrics.csv.gz ./qual_plots/
+    else
+        echo "ERROR: final_variants.metrics.csv.gz not found in work directory"
+        ls -la
+        exit 1
+    fi
 
     # Create R script inline
     cat > plot_variants.R << 'EOF'

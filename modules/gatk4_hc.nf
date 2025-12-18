@@ -7,7 +7,7 @@ process GATKHC {
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
-        enabled: params.keep_bam_gvcf
+        enabled: params.keep_gvcf
     
     input:
     path reference
@@ -33,6 +33,13 @@ process GATKHC {
     # Create safe filename from interval (replace : and - with _)
     interval_safe=\$(echo "${interval}" | tr ':-' '__')
     
+    # Set ERC mode based on invariant sites parameter
+    if [ "${params.call_invar_sites}" = "true" ]; then
+        ERC_MODE="BP_RESOLUTION"
+    else
+        ERC_MODE="GVCF"
+    fi
+    
     gatk --java-options "-Xmx8g" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
@@ -40,7 +47,7 @@ process GATKHC {
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \
         -output ${sample_id}_\${interval_safe}.g.vcf.gz \
-        -ERC GVCF \
+        -ERC \${ERC_MODE} \
         --create-output-variant-index
     
     # NOTE: Do NOT delete BAM files here!

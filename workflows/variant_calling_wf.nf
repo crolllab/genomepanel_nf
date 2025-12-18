@@ -8,6 +8,7 @@ include { SRAdownloadPE } from '../modules/download_SRA'
 include { SRAdownloadSE } from '../modules/download_SRA'
 include { trimSequencesPE } from '../modules/fastp_trimming'
 include { trimSequencesSE } from '../modules/fastp_trimming'
+include { filterReference } from '../modules/filter_reference'
 include { bwaIndex } from '../modules/bwa_index'
 include { gatkIndex } from '../modules/gatk_index'
 include { fastaIndex } from '../modules/index_fasta'
@@ -80,13 +81,36 @@ workflow variant_calling {
     // Local FASTQ reads
     // ---------------------
     if (params.reads) {
+        // Create channel from read pairs - let Nextflow handle the pairing
         read_pairs_local_ch = Channel.fromFilePairs(
             params.reads,
             checkIfExists: true,
-            flat: false // keeps paired R1/R2 in a tuple
+            flat: false, // keeps paired R1/R2 in a tuple
+            size: 2  // expect exactly 2 files per pair
         )
+        
+        // Reformat to extract proper sample IDs
+        // Find common prefix between paired files to use as sample ID
         local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
-            [sample_id, reads_list[0], reads_list[1], 'local']
+            // Get basenames without extensions
+            def name1 = reads_list[0].name.replaceAll(/\.(fastq|fq)(\.gz)?$/, '')
+            def name2 = reads_list[1].name.replaceAll(/\.(fastq|fq)(\.gz)?$/, '')
+            
+            // Find longest common prefix (this is the true sample ID)
+            def commonPrefix = ""
+            def minLen = Math.min(name1.length(), name2.length())
+            for (int i = 0; i < minLen; i++) {
+                if (name1[i] == name2[i]) {
+                    commonPrefix += name1[i]
+                } else {
+                    break
+                }
+            }
+            
+            // Remove trailing separators (_, ., -)
+            commonPrefix = commonPrefix.replaceAll(/[._-]+$/, '')
+            
+            return [commonPrefix, reads_list[0], reads_list[1], 'local']
         }
     } else {
         local_pe_formatted = Channel.empty()
@@ -134,6 +158,18 @@ workflow variant_calling {
 
 
     // ---------------------
+    // Reference filtering (optional)
+    // ---------------------
+    if (params.min_contig_length && params.min_contig_length != false) {
+        // Filter reference by contig length
+        filterReference(params.reference, params.min_contig_length)
+        reference_to_use = filterReference.out.filtered_fasta
+    } else {
+        // Use original reference
+        reference_to_use = Channel.fromPath(params.reference).collect()
+    }
+
+    // ---------------------
     // Reference indexes
     // ---------------------
     // Conditionally build or use provided BWA index
@@ -147,15 +183,15 @@ workflow variant_calling {
         bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
     } else {
         // Build BWA index from reference - returns 5 separate outputs
-        (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(params.reference)
+        (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
     }
     
-    gatk_index  = gatkIndex(params.reference)
-    fai_index   = fastaIndex(params.reference)
+    gatk_index  = gatkIndex(reference_to_use)
+    fai_index   = fastaIndex(reference_to_use)
     // ---------------------
     // Mapping
     // ---------------------
-    bwaMap(params.reference, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
+    bwaMap(reference_to_use, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
 
 
     // ---------------------
@@ -177,11 +213,11 @@ workflow variant_calling {
     dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
 
     // ---------------------
-    // Parallel SNP calling by 1 Mb segments
+    // Parallel SNP calling by genome segments
     // ---------------------
-    // Parse FAI file to create 1 Mb intervals
+    // Parse FAI file to create intervals based on params.reference_segments
     // FAI format: chr_name, length, offset, linebases, linewidth
-    segment_size = 1000000  // 1 Mb segments
+    segment_size = params.reference_segments
     
     intervals_ch = fai_index
         .splitCsv(sep: '\t')
@@ -212,7 +248,7 @@ workflow variant_calling {
         [sample_id, bam, bai, interval_name, chr]
     }
     
-    gvcf = GATKHC(params.reference, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
+    gvcf = GATKHC(reference_to_use, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
 
     // ---------------------
     // Combine, genotype, filter VCFs (per 1 Mb segment)
@@ -243,20 +279,20 @@ workflow variant_calling {
     
     // Run CombineGVCFs - process each 1 Mb segment independently
     // Output: tuple val(chr), val(interval), path(combined_gvcf_file)
-    cgvcf = CombineGVCFs(gvcf_grouped, params.reference, fai_index, gatk_index)
+    cgvcf = CombineGVCFs(gvcf_grouped, reference_to_use, fai_index, gatk_index)
 
     // Run GenotypeGVCF - processes each 1 Mb segment independently
-    vcf = GenotypeGVCFs(cgvcf, params.reference, fai_index, gatk_index)
+    vcf = GenotypeGVCFs(cgvcf, reference_to_use, fai_index, gatk_index)
 
     // ---------------------
     // Run FilterVCFs based on hard filters - process each 1 Mb segment independently
     // ---------------------
-    fvcf = FilterVCFs(vcf, params.reference, fai_index, gatk_index)
+    fvcf = FilterVCFs(vcf, reference_to_use, fai_index, gatk_index)
 
    // ---------------------
    // Clean VCFs - process each 1 Mb segment independently
    // ---------------------
-    clean_vcf = CleanVCFs(fvcf, params.reference, fai_index, gatk_index)
+    clean_vcf = CleanVCFs(fvcf, reference_to_use, fai_index, gatk_index)
     
     // ---------------------
     // Concatenate all segments to create final VCFs
