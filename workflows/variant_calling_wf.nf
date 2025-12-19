@@ -207,10 +207,13 @@ workflow variant_calling {
     // ---------------------
     // SRR to Sample mapping (optional)
     // ---------------------
-    // If a sample map file is provided, use it; otherwise create an empty placeholder
-    sample_map_file = (params.SRR_sample_map && params.SRR_sample_map instanceof String) 
-        ? Channel.fromPath(params.SRR_sample_map).collect() 
-        : Channel.of("NO_SAMPLE_MAP").collect()
+    // If a sample map file is provided, use it; otherwise use an empty placeholder file
+    // The placeholder file must exist so Channel.fromPath can stage it properly
+    if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
+        sample_map_file = Channel.fromPath(params.SRR_sample_map).collect()
+    } else {
+        sample_map_file = Channel.fromPath("${projectDir}/NO_SAMPLE_MAP.txt", checkIfExists: false).collect()
+    }
 
     // Updated workflow
     addRG(bam_sorted, sample_map_file)
