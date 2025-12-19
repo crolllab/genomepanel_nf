@@ -204,11 +204,18 @@ workflow variant_calling {
     bam_reports = samtoolsSort.out.report
     bam_reports_ch = bam_reports.collect()
 
-//    addRG(bam_sorted)
-//    dedup_bams = dupRemoval(addRG.out)
+    // ---------------------
+    // SRR to Sample mapping (optional)
+    // ---------------------
+    // If a sample map file is provided, use it; otherwise create an empty placeholder
+    if (params.SRR_sample_map) {
+        sample_map_file = Channel.fromPath(params.SRR_sample_map).collect()
+    } else {
+        sample_map_file = Channel.of(file('NO_SAMPLE_MAP')).collect()
+    }
 
     // Updated workflow
-    addRG(bam_sorted)
+    addRG(bam_sorted, sample_map_file)
     dedup_bams = dupRemoval(addRG.out.bam)
     dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
 
@@ -217,6 +224,7 @@ workflow variant_calling {
     // ---------------------
     // Parse FAI file to create intervals based on params.reference_segments
     // FAI format: chr_name, length, offset, linebases, linewidth
+    // If reference_segments is 0, use full chromosomes (no segmentation)
     segment_size = params.reference_segments
     
     intervals_ch = fai_index
@@ -226,12 +234,19 @@ workflow variant_calling {
             def chr_length = row[1] as Integer
             def intervals = []
             
-            // Generate 1 Mb segments for this chromosome
-            for (int start = 1; start <= chr_length; start += segment_size) {
-                def end = Math.min(start + segment_size - 1, chr_length)
-                def interval_name = "${chr}:${start}-${end}"
-                def interval_key = "${chr}_${start}_${end}"  // For grouping later
+            if (segment_size == 0) {
+                // No segmentation - use full chromosome
+                def interval_name = chr  // Just chromosome name for GATK -L
+                def interval_key = chr   // Key for grouping
                 intervals.add([chr, interval_name, interval_key])
+            } else {
+                // Generate segments for this chromosome
+                for (int start = 1; start <= chr_length; start += segment_size) {
+                    def end = Math.min(start + segment_size - 1, chr_length)
+                    def interval_name = "${chr}:${start}-${end}"
+                    def interval_key = "${chr}_${start}_${end}"  // For grouping later
+                    intervals.add([chr, interval_name, interval_key])
+                }
             }
             return intervals
         }

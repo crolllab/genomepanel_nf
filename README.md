@@ -123,7 +123,7 @@ Available parameters
 
 - `--call_invar_sites`: If set to `true`, GATK HaplotypeCaller will call invariant sites in addition to variant sites. This increases output file size significantly but may be useful for certain downstream analyses. Default: `false`.
 
-- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. Default: `1000000` (1 Mb).
+- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. You can de-activate segmentation by setting the value to `0`. Default: `1000000` (1 Mb).
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
@@ -132,6 +132,17 @@ Available parameters
   Important:
   - Accepts only paired-end reads locally. Both SE and PE are accepted from SRA.
   - If the download from SRA produces errors (connection reset, etc.), an alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
+
+- `--SRR_sample_map`: Optional. A CSV file mapping SRR accession IDs to sample names. This allows multiple SRR accessions to be assigned to the same sample name, which is useful when a sample was sequenced multiple times and should be genotyped as a single combined dataset. The CSV format is: `SRR_ID,Sample_Name` (one mapping per line, no header). If an SRR ID is not listed in the file, the original SRR ID will be used as the sample name. Default: `false` (no mapping). The repository includes an example file `sample_map.csv`.
+
+  Example `sample_map.csv`:
+  ```
+  SRR1234567,Sample_A
+  SRR1234568,Sample_A
+  SRR1234569,Sample_B
+  SRR1234570,Sample_C
+  ```
+  In this example, `SRR1234567` and `SRR1234568` will both be assigned to `Sample_A` during genotyping.
 
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
 
@@ -211,25 +222,8 @@ READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_*_{1,2}.
 READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
 ```
 
-### Quick test run
 
-Start a minimal test run using 3 local fastq files with 1 Mb genome segments, invariant site calling, and keeping intermediate BAM/GVCF files:
-
-```bash
-# activate conda environment
-micromamba activate nf_gp_env
-# run test pipeline
-nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './test_output' \
-  --reference $REF --ploidy 1 \
-  --reads '/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_{1A,3A,5A}_{1,2}.fq.gz' \
-  --reference_segments 1000000 \
-  --call_invar_sites true \
-  --keep_bam true \
-  --keep_gvcf true
-```
-
-### Full pipeline run
+### Pipeline run
 
 Start the pipeline using `slurm` and processing local fastq files and NCBI accessions. Temporary files are written to `/scratch` and the output will be in the `my_nf_run_output` folder. The `SRA_accessions.txt` example file is included in the repository.
 
@@ -239,6 +233,7 @@ NCBI_API_KEY=abcdef1234567890
 # activate conda environment
 micromamba activate nf_gp_env
 # run nextflow pipeline
+export NXF_OPTS='-Xms8g -Xmx64g'
 nextflow run main.nf -config nextflow.config -profile slurm \
   -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' \
   --NCBI_API_key $NCBI_API_KEY \
@@ -247,16 +242,6 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --SRA_index './SRA_accessions.txt'
 ```
 
-If you have pre-built BWA index files (from a previous run or pre-computed), you can skip the indexing step:
-
-```bash
-# run with pre-built BWA index (saves time and resources)
-nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' --keep_bam_gvcf false \
-  --reference $REF --ploidy 1 \
-  --bwa_index $REF \
-  --reads $READS
-```
 
 ### Notes on the exection:
 - Before executing the `nextflow` command, enter e.g. a `tmux` or `screen` session. The session needs to remain active until the end of the pipeline (even if you specify the `slurm` option)
