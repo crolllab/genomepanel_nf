@@ -99,31 +99,20 @@ singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--
 
 ## Step 2: Configure `genomepanel_nf` options  
 
-Available parameters
+### Available parameters
+
+_Run options:_
 
 - `-profile`: Optional. `local` skips the SLURM queuing system and runs tasks with up to 4 threads each. `local_highCPU` runs tasks with up to 24 threads each. `slurm` submits all tasks as SLURM jobs. Default: `slurm`.
 
-- `--outdir`: Optional. Folder to save final output files. Default: `./nf_output`.
-
-- `--keep_bam`: If set to `true`, per-sample BAM files will be saved to the output directory. Default: `false`.
-
-- `--keep_gvcf`: If set to `true`, per-sample GVCF files will be saved to the output directory. Default: `false`.
+- `-resume`: Optional. If set, the pipeline will resume from the last completed step, skipping already completed steps. The `work-dir` needs to be intact for this. This is particularly useful if e.g. the reference genome indexing was already completed in a previous run. Note that `genomepanel_nf` aggressively cleans up temporary files to save space, so resuming may not always be saving computation time.
 
 - `-work-dir`: Optional. Defines where to store temporary files (often many TB). Consider `/scratch/work` for large datasets. Default: `./work`. 
 
-- `-resume`: Optional. If set, the pipeline will resume from the last completed step, skipping already completed steps. The `work-dir` needs to be intact for this. This is particularly useful if e.g. the reference genome indexing was already completed in a previous run.
+- `--outdir`: Optional. Folder to save final output files. Default: `./nf_output`.
 
-- `--NCBI_API_key`: Required for querying and downloading from NCBI SRA. You can get your key by creating an [account on NCBI](https://account.ncbi.nlm.nih.gov/). After registration/login, find on the top right the link to the "Account settings". Click on "Create API key" and copy it.
 
-- `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa`, `.fna`or `.fas`).
-
-- `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources with very big genomes. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). 
-
-- `--min_contig_length`: Optional. Filter reference contigs shorter than this value (in base pairs). Useful for excluding small scaffolds or contigs from variant calling. Default: `false` (no filtering).
-
-- `--call_invar_sites`: If set to `true`, GATK HaplotypeCaller will call invariant sites in addition to variant sites. This increases output file size significantly but may be useful for certain downstream analyses. Default: `false`.
-
-- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. You can de-activate segmentation by setting the value to `0`. Default: `1000000` (1 Mb).
+_Read input options:_
 
 - `--reads`: Optional. Provide the path to the folder containing the fastq read files. The pipeline will automatically find all paired read files based on the naming convention. Must be bracketed by single quotes `'`. See below for examples. Important: accepts only paired-end reads.
 
@@ -144,13 +133,41 @@ Available parameters
   ```
   In this example, `SRR1234567` and `SRR1234568` will both be assigned to `Sample_A` during genotyping.
 
+
+_NCBI SRA download configuration:_
+
+- `--NCBI_API_key`: Required for querying and downloading from NCBI SRA. You can get your key by creating an [account on NCBI](https://account.ncbi.nlm.nih.gov/). After registration/login, find on the top right the link to the "Account settings". Click on "Create API key" and copy it.
+
+
+_Reference genome options:_
+
+- `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa`, `.fna`or `.fas`).
+
+- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. You can de-activate segmentation by setting the value to `0`. Default: `1000000` (1 Mb).
+
+- `--min_contig_length`: Optional. Filter reference contigs shorter than this value (in base pairs). Useful for excluding small scaffolds or contigs from variant calling. Default: `false` (no filtering).
+
+- `--bwa_index`: Optional. Provide the path prefix to pre-built BWA-mem2 index files. This skips the BWA indexing step, saving time and computational resources with very big genomes. The path should point to the reference prefix (e.g., `/path/to/ref.fasta` if the above option was specified with `--reference /path/to/ref.fasta`). The pipeline will automatically find the associated index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`). 
+
+
+_Genotyping option:_
+
 - `--ploidy`: Required. Use `1` for haploid genomes, `2` for diploid genomes. Can also be used to define higher ploidy levels in pooled samples.
+
+- `--call_invar_sites`: If set to `true`, GATK HaplotypeCaller will call invariant sites in addition to variant sites. This increases output file size significantly but may be useful for certain downstream analyses. Default: `false`.
+
+
+_Output options:_
+
+- `--keep_bam`: If set to `true`, per-sample BAM files will be saved to the output directory. Default: `false`.
+
+- `--keep_gvcf`: If set to `true`, per-sample GVCF files will be saved to the output directory. Default: `false`.
 
 ---
 
-## Step 3: Run `genomepanel_nf` - example options
+## Step 3: `genomepanel_nf` configuration example
 
-The below example is based on the _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
+The example below is based on the _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
 
 ### Obtain the reference genome
 
@@ -168,8 +185,6 @@ mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
 ### Select local fastq files
 
 The following examples show different ways to select paired-end fastq files. The `--reads` option must be bracketed by single quotes `'`. The examples assume that the read files are named according to the Illumina convention, i.e. ending with `_1.fq.gz` and `_2.fq.gz` or `_R1.fq.gz` and `_R2.fq.gz`. Adjust the patterns according to your own naming conventions.
-
-Note the use of `
 
 ```bash
 # Option 1 - select all fastq files ending with _1.fq.gz and _2.fq.gz
@@ -196,12 +211,12 @@ J9_L2_R1_001_18ku2CAeFgfk.fastq.gz and J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
 
 ### Define SRA/ENA accessions
 
-Example file to provide for the `--SRA_index ...` option. 
+Example file to provide for the `--SRA_index ...` option. Note that different accession types are accepted, including `PRJNA...`, `SRP...`, `SRX...`, and `SRR...`. The pipeline will automatically resolve all included `SRR...` run accessions.
 
 ```bash
-ERR13824484
-ERR13824571
-ERR13824499
+PRJNA250875
+SRR4235096
+ERR13824535
 ```
 
 Save the text file e.g. as `SRA_accessions.txt`. The repository includes an example file.
@@ -216,10 +231,6 @@ REF=$PWD/IPO323.fasta
 
 # read selection example 1 (small test case) - selects 3 paired-end reads from LEGserv
 READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_{1A,3A,5A}_{1,2}.fq.gz'
-# read selection example 2 (medium set) - selects 9 paired-end reads from LEGserv
-READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_*_{1,2}.fq.gz'
-# read selection example 3 (very large set) - selects nearly all available paired-end DNA-seq datasets on LEGserv
-READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
 ```
 
 
