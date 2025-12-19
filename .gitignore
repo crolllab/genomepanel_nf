@@ -1,12 +1,8 @@
 .DS_Store
-nf_output
 .nextflow*
 IPO323.fasta
 singularity
 run.sh
 .github/copilot-instructions.md
-plink_pca.sh
-nf_output
-true
 work
-test_output
+my_nf_run_output

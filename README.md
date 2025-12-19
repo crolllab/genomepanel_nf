@@ -246,7 +246,7 @@ micromamba activate nf_gp_env
 # run nextflow pipeline
 export NXF_OPTS='-Xms8g -Xmx64g'
 nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/nf_tmp' --outdir './my_nf_run_output' \
+  -work-dir '/scratch/my_nf_tmp' --outdir './my_nf_run_output' \
   --NCBI_API_key $NCBI_API_KEY \
   --reference $REF --ploidy 1 \
   --reads $READS \

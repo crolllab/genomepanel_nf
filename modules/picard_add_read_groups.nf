@@ -6,7 +6,7 @@ process addRG {
        
     input:
     tuple val(sample_id), path(sorted_bam), path(sorted_bai)
-    path sample_map
+    val sample_map
     
     output:
     tuple val(sample_id), path("${sample_id}_RG.bam"), emit: bam
@@ -18,7 +18,7 @@ process addRG {
     // GATK uses the SM tag for sample identification during joint genotyping
     """
     # Check if sample map file exists and is not empty
-    if [ -s "${sample_map}" ] && [ "${sample_map}" != "NO_SAMPLE_MAP" ]; then
+    if [ -f "${sample_map}" ] && [ -s "${sample_map}" ]; then
         # Look up sample name from map file (format: SRR_ID,Sample_Name)
         MAPPED_SAMPLE=\$(grep "^${sample_id}," "${sample_map}" | cut -d',' -f2 | tr -d '\\r\\n' || true)
         if [ -n "\$MAPPED_SAMPLE" ]; then
