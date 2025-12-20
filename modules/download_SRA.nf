@@ -53,9 +53,19 @@ EOF
                 if [ -s "${srr}_1.fastq.gz" ] && [ -s "${srr}_2.fastq.gz" ]; then
                     # Validate gzip integrity
                     if gzip -t ${srr}_1.fastq.gz 2>/dev/null && gzip -t ${srr}_2.fastq.gz 2>/dev/null; then
-                        echo "✓ Successfully downloaded from ENA (CRC validated)"
-                        success=true
-                        break
+                        # Validate paired-end read count consistency
+                        echo "Validating read counts..."
+                        count1=\$(zcat ${srr}_1.fastq.gz | wc -l | awk '{print int(\$1/4)}')
+                        count2=\$(zcat ${srr}_2.fastq.gz | wc -l | awk '{print int(\$1/4)}')
+                        
+                        if [ "\$count1" -eq "\$count2" ]; then
+                            echo "✓ Successfully downloaded from ENA (CRC validated, \$count1 paired reads)"
+                            success=true
+                            break
+                        else
+                            echo "⚠ ENA read count mismatch: R1=\$count1, R2=\$count2 (attempt \$attempt)"
+                            rm -f ${srr}_*.fastq.gz
+                        fi
                     else
                         echo "⚠ ENA files failed CRC validation (attempt \$attempt)"
                         rm -f ${srr}_*.fastq.gz
@@ -99,9 +109,21 @@ EOF
                             # Validate fastq format (check first read has 4 lines starting with @)
                             if head -n 1 ${srr}_1.fastq 2>/dev/null | grep -q '^@' && \
                                head -n 1 ${srr}_2.fastq 2>/dev/null | grep -q '^@'; then
-                                echo "✓ Successfully downloaded from NCBI (format validated)"
-                                success=true
-                                break
+                                
+                                # Validate paired-end read count consistency
+                                echo "Validating read counts..."
+                                count1=\$(cat ${srr}_1.fastq | wc -l | awk '{print int(\$1/4)}')
+                                count2=\$(cat ${srr}_2.fastq | wc -l | awk '{print int(\$1/4)}')
+                                
+                                if [ "\$count1" -eq "\$count2" ]; then
+                                    echo "✓ Successfully downloaded from NCBI (format validated, \$count1 paired reads)"
+                                    success=true
+                                    break
+                                else
+                                    echo "⚠ NCBI read count mismatch: R1=\$count1, R2=\$count2 (attempt \$attempt)"
+                                    echo "   This indicates data loss during fasterq-dump extraction"
+                                    rm -f ${srr}_*.fastq
+                                fi
                             else
                                 echo "⚠ NCBI files failed format validation (attempt \$attempt)"
                             fi
