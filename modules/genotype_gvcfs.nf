@@ -3,7 +3,7 @@ process GenotypeGVCFs {
     cpus 1
     memory { 16.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 2
+    maxRetries 3
 
 
     input:
