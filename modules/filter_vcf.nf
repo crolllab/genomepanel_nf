@@ -1,7 +1,9 @@
 process FilterVCFs {
     tag "GATK apply VCF filter flags"
     cpus 1
-    memory '16GB'
+    memory { 16.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(vcf_ch)
@@ -30,7 +32,7 @@ process FilterVCFs {
     output_file="filtered.${interval_safe}.vcf.gz"
        
     gatk IndexFeatureFile -I \${input_file}
-    gatk --java-options "-Xmx4g" VariantFiltration \
+    gatk --java-options "-Xmx\${task.memory.toGiga()-2}g" VariantFiltration \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${input_file} \

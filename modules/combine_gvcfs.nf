@@ -1,9 +1,9 @@
 process CombineGVCFs {
     tag "GATK4 Combine GVCFs"
     cpus 1
-    memory { 48.GB * task.attempt }
+    memory { 16.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 2
+    maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(gvcf_files)
@@ -26,7 +26,7 @@ process CombineGVCFs {
         fi
     done
 
-    gatk --java-options "-Xmx48g" \
+    gatk --java-options "-Xmx\${task.memory.toGiga()-2}g" \
         CombineGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \

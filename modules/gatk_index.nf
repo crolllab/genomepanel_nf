@@ -1,7 +1,9 @@
 process gatkIndex {
     tag "Reference GATK index building"
     cpus 1
-    memory '32GB'
+    memory { 16.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 3
 
     input:
     path reference
@@ -11,6 +13,6 @@ process gatkIndex {
 
     script:
     """
-    picard CreateSequenceDictionary R=$reference O=${reference.baseName}.dict
+    picard -Xmx\${task.memory.toGiga()-2}g CreateSequenceDictionary R=$reference O=${reference.baseName}.dict
     """
 }
