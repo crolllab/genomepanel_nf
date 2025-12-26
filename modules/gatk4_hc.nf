@@ -40,7 +40,7 @@ process GATKHC {
         ERC_MODE="GVCF"
     fi
     
-    gatk --java-options "-Xmx8g" HaplotypeCaller \
+    gatk --java-options "-Xmx\${task.memory.toGiga()-2}g" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -L ${interval} \

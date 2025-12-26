@@ -26,7 +26,7 @@ process CombineGVCFs {
         fi
     done
 
-    gatk --java-options "-Xmx48g" \
+    gatk --java-options "-Xmx\${task.memory.toGiga()-2}g" \
         CombineGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \

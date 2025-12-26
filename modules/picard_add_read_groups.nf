@@ -1,8 +1,9 @@
 process addRG {
     tag "PICARD adding ReadGroup in BAM files"
-    errorStrategy 'ignore'
     cpus 1
-    memory '16GB'
+    memory { 8.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 3
        
     input:
     tuple val(sample_id), path(sorted_bam), path(sorted_bai)
@@ -34,7 +35,7 @@ process addRG {
         echo "No sample map provided, using original ID: ${sample_id}"
     fi
     
-    picard AddOrReplaceReadGroups \
+    picard -Xmx\${task.memory.toGiga()-2}g AddOrReplaceReadGroups \
         -INPUT $sorted_bam \
         -OUTPUT ${sample_id}_RG.bam \
         -RGID ${sample_id} \
