@@ -35,7 +35,7 @@ process addRG {
         echo "No sample map provided, using original ID: ${sample_id}"
     fi
     
-    picard -Xmx\${task.memory.toGiga()-2}g AddOrReplaceReadGroups \
+    picard -Xmx${task.memory.toGiga()-2}g AddOrReplaceReadGroups \
         -INPUT $sorted_bam \
         -OUTPUT ${sample_id}_RG.bam \
         -RGID ${sample_id} \

@@ -13,6 +13,6 @@ process gatkIndex {
 
     script:
     """
-    picard -Xmx\${task.memory.toGiga()-2}g CreateSequenceDictionary R=$reference O=${reference.baseName}.dict
+    picard -Xmx${task.memory.toGiga()-2}g CreateSequenceDictionary R=$reference O=${reference.baseName}.dict
     """
 }

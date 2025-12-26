@@ -22,14 +22,14 @@ process dupRemoval {
 
     script:
     """
-    picard -Xmx\${task.memory.toGiga()-2}g MarkDuplicates \
+    picard -Xmx${task.memory.toGiga()-2}g MarkDuplicates \
         -INPUT $rg_bam \
         -OUTPUT ${sample_id}_RG_dedup.bam \
         -METRICS_FILE ${sample_id}_DUP_metrics.txt \
         -REMOVE_DUPLICATES true \
         --VALIDATION_STRINGENCY SILENT
 
-    picard -Xmx\${task.memory.toGiga()-2}g BuildBamIndex \
+    picard -Xmx${task.memory.toGiga()-2}g BuildBamIndex \
         -INPUT ${sample_id}_RG_dedup.bam \
         -OUTPUT ${sample_id}_RG_dedup.bam.bai
 
