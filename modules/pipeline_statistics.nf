@@ -50,8 +50,8 @@ process PipelineStatistics {
         # Find ALL work dirs for this process
         while IFS= read -r dir; do
             if [ -f "\$dir/.command.run" ]; then
-                # Check if this is the right process type
-                if grep -q "variant_calling:\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
+                # Check if this is the right process type (more flexible pattern matching)
+                if grep -qE "(variant_calling:)?\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
                     total=\$((total + 1))
                     
                     if [ -f "\$dir/.exitcode" ]; then
@@ -91,7 +91,7 @@ process PipelineStatistics {
                     fi
                 fi
             fi
-        done < <(find ${workflow.workDir} -maxdepth 2 -type d -name "[a-f0-9]*" 2>/dev/null)
+        done < <(find ${workflow.workDir} -maxdepth 3 -type d -name "[a-f0-9]*" 2>/dev/null)
         
         if [ \$total -gt 0 ]; then
             if [ \$failed -gt 0 ]; then
@@ -118,8 +118,8 @@ process PipelineStatistics {
         # Use find to get all directories with required files, then filter by process
         while IFS= read -r dir; do
             if [ -f "\$dir/.command.run" ] && [ -f "\$dir/.command.begin" ] && [ -f "\$dir/.exitcode" ]; then
-                # Check if this is the right process type
-                if grep -q "variant_calling:\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
+                # Check if this is the right process type (more flexible pattern matching)
+                if grep -qE "(variant_calling:)?\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
                     exitcode=\$(cat "\$dir/.exitcode")
                     if [ "\$exitcode" -eq 0 ]; then
                         begin=\$(stat -c %Y "\$dir/.command.begin" 2>/dev/null)
@@ -136,7 +136,7 @@ process PipelineStatistics {
                     fi
                 fi
             fi
-        done < <(find ${workflow.workDir} -maxdepth 2 -type d -name "[a-f0-9]*" 2>/dev/null)
+        done < <(find ${workflow.workDir} -maxdepth 3 -type d -name "[a-f0-9]*" 2>/dev/null)
         
         if [ -n "\$times" ] && [ \$count -gt 0 ]; then
             sum=0
@@ -242,24 +242,23 @@ process PipelineStatistics {
     variant_complete=0
     
     # Count successful completions at key stages
-    for dir in ${workflow.workDir}/??/*; do
-        [ -d "\$dir" ] || continue
+    while IFS= read -r dir; do
         [ -f "\$dir/.exitcode" ] || continue
         exitcode=\$(cat "\$dir/.exitcode")
         [ "\$exitcode" -eq 0 ] || continue
         
         if [ -f "\$dir/.command.run" ]; then
-            if grep -q "variant_calling:SRAdownload" "\$dir/.command.run" 2>/dev/null; then
+            if grep -qE "(variant_calling:)?SRAdownload" "\$dir/.command.run" 2>/dev/null; then
                 download_complete=\$((download_complete + 1))
-            elif grep -q "variant_calling:trimSequences" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "(variant_calling:)?trimSequences" "\$dir/.command.run" 2>/dev/null; then
                 trim_complete=\$((trim_complete + 1))
-            elif grep -q "variant_calling:bwaMap" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "(variant_calling:)?bwaMap" "\$dir/.command.run" 2>/dev/null; then
                 mapping_complete=\$((mapping_complete + 1))
-            elif grep -q "variant_calling:GATKHC" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "(variant_calling:)?GATKHC" "\$dir/.command.run" 2>/dev/null; then
                 variant_complete=\$((variant_complete + 1))
             fi
         fi
-    done
+    done < <(find ${workflow.workDir} -maxdepth 3 -type d -name "[a-f0-9]*" 2>/dev/null)
     
     echo "" >> \$FAIL_FILE
     echo "Pipeline Stage Completion:" >> \$FAIL_FILE
