@@ -51,7 +51,7 @@ process PipelineStatistics {
         while IFS= read -r dir; do
             if [ -f "\$dir/.command.run" ]; then
                 # Check if this is the right process type (more flexible pattern matching)
-                if grep -qE "(variant_calling:)?\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
+                if grep -qE "variant_calling:\$process_pattern|^\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
                     total=\$((total + 1))
                     
                     if [ -f "\$dir/.exitcode" ]; then
@@ -119,7 +119,7 @@ process PipelineStatistics {
         while IFS= read -r dir; do
             if [ -f "\$dir/.command.run" ] && [ -f "\$dir/.command.begin" ] && [ -f "\$dir/.exitcode" ]; then
                 # Check if this is the right process type (more flexible pattern matching)
-                if grep -qE "(variant_calling:)?\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
+                if grep -qE "variant_calling:\$process_pattern|^\$process_pattern" "\$dir/.command.run" 2>/dev/null; then
                     exitcode=\$(cat "\$dir/.exitcode")
                     if [ "\$exitcode" -eq 0 ]; then
                         begin=\$(stat -c %Y "\$dir/.command.begin" 2>/dev/null)
@@ -248,13 +248,13 @@ process PipelineStatistics {
         [ "\$exitcode" -eq 0 ] || continue
         
         if [ -f "\$dir/.command.run" ]; then
-            if grep -qE "(variant_calling:)?SRAdownload" "\$dir/.command.run" 2>/dev/null; then
+            if grep -qE "variant_calling:SRAdownload|^SRAdownload" "\$dir/.command.run" 2>/dev/null; then
                 download_complete=\$((download_complete + 1))
-            elif grep -qE "(variant_calling:)?trimSequences" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "variant_calling:trimSequences|^trimSequences" "\$dir/.command.run" 2>/dev/null; then
                 trim_complete=\$((trim_complete + 1))
-            elif grep -qE "(variant_calling:)?bwaMap" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "variant_calling:bwaMap|^bwaMap" "\$dir/.command.run" 2>/dev/null; then
                 mapping_complete=\$((mapping_complete + 1))
-            elif grep -qE "(variant_calling:)?GATKHC" "\$dir/.command.run" 2>/dev/null; then
+            elif grep -qE "variant_calling:GATKHC|^GATKHC" "\$dir/.command.run" 2>/dev/null; then
                 variant_complete=\$((variant_complete + 1))
             fi
         fi
