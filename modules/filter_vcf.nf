@@ -32,7 +32,7 @@ process FilterVCFs {
     output_file="filtered.${interval_safe}.vcf.gz"
        
     gatk IndexFeatureFile -I \${input_file}
-    gatk --java-options "-Xmx\${task.memory.toGiga()-2}g" VariantFiltration \
+    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" VariantFiltration \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${input_file} \
