@@ -2,7 +2,6 @@ process PipelineStatistics {
     tag "Generating pipeline execution statistics"
     memory '8GB'
     cpus 1
-    time '30m'
     
     publishDir params.outdir, mode: 'copy'
     
