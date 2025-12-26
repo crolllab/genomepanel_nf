@@ -9,9 +9,9 @@ process PipelineStatistics {
     val ready  // Dummy input to ensure this runs at the end
     
     output:
-    path "pipeline_execution_stats.txt", emit: stats
-    path "pipeline_execution_stats.tsv", emit: stats_tsv
-    path "pipeline_failures_summary.txt", emit: failures
+    path "pipeline_execution_stats.txt"
+    path "pipeline_execution_stats.tsv"
+    path "pipeline_failures_summary.txt"
     
     script:
     """
