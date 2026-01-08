@@ -32,23 +32,26 @@ log.info """
      6. Variant quality plotting, read and mapping stats   
    
    Configuration:
-     working dir    : ${params.workdir}
-     NCBI API key   : ${params.NCBI_API_key}
-     ploidy         : ${params.ploidy}
-
-     reference      : ${params.reference}
-     bwa_index      : ${params.bwa_index}
-     min contig len : ${params.min_contig_length}
-     ref segments   : ${params.reference_segments}
-     invar sites    : ${params.call_invar_sites}
-
-     local files    : ${params.reads}
-     SRA ids file   : ${params.SRA_index}
-     local bams     : ${params.bam_input}
-
-     outdir         : ${params.outdir}
-     keep BAM       : ${params.keep_bam}
-     keep GVCF      : ${params.keep_gvcf}
+       NCBI API key   : ${params.NCBI_API_key}
+       Ploidy         : ${params.ploidy}
+       Inv. site calls: ${params.call_invar_sites}
+  
+       Reference      : ${params.reference}
+       Ref segments   : ${params.reference_segments}
+       Min contig len : ${params.min_contig_length}
+       BWA index      : ${params.bwa_index}
+  
+     Input data
+       Local fastq    : ${params.reads}
+       SRA ID file    : ${params.SRA_index}
+       SRR-sample map : ${params.SRR_sample_map}
+       Local bam      : ${params.bam_input}
+  
+     Output options
+       Working dir    : ${params.workdir}
+       Output dir     : ${params.outdir}
+       Keep BAM       : ${params.keep_bam}
+       Keep GVCF      : ${params.keep_gvcf}
     """
 
 
