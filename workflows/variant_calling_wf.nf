@@ -29,7 +29,6 @@ include { RQualPlotting } from '../modules/r_plotting'
 include { PopGenVCF } from '../modules/popgen_vcf'
 include { RSummarizingBWA } from '../modules/r_process_summary_bwa'
 include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
-include { PipelineStatistics } from '../modules/pipeline_statistics'
 
 // ---------------------
 // Main workflow
@@ -391,11 +390,5 @@ workflow variant_calling {
         // For BAM input, no FASTP/BWA reports to summarize
         all_done = concat_clean_vcf.mix(concat_vcf).collect()
     }
-
-    // ---------------------
-    // Generate pipeline execution statistics
-    // ---------------------
-    // Pass the actual runtime work directory to ensure correct path
-    PipelineStatistics(all_done, workflow.workDir)
 
 }
