@@ -122,7 +122,24 @@ _Read input options:_
   - Accepts only paired-end reads locally. Both SE and PE are accepted from SRA.
   - If the download from SRA produces errors (connection reset, etc.), an alternative is to download the files separately, and use the `--reads` option to specify the downloaded files. See below for an example of how to download SRA files manually.
 
-- `--SRR_sample_map`: Optional. A CSV file mapping SRR accession IDs to sample names. This allows multiple SRR accessions to be assigned to the same sample name, which is useful when a sample was sequenced multiple times and should be genotyped as a single combined dataset. The CSV format is: `SRR_ID,Sample_Name` (one mapping per line, no header). If an SRR ID is not listed in the file, the original SRR ID will be used as the sample name. Default: `false` (no mapping). The repository includes an example file `sample_map.csv`.
+- `--bam_input`: Optional. **Alternative entry point**: Provide a glob pattern to pre-existing BAM files to skip read processing steps (SRA download, trimming, mapping, duplicate marking) and start directly with variant calling. This is useful when you have already processed BAM files from another pipeline or a previous run. Must be bracketed by single quotes `'`. Cannot be used together with `--reads` or `--SRA_index`. Sample names are extracted from BAM filenames, automatically removing `_RG_dedup` suffix if present.
+
+  **Requirements for BAM files:**
+  - BAM files must be coordinate-sorted
+  - BAM files must contain read group (@RG) information in the header
+  - Each BAM file must have a corresponding `.bai` index file in the same directory
+  - These requirements are NOT validated by the pipeline - ensure your files meet these criteria before running
+  
+  Example:
+  ```bash
+  # Process all BAM files in a directory
+  --bam_input '/path/to/bams/*.bam'
+  
+  # Process specific samples
+  --bam_input '/path/to/bams/sample_{A,B,C}_RG_dedup.bam'
+  ```
+
+- `--SRR_sample_map`: Optional. A CSV file mapping SRR accession IDs to sample names. This allows multiple SRR accessions to be assigned to the same sample name, which is useful when a sample was sequenced multiple times and should be genotyped as a single combined dataset. The CSV format is: `SRR_ID,Sample_Name` (one mapping per line, no header). If an SRR ID is not listed in the file, the original SRR ID will be used as the sample name. Default: `false` (no mapping). The repository includes an example file `sample_map.csv`. Note: This option only applies when using `--reads` or `--SRA_index`, not with `--bam_input`.
 
   Example `sample_map.csv`:
   ```
@@ -143,7 +160,7 @@ _Reference genome options:_
 
 - `--reference`: Required. Provide a reference genome fasta file with an absolute path and make sure the file has the `.fasta` extension (not `.fa`, `.fna`or `.fas`).
 
-- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. You can de-activate segmentation by setting the value to `0`. Default: `1000000` (1 Mb).
+- `--reference_segments`: Optional. Size of genome segments (in base pairs) used for parallel processing during variant calling. Smaller values increase parallelization but add overhead. Larger values reduce parallelism but minimize overhead. You can de-activate segmentation by setting the value to `0`. Default: `0` (no segmentation).
 
 - `--min_contig_length`: Optional. Filter reference contigs shorter than this value (in base pairs). Useful for excluding small scaffolds or contigs from variant calling. Default: `false` (no filtering).
 
