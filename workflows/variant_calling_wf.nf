@@ -16,6 +16,7 @@ include { bwaMap } from '../modules/bwa_mapping'
 include { samtoolsSort } from '../modules/samtools_sort'
 include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
+include { loadBAMs } from '../modules/load_bams'
 include { samtoolsRealignedIndex } from '../modules/samtools_index'
 include { GATKHC } from '../modules/gatk4_hc'
 include { CombineGVCFs } from '../modules/combine_gvcfs'
@@ -42,9 +43,37 @@ workflow variant_calling {
        exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
     }
     
-    if (!params.reads && !params.SRA_index) {
-       exit 1, "ERROR: No input reads provided. Supply local FASTQ files and/or SRA run accessions."
+    if (!params.reads && !params.SRA_index && !params.bam_input) {
+       exit 1, "ERROR: No input provided. Supply local FASTQ files (--reads), SRA accessions (--SRA_index), or BAM files (--bam_input)."
     }
+    
+    if (params.bam_input && (params.reads || params.SRA_index)) {
+       exit 1, "ERROR: Cannot use --bam_input with --reads or --SRA_index. Choose either BAM input or read-based processing."
+    }
+    
+    // ---------------------
+    // Reference filtering (optional)
+    // ---------------------
+    if (params.min_contig_length && params.min_contig_length != false) {
+        // Filter reference by contig length
+        filterReference(params.reference, params.min_contig_length)
+        reference_to_use = filterReference.out.filtered_fasta
+    } else {
+        // Use original reference
+        reference_to_use = Channel.fromPath(params.reference).collect()
+    }
+
+    // ---------------------
+    // Reference indexes (needed for both read and BAM input)
+    // ---------------------
+    gatk_index  = gatkIndex(reference_to_use)
+    fai_index   = fastaIndex(reference_to_use)
+
+    // ---------------------
+    // Input processing: BAM files OR reads (SRA/local)
+    // ---------------------
+    if (!params.bam_input) {
+    // Process reads through full pipeline
     
     // ---------------------
     // SRA metadata + downloads
@@ -158,19 +187,7 @@ workflow variant_calling {
 
 
     // ---------------------
-    // Reference filtering (optional)
-    // ---------------------
-    if (params.min_contig_length && params.min_contig_length != false) {
-        // Filter reference by contig length
-        filterReference(params.reference, params.min_contig_length)
-        reference_to_use = filterReference.out.filtered_fasta
-    } else {
-        // Use original reference
-        reference_to_use = Channel.fromPath(params.reference).collect()
-    }
-
-    // ---------------------
-    // Reference indexes
+    // BWA index (only needed for read input)
     // ---------------------
     // Conditionally build or use provided BWA index
     if (params.bwa_index) {
@@ -186,8 +203,6 @@ workflow variant_calling {
         (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
     }
     
-    gatk_index  = gatkIndex(reference_to_use)
-    fai_index   = fastaIndex(reference_to_use)
     // ---------------------
     // Mapping
     // ---------------------
@@ -218,7 +233,41 @@ workflow variant_calling {
     // Updated workflow
     addRG(bam_sorted, sample_map_file)
     dedup_bams = dupRemoval(addRG.out.bam)
-    dedup_with_index = dedup_bams.bam  // or just use dedup_bams directly
+    dedup_with_index = dedup_bams.bam
+    
+    } else {
+    // ---------------------
+    // Load pre-existing BAM files
+    // ---------------------
+    // Parse BAM files from glob pattern
+    // Extract sample name by removing _RG_dedup suffix if present
+    bam_ch = Channel
+        .fromPath(params.bam_input)
+        .map { bam_file ->
+            def sample_name = bam_file.baseName.replaceAll(/_RG_dedup$/, '')
+            def bai_file = file("${bam_file}.bai")
+            if (!bai_file.exists()) {
+                exit 1, "ERROR: Index file not found for ${bam_file}. Expected: ${bai_file}"
+            }
+            tuple(sample_name, bam_file, bai_file)
+        }
+    
+    dedup_with_index = loadBAMs(bam_ch).bam
+    
+    // When using BAM input, BWA indices aren't needed but GATKHC module expects them
+    // Use the same BWA index logic as for read processing
+    if (params.bwa_index) {
+        bwa_amb = Channel.fromPath("${params.bwa_index}.amb").collect()
+        bwa_ann = Channel.fromPath("${params.bwa_index}.ann").collect()
+        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64").collect()
+        bwa_pac = Channel.fromPath("${params.bwa_index}.pac").collect()
+        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
+    } else {
+        // Build BWA index from reference even for BAM input (needed by GATKHC module)
+        (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
+    }
+    
+    }  // End of BAM input vs reads processing conditional
 
     // ---------------------
     // Parallel SNP calling by genome segments
@@ -330,16 +379,23 @@ workflow variant_calling {
     RQualPlotting(concat_vcf)
 
     // ---------------------
-    // Summarize FASTP and BWA steps with R
+    // Summarize FASTP and BWA steps with R (only for read processing)
     // ---------------------
-    RSummarizingFASTP(fastp_json_ch)
-    RSummarizingBWA(bam_reports_ch)    
+    if (!params.bam_input) {
+        RSummarizingFASTP(fastp_json_ch)
+        RSummarizingBWA(bam_reports_ch)
+        
+        // Mix all final outputs including R summaries
+        all_done = concat_clean_vcf.mix(concat_vcf).mix(RSummarizingFASTP.out).mix(RSummarizingBWA.out).collect()
+    } else {
+        // For BAM input, no FASTP/BWA reports to summarize
+        all_done = concat_clean_vcf.mix(concat_vcf).collect()
+    }
 
     // ---------------------
     // Generate pipeline execution statistics
     // ---------------------
-    // Mix all final outputs to create a single ready signal
-    all_done = concat_clean_vcf.mix(concat_vcf).mix(RSummarizingFASTP.out).mix(RSummarizingBWA.out).collect()
-    PipelineStatistics(all_done)
+    // Pass the actual runtime work directory to ensure correct path
+    PipelineStatistics(all_done, workflow.workDir)
 
 }

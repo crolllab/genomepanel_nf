@@ -5,8 +5,12 @@ process PipelineStatistics {
     
     publishDir params.outdir, mode: 'copy'
     
+    // Disable cleanup for this process to preserve work directories for analysis
+    scratch false
+    
     input:
     val ready
+    val workdir_path
     
     output:
     path "pipeline_execution_stats.txt"
@@ -18,7 +22,7 @@ process PipelineStatistics {
     
     OUTFILE="pipeline_execution_stats.txt"
     TSV_FILE="pipeline_execution_stats.tsv"
-    WORKDIR="!{workflow.workDir}"
+    WORKDIR="!{workdir_path}"
     
     echo "=================================================================" > $OUTFILE
     echo "  Nextflow Pipeline - Process Statistics" >> $OUTFILE
@@ -38,7 +42,8 @@ process PipelineStatistics {
         
         for dir in $(find $WORKDIR -maxdepth 3 -type d -name "[a-f0-9]*" 2>/dev/null); do
             if [ -f "$dir/.command.run" ] && [ -f "$dir/.command.begin" ] && [ -f "$dir/.exitcode" ]; then
-                if grep -q "$pattern" "$dir/.command.run" 2>/dev/null; then
+                # Match pattern in the process name line (e.g., "variant_calling:bwaMap")
+                if grep "^### name:.*$pattern" "$dir/.command.run" 2>/dev/null | grep -q .; then
                     exitcode=$(cat "$dir/.exitcode")
                     if [ "$exitcode" -eq 0 ]; then
                         begin=$(stat -c %Y "$dir/.command.begin" 2>/dev/null)

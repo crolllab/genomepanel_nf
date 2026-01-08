@@ -8,7 +8,7 @@ process filterReference {
     
     output:
     path "*.red.fasta", emit: filtered_fasta
-    path "*.filter_stats.txt", emit: stats
+    path "*.stats.txt", emit: stats
     
     script:
     def base_name = reference.baseName

@@ -2,7 +2,6 @@
 .nextflow*
 IPO323.fasta
 singularity
-run.sh
 .github/copilot-instructions.md
 work
-my_nf_run_output
+nf_output

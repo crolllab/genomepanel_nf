@@ -12,7 +12,8 @@ params.bwa_index = ""  // Optional: path to pre-built BWA index files
 params.min_contig_length = false  // Filter reference contigs shorter than this value (bp)
 params.reference_segments = 1000000  // Genome segment size for parallel variant calling (bp)
 params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCaller
-params.SRR_sample_map = false  // Optional CSV file mapping SRR IDs to sample names
+params.bam_input = ""  // Optional: path to pre-existing BAM files
+params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
 
 include { variant_calling } from './workflows/variant_calling_wf'
 
@@ -43,7 +44,7 @@ log.info """
 
      local files    : ${params.reads}
      SRA ids file   : ${params.SRA_index}
-     SRR sample map : ${params.SRR_sample_map}
+     local bams     : ${params.bam_input}
 
      outdir         : ${params.outdir}
      keep BAM       : ${params.keep_bam}

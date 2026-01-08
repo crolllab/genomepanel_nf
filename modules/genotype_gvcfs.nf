@@ -3,7 +3,7 @@ process GenotypeGVCFs {
     cpus 1
     memory { 16.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 2
 
 
     input:
@@ -32,7 +32,7 @@ process GenotypeGVCFs {
         INVAR_OPTS=""
     fi
     
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" GenotypeGVCFs \
+    gatk --java-options "-Xmx16g" GenotypeGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${combined_file} \

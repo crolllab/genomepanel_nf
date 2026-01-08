@@ -1,9 +1,8 @@
 process CleanVCFs {
     tag "Remove low-qual SNPs"
+    errorStrategy 'ignore'
     cpus 1
-    memory { 16.GB * task.attempt }
-    errorStrategy 'retry'
-    maxRetries 3
+    memory '48GB'
 
     input:
     tuple val(chr), val(interval), path(fvcf_ch)
@@ -31,7 +30,7 @@ process CleanVCFs {
         NON_VAR_OPTS="--exclude-non-variants"
     fi
     
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" SelectVariants \
+    gatk --java-options "-Xmx4g" SelectVariants \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${input_file} \

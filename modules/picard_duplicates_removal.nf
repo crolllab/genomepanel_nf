@@ -2,9 +2,7 @@ process dupRemoval {
     tag "PICARD marking duplicates in BAM files"
     errorStrategy 'ignore'
     cpus 1
-    memory { 8.GB * task.attempt }
-    errorStrategy 'retry'
-    maxRetries 3
+    memory '16GB'
 
     publishDir "${params.outdir}/bam_files",
         mode: 'copy',
@@ -22,14 +20,14 @@ process dupRemoval {
 
     script:
     """
-    picard -Xmx${task.memory.toGiga()-2}g MarkDuplicates \
+    picard MarkDuplicates \
         -INPUT $rg_bam \
         -OUTPUT ${sample_id}_RG_dedup.bam \
         -METRICS_FILE ${sample_id}_DUP_metrics.txt \
         -REMOVE_DUPLICATES true \
         --VALIDATION_STRINGENCY SILENT
 
-    picard -Xmx${task.memory.toGiga()-2}g BuildBamIndex \
+    picard BuildBamIndex \
         -INPUT ${sample_id}_RG_dedup.bam \
         -OUTPUT ${sample_id}_RG_dedup.bam.bai
 
