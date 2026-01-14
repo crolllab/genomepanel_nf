@@ -1,6 +1,5 @@
 process samtoolsSort {
     tag "Sorting BAM files"
-    memory '16GB'
     cpus 1
     memory { 8.GB * task.attempt }
     errorStrategy 'retry'
