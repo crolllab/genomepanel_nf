@@ -1,6 +1,7 @@
 process trimSequencesPE {
     tag "FASTP PE trimming"
-    errorStrategy 'ignore'
+    errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
+    maxRetries 2
     memory '4GB'
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
         
@@ -43,7 +44,8 @@ process trimSequencesPE {
 
 process trimSequencesSE {
     tag "FASTP SE trimming"
-    errorStrategy 'ignore'
+    errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
+    maxRetries 2
     memory '4GB'
     cpus 4
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
