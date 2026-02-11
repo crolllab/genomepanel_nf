@@ -51,7 +51,13 @@ git clone git@github.com:crolllab/genomepanel_nf.git
 cd genomepanel_nf
 ```
 
-Create a conda environment for Nextflow
+Activate the nextflow module (if available on your system)
+
+```bash
+module load Nextflow
+```
+
+Alternatively, create a conda environment for Nextflow
 
 ```bash
 micromamba create -n nf_gp_env
@@ -258,8 +264,9 @@ Start the pipeline using `slurm` and processing local fastq files and NCBI acces
 ```bash
 # substitute with your own NCBI API key!
 NCBI_API_KEY=abcdef1234567890
-# activate conda environment
-micromamba activate nf_gp_env
+
+# make sure nextflow is available (module load or micromamba)
+
 # run nextflow pipeline
 export NXF_OPTS='-Xms8g -Xmx64g'
 nextflow run main.nf -config nextflow.config -profile slurm \
