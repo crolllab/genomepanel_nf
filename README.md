@@ -45,6 +45,8 @@ The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP ca
 
 ## Step 1: Repository, singularity and nextflow environment
 
+**NB: Step 1 can be skipped on LEGcompute by using `module load genomepanel-nf`**
+
 Cloning the repository, 
 ```bash
 git clone git@github.com:crolllab/genomepanel_nf.git
