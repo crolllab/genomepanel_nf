@@ -43,7 +43,7 @@ process GATKHC {
     gatk --java-options "-Xmx${task.memory.toGiga()-2}g" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -L ${interval} \
+        -L "${interval}" \
         --sample-ploidy $params.ploidy \
         -input ${dedup_bam} \
         -output ${sample_id}_\${interval_safe}.g.vcf.gz \

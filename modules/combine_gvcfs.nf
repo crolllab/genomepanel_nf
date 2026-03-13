@@ -30,7 +30,7 @@ process CombineGVCFs {
         CombineGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
-        -L ${interval} \
+        -L "${interval}" \
         -V gvcfs.list \
         -output combined.${interval_safe}.g.vcf.gz
     """
