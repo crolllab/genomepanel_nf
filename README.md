@@ -111,7 +111,7 @@ singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--
 
 _Run options:_
 
-- `-profile`: Optional. `local` skips the SLURM queuing system and runs tasks with up to 4 threads each. `local_highCPU` runs tasks with up to 24 threads each. `slurm` submits all tasks as SLURM jobs. Default: `slurm`.
+- `-profile`: Optional. `local` runs tasks locally with up to 4 threads each. `local_highCPU` runs tasks with up to 24 threads each. `slurm` submits all tasks as SLURM jobs. Default: `local`.
 
 - `-resume`: Optional. If set, the pipeline will resume from the last completed step, skipping already completed steps. The `work-dir` needs to be intact for this. This is particularly useful if e.g. the reference genome indexing was already completed in a previous run. Note that `genomepanel_nf` aggressively cleans up temporary files to save space, so resuming may not always be saving computation time.
 
