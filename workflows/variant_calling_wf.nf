@@ -395,6 +395,6 @@ workflow variant_calling {
     // ---------------------
     // Generate pipeline execution statistics
     // ---------------------
-    PipelineStatistics(all_done)
+    PipelineStatistics(all_done, workflow.launchDir.resolve(params.outdir).resolve("pipeline_trace.txt"))
 
 }

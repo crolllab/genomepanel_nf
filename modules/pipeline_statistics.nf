@@ -7,6 +7,7 @@ process PipelineStatistics {
     
     input:
     val ready
+    path trace_file
     
     output:
     path "pipeline_execution_stats.txt"
@@ -19,15 +20,7 @@ process PipelineStatistics {
     
     OUTFILE="pipeline_execution_stats.txt"
     TSV_FILE="pipeline_execution_stats.tsv"
-    OUTDIR="${params.outdir}"
-    LAUNCH_DIR="${workflow.launchDir}"
-    OUTDIR="\${OUTDIR%/}"
-
-    if [[ "\$OUTDIR" = /* ]]; then
-        TRACE_FILE="\$OUTDIR/pipeline_trace.txt"
-    else
-        TRACE_FILE="\$LAUNCH_DIR/\$OUTDIR/pipeline_trace.txt"
-    fi
+    TRACE_FILE="${trace_file}"
     
     echo "=================================================================" > \$OUTFILE
     echo "  Nextflow Pipeline - Process Statistics" >> \$OUTFILE
