@@ -18,6 +18,7 @@ params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample name
 include { variant_calling } from './workflows/variant_calling_wf'
 
 
+log.info """
    ===========================================
    || GENOME PANEL VARIANT CALLING WORKFLOW ||
    ===========================================
