@@ -48,7 +48,7 @@ log.info """
        Local bam      : ${params.bam_input}
   
      Output options
-       Working dir    : ${params.workdir}
+      Working dir    : ${workflow.workDir}
        Output dir     : ${params.outdir}
        Keep BAM       : ${params.keep_bam}
        Keep GVCF      : ${params.keep_gvcf}

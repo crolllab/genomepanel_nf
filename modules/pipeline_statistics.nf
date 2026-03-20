@@ -52,7 +52,7 @@ process PipelineStatistics {
         return s
     }
 
-    function to_seconds(raw,    s, n, i, tok, m, val, unit, total) {
+    function to_seconds(raw,    s, n, i, tok, val, unit, total) {
         s = trim(raw)
         if (s == "") return -1
 
@@ -61,21 +61,21 @@ process PipelineStatistics {
         for (i = 1; i <= n; i++) {
             if (tok[i] == "") continue
 
-            if (match(tok[i], /^([0-9]*\\.?[0-9]+)(ms|s|m|h|d)\$/, m)) {
-                val = m[1] + 0
-                unit = m[2]
-                if (unit == "ms") total += (val / 1000)
-                else if (unit == "s") total += val
-                else if (unit == "m") total += (val * 60)
-                else if (unit == "h") total += (val * 3600)
-                else if (unit == "d") total += (val * 86400)
-            }
-            else if (tok[i] ~ /^[0-9]*\\.?[0-9]+\$/) {
-                total += (tok[i] + 0)
-            }
-            else {
-                return -1
-            }
+            # Extract unit (trailing letters) and numeric value using gsub
+            # This is POSIX-compatible and works in BusyBox awk (no 3-arg match)
+            unit = tok[i]
+            gsub(/^[0-9]*\\.?[0-9]+/, "", unit)
+            val = tok[i]
+            gsub(/[a-zA-Z]+\$/, "", val)
+            val = val + 0
+
+            if (unit == "ms") total += (val / 1000)
+            else if (unit == "s") total += val
+            else if (unit == "m") total += (val * 60)
+            else if (unit == "h") total += (val * 3600)
+            else if (unit == "d") total += (val * 86400)
+            else if (unit == "") total += val
+            else return -1
         }
 
         return total
