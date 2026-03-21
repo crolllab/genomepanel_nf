@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 
 params.outdir = "./nf_output/"
+params.workdir = "./work"
 params.reference = ""
 params.reads = ""
 params.SRA_index = ""
