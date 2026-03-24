@@ -1,4 +1,5 @@
 process trimSequencesPE {
+    time '7d'
     tag "FASTP PE trimming"
     errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
     maxRetries 2
@@ -43,6 +44,7 @@ process trimSequencesPE {
 }
 
 process trimSequencesSE {
+    time '7d'
     tag "FASTP SE trimming"
     errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
     maxRetries 2

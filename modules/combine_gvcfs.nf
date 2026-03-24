@@ -1,4 +1,5 @@
 process CombineGVCFs {
+    time '7d'
     tag "GATK4 Combine GVCFs"
     cpus 1
     memory { 16.GB * task.attempt }

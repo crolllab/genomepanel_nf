@@ -1,4 +1,5 @@
 process ConcatCleanVCFs {
+    time '7d'
     tag "BCFtools concat clean VCFs"
     cpus 1
     memory '48GB'

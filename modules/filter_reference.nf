@@ -1,4 +1,5 @@
 process filterReference {
+    time '7d'
     
     publishDir "${params.outdir}/reference", mode: 'copy'
     

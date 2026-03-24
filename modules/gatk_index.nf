@@ -1,4 +1,5 @@
 process gatkIndex {
+    time '7d'
     tag "Reference GATK index building"
     cpus 1
     memory { 16.GB * task.attempt }

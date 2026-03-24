@@ -1,4 +1,5 @@
 process bwaIndex {
+    time '7d'
     tag "Reference BWA index building"    
     cpus 1
     memory '64GB'

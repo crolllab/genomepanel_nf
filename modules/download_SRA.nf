@@ -1,5 +1,6 @@
 // Hybrid download for paired-end reads: tries ENA URL first, falls back to NCBI
 process SRAdownloadPE {
+    time '7d'
     cpus 1
     memory '4GB'
     tag "Downloading PE: $srr"
@@ -155,6 +156,7 @@ EOF
 
 // Hybrid download for single-end reads: tries ENA URL first, falls back to NCBI
 process SRAdownloadSE {
+    time '7d'
     cpus 1
     memory '4GB'
     tag "Downloading SE: $srr"

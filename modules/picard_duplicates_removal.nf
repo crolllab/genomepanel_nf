@@ -1,4 +1,5 @@
 process dupRemoval {
+    time '7d'
     tag "PICARD marking duplicates in BAM files"
     errorStrategy 'ignore'
     cpus 1

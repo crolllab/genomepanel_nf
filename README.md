@@ -17,7 +17,8 @@ Pipeline to variant call large genome panels
 6. [Step 5: Pipeline output](#step-5-pipeline-output)
 7. [Description of pipeline steps](#description-of-pipeline-steps)
 8. [Features to consider / bug fixes](#features-to-consider--bug-fixes)
-9. [Utilities](#utilities)
+9. [Notes on HPC usage](#notes-on-hpc-usage)
+10. [Utilities](#utilities)
    - [Download SRA files manually](#download-sra-files-manually)
    - [Rename samples in final vcf](#rename-samples-in-final-vcf)
 
@@ -26,6 +27,12 @@ Pipeline to variant call large genome panels
 ## Overview
 
 The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP calling and quality checks. The pipeline accepts either locally stored Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome for improved parallelization. 
+
+## Release notes
+
+### v1.0.2
+- Added a dedicated **Notes on HPC usage** section in this README.
+- Added a default process time limit of `7d` across all module tasks to improve SLURM scheduling behavior.
 
 **Implemented steps:**
 - `entrez-direct`: query NCBI SRA for metadata (optional)
@@ -376,6 +383,19 @@ final_variants.plots.QUAL.pdf
 - run basic pop gen analyses (e.g. PCA, admixture)
 - include sample renaming step as an option
 - allow for multiple SRA accessions or fastq pairs per sample name
+
+---
+
+## Notes on HPC usage
+- The pipeline is designed to minimize storage space by deleting intermediate files after each step. However, this means that resuming the pipeline may not be possible.
+- Despite aggressive temporary file cleanup, the pipeline can still require a large amount of storage space (often many TB) during execution. If space becomes an issue, consider using more aggressive `maxForks` settings in the `nextflow.config` file to reduce the number of parallel tasks. Reduce first the download, trim and mapping concurrency.
+- For very large pipeline runs, make sure that the node on which the executor runs has enough memory overhead (e.g. 20-30 GB) as a surge in task execution could lead to pipeline failures.
+- Make sure the `work-dir` is on a fast storage system with enough space to store temporary files (often many TB).
+- With the `slurm` profile, all tasks request a 7-day time limit. If this is not optimal for available queues on the HPC system, consider adjusting the time limits in each task file. 
+- Execution of new task is rate limited to no overwhelm a system. Look for the executor configuration in `nextflow.config` in the `nextflow.config` file.
+- SRA downloads are capped at 10 parallel downloads to avoid stalling by NCBI. You can adjust this limit in the `nextflow.config` with the `maxForks` option. 
+- The trimming step with fastp is also rate limited to 20 parallel tasks as these can be very I/O intensive. Adjust this limit in the `nextflow.config` with the `maxForks` option.
+- Similarly, the GATK HaplotypeCaller step is rate limited to 100 parallel tasks to avoid overwhelming the system. Adjust this limit in the `nextflow.config` with the `maxForks` option.
 
 ---
 

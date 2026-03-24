@@ -1,4 +1,5 @@
 process PipelineStatistics {
+    time '7d'
     tag "Generating pipeline execution statistics"
     memory '8GB'
     cpus 1

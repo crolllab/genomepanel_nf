@@ -1,4 +1,5 @@
 process samtoolsSort {
+    time '7d'
     tag "Sorting BAM files"
     cpus 1
     memory { 8.GB * task.attempt }

@@ -1,4 +1,5 @@
 process FilterVCFs {
+    time '7d'
     tag "GATK apply VCF filter flags"
     cpus 1
     memory { 16.GB * task.attempt }

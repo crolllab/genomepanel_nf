@@ -1,4 +1,5 @@
 process samtoolsRealignedIndex {
+    time '7d'
     tag "Indexing BAM files"
     errorStrategy 'ignore'
     cpus 1

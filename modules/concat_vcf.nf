@@ -1,4 +1,5 @@
 process ConcatVCFs {
+    time '7d'
     tag "BCFtools concat VCFs + qual metrics"
     cpus 1
     memory '48GB'

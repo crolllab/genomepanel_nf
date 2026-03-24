@@ -1,4 +1,5 @@
 process RQualPlotting {
+    time '7d'
     tag "Plotting qual metrics with R"
     errorStrategy 'ignore'
     cpus 1

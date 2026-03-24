@@ -1,4 +1,5 @@
 process loadBAMs {
+    time '7d'
     tag "Loading pre-existing BAM files"
     
     input:

@@ -1,4 +1,5 @@
 process RSummarizingBWA {
+    time '7d'
     tag "Summarizing BWA stats with R"
     cpus 1
     publishDir "${params.outdir}", mode: 'copy'

@@ -1,4 +1,5 @@
 process CleanVCFs {
+    time '7d'
     tag "Remove low-qual SNPs"
     cpus 1
     memory { 16.GB * task.attempt }

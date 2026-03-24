@@ -1,4 +1,5 @@
 process SRAresolve {
+    time '7d'
     tag "Querying $accessions_file for SRR ids and ENA URLs"
     cpus 1
     memory '4GB'

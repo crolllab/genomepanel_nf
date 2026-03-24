@@ -1,4 +1,5 @@
 process fastaIndex {
+    time '7d'
     tag "Reference FASTA index building"    
     cpus 1
     memory '32GB'

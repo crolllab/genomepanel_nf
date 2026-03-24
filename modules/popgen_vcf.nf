@@ -1,4 +1,5 @@
 process PopGenVCF {
+    time '7d'
     tag "Generating VCF for pop. gen."
     cpus 1
     memory '4GB'

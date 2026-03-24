@@ -1,4 +1,5 @@
 process GATKHC {
+    time '7d'
     tag "GATK4 HaplotypeCaller"
     cpus 1
     memory { 8.GB * task.attempt }
