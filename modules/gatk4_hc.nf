@@ -2,9 +2,9 @@ process GATKHC {
     time '7d'
     tag "GATK4 HaplotypeCaller"
     cpus 1
-    memory { 8.GB * task.attempt }
+    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 4
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
