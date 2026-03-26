@@ -1,5 +1,7 @@
 process loadBAMs {
     time '7d'
+    cpus 1
+    memory '1GB'
     tag "Loading pre-existing BAM files"
     
     input:
