@@ -2,7 +2,9 @@ process bwaIndex {
     time '7d'
     tag "Reference BWA index building"    
     cpus 1
-    memory '64GB'
+    memory { 8.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 4
 
     input:
     path reference

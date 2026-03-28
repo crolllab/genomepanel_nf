@@ -2,7 +2,9 @@ process ConcatCleanVCFs {
     time '7d'
     tag "BCFtools concat clean VCFs"
     cpus 1
-    memory '48GB'
+    memory { 4.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 3
     publishDir params.outdir, mode: 'copy'
 
     input:

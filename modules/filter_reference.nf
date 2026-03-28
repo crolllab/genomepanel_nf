@@ -1,6 +1,9 @@
 process filterReference {
     time '7d'
-    
+    memory { 4.GB * task.attempt }
+    errorStrategy 'retry'
+    maxRetries 3
+
     publishDir "${params.outdir}/reference", mode: 'copy'
     
     input:

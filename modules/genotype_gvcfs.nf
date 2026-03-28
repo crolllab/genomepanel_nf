@@ -2,9 +2,9 @@ process GenotypeGVCFs {
     time '7d'
     tag "GATK4 Genotype GVCFs"
     cpus 1
-    memory { 16.GB * task.attempt }
+    memory { 8.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 4
 
 
     input:

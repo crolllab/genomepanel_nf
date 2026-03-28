@@ -2,9 +2,9 @@ process FilterVCFs {
     time '7d'
     tag "GATK apply VCF filter flags"
     cpus 1
-    memory { 16.GB * task.attempt }
+    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 5
 
     input:
     tuple val(chr), val(interval), path(vcf_ch)

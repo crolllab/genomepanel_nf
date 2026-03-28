@@ -2,7 +2,7 @@ process PopGenVCF {
     time '7d'
     tag "Generating VCF for pop. gen."
     cpus 1
-    memory '4GB'
+    memory '1GB'
     errorStrategy 'ignore'
     publishDir params.outdir, mode: 'copy'
 
