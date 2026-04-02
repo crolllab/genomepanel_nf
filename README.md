@@ -1,4 +1,5 @@
 ![alt text](https://github.com/crolllab/genomepanel_nf/blob/main/logo.png?raw=true)
+(created by Claude)
 
 Pipeline to variant call large genome panels
 ========================================
@@ -35,31 +36,13 @@ The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP ca
 - Redesigned QC report (`pipeline_report.html`): unified fastp, BWA and variant quality sections into a single HTML report with inline PDF plots (font-independent, works in all containers and browsers).
 - Optimized SLURM resource requests across all pipeline modules.
 
-### v1.0.2
-- Added a dedicated **Notes on HPC usage** section in this README.
-- Added a default process time limit of `7d` across all module tasks to improve SLURM scheduling behavior.
-
-**Implemented steps:**
-- `entrez-direct`: query NCBI SRA for metadata (optional)
-- `sratools`: download SRA files (optional)
-- `fastp`: quality control
-- `bwa-mem2`: read mapping
-- `samtools`: sorting, indexing, and merging
-- `picard`: mark duplicates
-- `gatk`: HaplotypeCaller and joint genotyping
-- `gatk`: VariantFiltration and quality score plotting
-- `vcftools`: VCF filtering and subsetting
-- Pipeline statistics: automatic execution time analysis for all process types
-
-**Current limitations:**
-- If a sample is represented by multiple SRA accessions or fastq file pairs, the datasets are not combined into a single variant call. 
 ---
 
 ## Step 1: Repository, singularity and nextflow environment
 
 **NB: Step 1 can be skipped on LEGcompute by using `module load genomepanel-nf`**
 
-Cloning the repository, 
+Cloning the repository 
 ```bash
 git clone git@github.com:crolllab/genomepanel_nf.git
 cd genomepanel_nf
@@ -82,13 +65,13 @@ micromamba install -c bioconda nextflow
 ### Singularity images
 The `singularity` folder must be in the same directory as the `main.nf` file.
 
-A copy of the compatible images is on LEGserv.
+For Croll lab users: a copy of the compatible images is on LEGserv.
 
 ```bash
 rsync -va /legserv/Temp/Shared/genomepanel_nf/singularity .
 ```
 
-Alternatively, you can pull the images directly from the Galaxy Project depot.
+For any user: you can pull the images directly from the Galaxy Project depot.
 
 ```bash
 mkdir -p singularity
