@@ -1,0 +1,20 @@
+{
+  "creators": [
+    {
+      "name": "Croll, Daniel",
+      "affiliation": "Laboratory of Evolutionary Genetics, University of Neuchâtel",
+      "orcid": "0000-0002-2452-700X"
+    }
+  ],
+  "title": "crolllab/genomepanel_nf",
+  "description": "Nextflow pipeline for reference genome mapping, SNP calling and quality checks on large genome panels.",
+  "license": "cc-by-4.0",
+  "keywords": [
+    "nextflow",
+    "variant calling",
+    "SNP",
+    "genome panel",
+    "GATK",
+    "bioinformatics"
+  ]
+}

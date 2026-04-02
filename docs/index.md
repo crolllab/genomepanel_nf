@@ -139,7 +139,7 @@ Please cite the underlying tools if you use them through this pipeline.
 
 If you use genomepanel_nf in your research, please cite:
 
-> Laboratory of Evolutionary Genetics @ UNINE. (2026). *crolllab/genomepanel_nf* (v1.0.4). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
+> Croll, D. (2026). *crolllab/genomepanel_nf* (v1.0.4). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 
