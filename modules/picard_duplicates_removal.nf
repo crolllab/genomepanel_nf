@@ -1,7 +1,6 @@
 process dupRemoval {
-    time '7d'
+    time '1d'
     tag "PICARD marking duplicates in BAM files"
-    errorStrategy 'ignore'
     cpus 1
     memory { 8.GB * task.attempt }
     errorStrategy 'retry'

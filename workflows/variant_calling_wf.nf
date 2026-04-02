@@ -17,7 +17,6 @@ include { samtoolsSort } from '../modules/samtools_sort'
 include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
 include { loadBAMs } from '../modules/load_bams'
-include { samtoolsRealignedIndex } from '../modules/samtools_index'
 include { GATKHC } from '../modules/gatk4_hc'
 include { CombineGVCFs } from '../modules/combine_gvcfs'
 include { GenotypeGVCFs } from '../modules/genotype_gvcfs'
@@ -149,7 +148,7 @@ workflow variant_calling {
     // Only create SRA channel if SRA processing was enabled
     if (params.SRA_index) {
         // Simple channel formatting - downloads that succeed will have outputs
-        // Downloads that fail will not emit anything due to errorStrategy 'ignore'
+        // Downloads that still fail after retries will not emit anything
         // Add source tag to distinguish from local files
         sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, 'SRA'] }
         sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, 'SRA'] }
@@ -370,26 +369,34 @@ workflow variant_calling {
     PopGenVCF(concat_clean_vcf)
 
     // ---------------------
-    // Concat all variants (incl. low qual) + R plotting
+    // Concat all variants (incl. low qual)
     // ---------------------
     // Extract just the file paths from the tuples before collecting
     fvcf_ch = fvcf.map{ chr, interval, files -> files }.collect()
     concat_vcf = ConcatVCFs(fvcf_ch)
-    R_script = file('./R_plotting.R')
-    RQualPlotting(concat_vcf)
 
     // ---------------------
-    // Summarize FASTP and BWA steps with R (only for read processing)
+    // R QC report + optional FASTP/BWA summaries
     // ---------------------
     if (!params.bam_input) {
         RSummarizingFASTP(fastp_json_ch)
         RSummarizingBWA(bam_reports_ch)
-        
-        // Mix all final outputs including R summaries
-        all_done = concat_clean_vcf.mix(concat_vcf).mix(RSummarizingFASTP.out).mix(RSummarizingBWA.out).collect()
+        // Pass TSV summary files to the plotting process
+        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out)
+
+        // Mix all final outputs including R summaries and the HTML report
+        all_done = concat_clean_vcf.mix(concat_vcf)
+            .mix(RSummarizingFASTP.out)
+            .mix(RSummarizingBWA.out)
+            .mix(RQualPlotting.out.report)
+            .collect()
     } else {
-        // For BAM input, no FASTP/BWA reports to summarize
-        all_done = concat_clean_vcf.mix(concat_vcf).collect()
+        // For BAM input, no FASTP/BWA TSV files available
+        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]))
+
+        all_done = concat_clean_vcf.mix(concat_vcf)
+            .mix(RQualPlotting.out.report)
+            .collect()
     }
 
     // ---------------------

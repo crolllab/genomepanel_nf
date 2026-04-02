@@ -1,8 +1,10 @@
 process RSummarizingBWA {
-    time '7d'
+  time '1h'
     tag "Summarizing BWA stats with R"
     cpus 1
     memory '1GB'
+  errorStrategy 'retry'
+  maxRetries 3
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

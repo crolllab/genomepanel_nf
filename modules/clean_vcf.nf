@@ -1,10 +1,10 @@
 process CleanVCFs {
-    time '7d'
+    time '1d'
     tag "Remove low-qual SNPs"
     cpus 1
     memory { 2.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 5
+    maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(fvcf_ch)

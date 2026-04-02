@@ -2,9 +2,10 @@ process SRAresolve {
     time '7d'
     tag "Querying $accessions_file for SRR ids and ENA URLs"
     cpus 1
-    memory '4GB'
+    memory '1GB'
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    errorStrategy 'retry'
+    maxRetries 3
 
     input:
     path accessions_file

@@ -1,10 +1,10 @@
 process fastaIndex {
-    time '7d'
+    time '1d'
     tag "Reference FASTA index building"    
     cpus 1
-    memory { 8.GB * task.attempt }
+    memory { 2.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 4
+    maxRetries 3
     
     beforeScript """
         mkdir -p "\$PWD/tmp"

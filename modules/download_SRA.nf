@@ -4,7 +4,9 @@ process SRAdownloadPE {
     cpus 1
     memory '4GB'
     tag "Downloading PE: $srr"
-    errorStrategy 'ignore'
+    errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
+    maxRetries 4
+    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s, 8s
     
     input:
     tuple val(srr), val(url1), val(url2), val(source)
@@ -26,18 +28,18 @@ process SRAdownloadPE {
 /repository/user/main/public/cache-enabled = "false"
 EOF
     
-    echo "Downloading $srr from $source"
+    echo "Downloading $srr from $source (attempt $TASK_ATTEMPT of 4)"
     
-    # Retry loop: attempt download up to 3 times with 1-hour delays
-    max_attempts=3
+    # Retry loop: attempt download up to 4 times
+    # Nextflow handles exponential backoff delays between retries
+    max_attempts=4
     attempt=1
     success=false
     
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
-            # Wait 1 hour before retry
-            echo "Retry attempt \$attempt of \$max_attempts (waiting 1 hour)..."
-            sleep 3600
+            # Nextflow exponential backoff handles the delay
+            echo "Retry attempt \$attempt of \$max_attempts..."
             # Clean up any partial files
             rm -f ${srr}_*.fastq* 2>/dev/null || true
             rm -rf ncbi_download 2>/dev/null || true
@@ -160,7 +162,9 @@ process SRAdownloadSE {
     cpus 1
     memory '4GB'
     tag "Downloading SE: $srr"
-    errorStrategy 'ignore'
+    errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
+    maxRetries 4
+    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s, 8s
     
     input:
     tuple val(srr), val(url1), val(source)
@@ -182,18 +186,18 @@ process SRAdownloadSE {
 /repository/user/main/public/cache-enabled = "false"
 EOF
     
-    echo "Downloading $srr from $source"
+    echo "Downloading $srr from $source (attempt $TASK_ATTEMPT of 4)"
     
-    # Retry loop: attempt download up to 3 times with 1-hour delays
-    max_attempts=3
+    # Retry loop: attempt download up to 4 times
+    # Nextflow handles exponential backoff delays between retries
+    max_attempts=4
     attempt=1
     success=false
     
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
-            # Wait 1 hour before retry
-            echo "Retry attempt \$attempt of \$max_attempts (waiting 1 hour)..."
-            sleep 3600
+            # Nextflow exponential backoff handles the delay
+            echo "Retry attempt \$attempt of \$max_attempts..."
             # Clean up any partial files
             rm -f ${srr}*.fastq* 2>/dev/null || true
             rm -rf ncbi_download 2>/dev/null || true
