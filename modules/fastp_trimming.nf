@@ -3,7 +3,6 @@ process trimSequencesPE {
     tag "FASTP PE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 3
-    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s
     memory { 2.GB * task.attempt }
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
         
@@ -49,7 +48,6 @@ process trimSequencesSE {
     tag "FASTP SE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 3
-    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s
     memory { 2.GB * task.attempt }
     cpus 4
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"

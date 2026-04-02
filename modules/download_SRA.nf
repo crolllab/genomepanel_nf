@@ -6,7 +6,6 @@ process SRAdownloadPE {
     tag "Downloading PE: $srr"
     errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
     maxRetries 4
-    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s, 8s
     
     input:
     tuple val(srr), val(url1), val(url2), val(source)
@@ -164,7 +163,6 @@ process SRAdownloadSE {
     tag "Downloading SE: $srr"
     errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
     maxRetries 4
-    retryStrategy 'exponential' // Exponential backoff: 0s, 2s, 4s, 8s
     
     input:
     tuple val(srr), val(url1), val(source)
