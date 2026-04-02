@@ -4,6 +4,6 @@ authors:
 - family-names: Croll
   given-names: Daniel
   orcid: https://orcid.org/0000-0002-2072-380X
-title: "genomepanel_nf"
+title: "genomepanel_nf - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels"
 version: v1.0.4b
 date-released: 2026-04-03
