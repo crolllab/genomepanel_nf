@@ -1,23 +1,9 @@
-cff-version: 1.2.0
+cff-version: 1.1.0
 message: "If you use this software, please cite it as below."
-type: software
-title: "genomepanel_nf"
-abstract: "Nextflow pipeline for reference genome mapping, SNP calling and quality checks on large genome panels."
 authors:
-  - family-names: Croll
-    given-names: Daniel
-    orcid: https://orcid.org/0000-0002-2072-380X
-    affiliation: "Laboratory of Evolutionary Genetics, University of Neuchâtel"
-repository-code: https://github.com/crolllab/genomepanel_nf
-url: https://crolllab.github.io/genomepanel_nf/
-doi: 10.5281/zenodo.19392838
-version: 1.0.4
-date-released: "2026-04-02"
-license: CC-BY-4.0
-keywords:
-  - nextflow
-  - variant calling
-  - SNP
-  - genome panel
-  - GATK
-  - bioinformatics
+- family-names: Croll
+  given-names: Daniel
+  orcid: https://orcid.org/0000-0002-2072-380X
+title: "genomepanel_nf"
+version: v1.0.4b
+date-released: 2026-04-03
