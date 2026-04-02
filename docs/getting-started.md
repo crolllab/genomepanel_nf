@@ -26,7 +26,7 @@ cd genomepanel_nf
     module load Nextflow
     ```
 
-    !!! tip "Croll lab users"
+    !!! note "Croll lab"
         On LEGcompute you can skip Steps 1–2 entirely by loading the module:
         ```bash
         module load genomepanel-nf
