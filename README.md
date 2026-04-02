@@ -30,6 +30,11 @@ The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP ca
 
 ## Release notes
 
+### v1.0.3
+- Updated all Singularity container images to latest Galaxy depot releases: sra-tools 3.4.1, fastp 1.3.1, bwa-mem2 2.3, samtools 1.23.1, bcftools 1.23.1, gatk4-spark 4.6.2.0 (build rev 1).
+- Redesigned QC report (`pipeline_report.html`): unified fastp, BWA and variant quality sections into a single HTML report with inline PDF plots (font-independent, works in all containers and browsers).
+- Optimized SLURM resource requests across all pipeline modules.
+
 ### v1.0.2
 - Added a dedicated **Notes on HPC usage** section in this README.
 - Added a default process time limit of `7d` across all module tasks to improve SLURM scheduling behavior.
