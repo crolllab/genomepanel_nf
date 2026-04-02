@@ -1,8 +1,9 @@
 ![alt text](https://github.com/crolllab/genomepanel_nf/blob/main/logo.png?raw=true)
-(created by Claude)
 
 Pipeline to variant call large genome panels
 ========================================
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 
 ## Table of Contents
 

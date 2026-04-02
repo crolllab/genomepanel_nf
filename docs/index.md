@@ -8,6 +8,7 @@ The pipeline is designed to run on HPC clusters via SLURM or on a single local m
 
 [Get started :octicons-rocket-16:](getting-started.md){ .md-button .md-button--primary }
 [View on GitHub :octicons-mark-github-16:](https://github.com/crolllab/genomepanel_nf){ .md-button }
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 
 ---
 
@@ -131,6 +132,18 @@ Please cite the underlying tools if you use them through this pipeline.
 - Added `--bam_input` alternative entry point for pre-processed BAM files.
 - Added `--min_contig_length` option to filter short reference contigs.
 - Added `--bwa_index` option to supply pre-built BWA-mem2 index files.
+
+---
+
+## How to cite
+
+If you use genomepanel_nf in your research, please cite:
+
+> Laboratory of Evolutionary Genetics @ UNINE. (2026). *crolllab/genomepanel_nf* (v1.0.4). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
+
+Please also cite the underlying tools listed in the [Software table](#software-used-by-genomepanel_nf) above.
 
 ---
 
