@@ -6,7 +6,7 @@ abstract: "Nextflow pipeline for reference genome mapping, SNP calling and quali
 authors:
   - family-names: Croll
     given-names: Daniel
-    orcid: https://orcid.org/0000-0002-2452-700X
+    orcid: https://orcid.org/0000-0002-2072-380X
     affiliation: "Laboratory of Evolutionary Genetics, University of Neuchâtel"
 repository-code: https://github.com/crolllab/genomepanel_nf
 url: https://crolllab.github.io/genomepanel_nf/
