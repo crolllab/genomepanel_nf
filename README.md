@@ -32,6 +32,9 @@ The `genomepanel_nf` Nextflow pipeline performs highly efficient reference genom
 
 ## Release notes
 
+### v1.0.4b
+- Fixed invalid `retryStrategy` process directive in `download_SRA.nf` and `fastp_trimming.nf` that caused a pipeline startup error with Nextflow ≥25.x.
+
 ### v1.0.4
 - Added GitHub Pages documentation site at https://crolllab.github.io/genomepanel_nf/
 

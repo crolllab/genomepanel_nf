@@ -118,6 +118,10 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.4b *(April 2026)*
+
+- Fixed invalid `retryStrategy` process directive in `download_SRA.nf` and `fastp_trimming.nf` that caused a pipeline startup error with Nextflow ≥25.x.
+
 ### v1.0.4 *(April 2026)*
 
 - Added GitHub Pages documentation site at [crolllab.github.io/genomepanel_nf](https://crolllab.github.io/genomepanel_nf/).
