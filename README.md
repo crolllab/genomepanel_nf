@@ -65,13 +65,7 @@ micromamba install -c bioconda nextflow
 ### Singularity images
 The `singularity` folder must be in the same directory as the `main.nf` file.
 
-For Croll lab users: a copy of the compatible images is on LEGserv.
-
-```bash
-rsync -va /legserv/Temp/Shared/genomepanel_nf/singularity .
-```
-
-For any user: you can pull the images directly from the Galaxy Project depot.
+You can pull the images directly from the Galaxy Project depot.
 
 ```bash
 mkdir -p singularity
@@ -97,6 +91,13 @@ singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
 # vcftools
 singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--pl5321h077b44d_0
 ```
+
+(For Croll lab users: a copy of the compatible images is on the file server)
+
+```bash
+rsync -va /legserv/Temp/Shared/genomepanel_nf/singularity .
+```
+
 
 ---
 
@@ -142,7 +143,7 @@ _Read input options:_
   --bam_input '/path/to/bams/sample_{A,B,C}_RG_dedup.bam'
   ```
 
-- `--SRR_sample_map`: Optional. A CSV file mapping SRR accession IDs to sample names. This allows multiple SRR accessions to be assigned to the same sample name, which is useful when a sample was sequenced multiple times and should be genotyped as a single combined dataset. The CSV format is: `SRR_ID,Sample_Name` (one mapping per line, no header). If an SRR ID is not listed in the file, the original SRR ID will be used as the sample name. Default: `false` (no mapping). The repository includes an example file `sample_map.csv`. Note: This option only applies when using `--reads` or `--SRA_index`, not with `--bam_input`.
+- `--SRR_sample_map`: Optional. A CSV file mapping SRR accession IDs to sample names. This allows multiple SRR accessions to be assigned to the same sample name, which is useful when a sample was sequenced multiple times and should be genotyped as a single combined dataset. The CSV format is: `SRR_ID,Sample_Name` (one mapping per line, no header). This process can also be used to rename samples. If an SRR ID is not listed in the file, the original SRR ID will be used as the sample name. Default: `false` (no mapping). The repository includes an example file `sample_map.csv`. Note: This option only applies when using `--reads` or `--SRA_index`, not with `--bam_input`.
 
   Example `sample_map.csv`:
   ```
@@ -151,7 +152,7 @@ _Read input options:_
   SRR1234569,Sample_B
   SRR1234570,Sample_C
   ```
-  In this example, `SRR1234567` and `SRR1234568` will both be assigned to `Sample_A` during genotyping.
+  In this example, `SRR1234567` and `SRR1234568` will both be assigned to `Sample_A` during genotyping. The repository includes an example file `sample_map.csv`.
 
 
 _NCBI SRA download configuration:_
@@ -187,19 +188,15 @@ _Output options:_
 
 ## Step 3: `genomepanel_nf` configuration example
 
-The example below is based on the _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
+The example below is based on the wheat pathogen _Zymoseptoria tritici_ IPO323 reference genome and Illumina paired-end reads from local file servers and NCBI SRA. Substitute reference genome, NCBI accessions and local read paths with your own data.
 
 ### Obtain the reference genome
 
 ```bash
-# General option - from Ensembl Fungi
-wget http://ftp.ensemblgenomes.org/pub/fungi/release-61/fasta/zymoseptoria_tritici/dna/Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
+# Obtain reference genome from Ensembl Fungi
+wget http://ftp.ensemblgenomes.org/pub/fungi/current/fasta/zymoseptoria_tritici/dna/Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
 gunzip Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
 mv Zymoseptoria_tritici.MG2.dna.toplevel.fa IPO323.fasta
-
-# From local file server (LEGserv)
-cp /legserv/NGS_data/Zymoseptoria/Zt_Reference_genomes/19Pangenome_genomes/IPO323/Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa .
-mv Zymoseptoria_tritici.MG2.dna.toplevel.mt+.fa IPO323.fasta
 ```
 
 ### Select local fastq files
@@ -218,16 +215,8 @@ The following examples show different ways to select paired-end fastq files. The
 
 # Option 4 - select all files (including all subdirectories), with optional variation in fq/fastq, 1/R1 (2/R2), optional _001 or _001_ additions
 --reads '/path/to/reads/**_{,R}{1,2}{,_001,_001_*}.{fq,fastq}.gz'
-````
-
-```bash
-# Option 4 will include these files among others:
-ST01IR_A48b.cleanData_1.fq.gz and ST01IR_A48b.cleanData_2.fq.gz
-ST01IR_A26b.cleanData_R1.fq.gz and ST01IR_A26b.cleanData_R2.fq.gz
-ST01IR_A26b.cleanData_R1.fastq.gz and ST01IR_A26b.cleanData_R2.fastq.gz
-ST01IR_A26b.cleanData_R1_001.fastq.gz and ST01IR_A26b.cleanData_R2_001.fastq.gz
-J9_L2_R1_001_18ku2CAeFgfk.fastq.gz and J9_L2_R2_001_j2kKKZcCX6h0.fastq.gz
 ```
+
 
 ### Define SRA/ENA accessions
 
@@ -249,8 +238,8 @@ Save the text file e.g. as `SRA_accessions.txt`. The repository includes an exam
 # example input reference genome (see above how to obtain it)
 REF=$PWD/IPO323.fasta
 
-# read selection example 1 (small test case) - selects 3 paired-end reads from LEGserv
-READS='/legserv/NGS_data/Zymoseptoria/Illumina_DNAseq/Croll_2013/ST99CH_{1A,3A,5A}_{1,2}.fq.gz'
+# read pairs ending with _1.fq.gz and _2.fq.gz in the /path/to/reads/ folder
+READS='/path/to/reads/*_{1,2}.fq.gz'
 ```
 
 
@@ -301,20 +290,25 @@ final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz
 ```
 
 Text files listing the SRR accessions and NCBI/ENA download URLs used for single-end and paired-end reads, respectively.
-```
+```bash
 NCBI_download_urls.tsv
 NCBI_SRR_PE_accessions.txt
 NCBI_SRR_SE_accessions.txt
 ```
 
 TSV files summarizing `fastp` and `bwa-mem2` statistics for all samples.
-```
+```bash
 fastp_summary.tsv
 bwa_summary.tsv
 ```
 
-Pipeline execution statistics with completion times for all process types.
+A graphical report with some key sample and variant quality metrics.
+```bash
+pipeline_report.html
 ```
+
+Pipeline execution statistics with completion times for all process types.
+```bash
 pipeline_execution_stats.txt       # Human-readable formatted report
 pipeline_execution_stats.tsv       # Machine-readable tab-separated format
 ```
@@ -326,15 +320,6 @@ The pipeline statistics files include:
 - Minimum and maximum execution times
 - Useful for identifying bottlenecks, optimizing resources, and documenting pipeline performance
 
-Example output:
-```
-Process                        Count    Average Time      Range (Min - Max)
----------------------------------------------------------------------------------
-SRA Download (PE)              2,415      2m 02s           24s - 9m28s
-FASTP Trimming (PE)            2,415         41s            9s - 4m12s
-BWA Mapping                    2,415      3m 28s           19s - 16m28s
-GATK HaplotypeCaller           2,415     52m 04s          45m12s - 63m28s
-```
 
 ### Additional output folders:
 - `bam_files/`: If `--keep_bam_gvcf true` is set, contains per-sample BAM files after marking duplicates.
@@ -358,7 +343,7 @@ final_variants.plots.QUAL.pdf
 
 1. `fastp` is run with default settings, a summary tsv file is produced at the end.
 2. `bwa-mem2` is run with default settings, a summary tsv file is produced at the end.
-3. `gatk` Haplotypecaller emits GVCF, you need to set `--sample-ploidy` (see above)
+3. `gatk` Haplotypecaller emits GVCF, you need to set `--ploidy` (see above)
 4. `gatk` VariantFiltration flags low quality variants based on the following criteria: `QD<20.0`, `MQ<30.0`,`ReadPosRankSum <-2.0 | >2.0`, `MQRankSum <-2.0 | >2.0` and `BaseQRankSum <-2.0 | >2.0`. No filtering based on `QUAL` values as these are sample size dependent.
 5. `bcftools` is used to produce a high-quality variants file including only variants passing the GATK VariantFiltration criteria.
 6. Variant quality metrics are plotted using an R script.
@@ -369,8 +354,6 @@ final_variants.plots.QUAL.pdf
 ## Features to consider / bug fixes
 - include GATK CNV calling
 - run basic pop gen analyses (e.g. PCA, admixture)
-- include sample renaming step as an option
-- allow for multiple SRA accessions or fastq pairs per sample name
 
 ---
 
