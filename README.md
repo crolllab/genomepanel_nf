@@ -91,19 +91,19 @@ cd singularity
 # entrez-direct
 singularity pull https://depot.galaxyproject.org/singularity/entrez-direct:24.0--he881be0_0
 # sratools
-singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
+singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.4.1--h4304569_0
 # fastp
-singularity pull https://depot.galaxyproject.org/singularity/fastp%3A0.24.1--heae3180_0
+singularity pull https://depot.galaxyproject.org/singularity/fastp%3A1.3.1--h43da1c4_0
 # bwa
-singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.2.1--he70b90d_8
+singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.3--he70b90d_0
 # samtools
-singularity pull https://depot.galaxyproject.org/singularity/samtools%3A1.22.1--h96c455f_0
+singularity pull https://depot.galaxyproject.org/singularity/samtools%3A1.23.1--ha83d96e_0
 # picard
 singularity pull https://depot.galaxyproject.org/singularity/picard%3A3.4.0--hdfd78af_0
 # gatk
-singularity pull https://depot.galaxyproject.org/singularity/gatk4-spark%3A4.6.2.0--hdfd78af_0
+singularity pull https://depot.galaxyproject.org/singularity/gatk4-spark%3A4.6.2.0--hdfd78af_1
 # bcftools
-singularity pull https://depot.galaxyproject.org/singularity/bcftools%3A1.21--h8b25389_0
+singularity pull https://depot.galaxyproject.org/singularity/bcftools%3A1.23.1--hb2cee57_0
 # R with tidyverse
 singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
 # vcftools

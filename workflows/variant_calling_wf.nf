@@ -369,26 +369,34 @@ workflow variant_calling {
     PopGenVCF(concat_clean_vcf)
 
     // ---------------------
-    // Concat all variants (incl. low qual) + R plotting
+    // Concat all variants (incl. low qual)
     // ---------------------
     // Extract just the file paths from the tuples before collecting
     fvcf_ch = fvcf.map{ chr, interval, files -> files }.collect()
     concat_vcf = ConcatVCFs(fvcf_ch)
-    R_script = file('./R_plotting.R')
-    RQualPlotting(concat_vcf)
 
     // ---------------------
-    // Summarize FASTP and BWA steps with R (only for read processing)
+    // R QC report + optional FASTP/BWA summaries
     // ---------------------
     if (!params.bam_input) {
         RSummarizingFASTP(fastp_json_ch)
         RSummarizingBWA(bam_reports_ch)
-        
-        // Mix all final outputs including R summaries
-        all_done = concat_clean_vcf.mix(concat_vcf).mix(RSummarizingFASTP.out).mix(RSummarizingBWA.out).collect()
+        // Pass TSV summary files to the plotting process
+        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out)
+
+        // Mix all final outputs including R summaries and the HTML report
+        all_done = concat_clean_vcf.mix(concat_vcf)
+            .mix(RSummarizingFASTP.out)
+            .mix(RSummarizingBWA.out)
+            .mix(RQualPlotting.out.report)
+            .collect()
     } else {
-        // For BAM input, no FASTP/BWA reports to summarize
-        all_done = concat_clean_vcf.mix(concat_vcf).collect()
+        // For BAM input, no FASTP/BWA TSV files available
+        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]))
+
+        all_done = concat_clean_vcf.mix(concat_vcf)
+            .mix(RQualPlotting.out.report)
+            .collect()
     }
 
     // ---------------------
