@@ -1,5 +1,5 @@
 process addRG {
-    time '7d'
+    time '1d'
     tag "PICARD adding ReadGroup in BAM files"
     cpus 1
     memory { 8.GB * task.attempt }

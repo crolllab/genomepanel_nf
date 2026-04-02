@@ -1,8 +1,10 @@
 process PipelineStatistics {
-    time '7d'
+    time '4h'
     tag "Generating pipeline execution statistics"
     cpus 1
     memory '1GB'
+    errorStrategy 'retry'
+    maxRetries 3
     
     publishDir params.outdir, mode: 'copy'
     
@@ -139,7 +141,7 @@ process PipelineStatistics {
         bwaMap samtoolsSort addRG dupRemoval
         loadBAMs GATKHC CombineGVCFs GenotypeGVCFs
         CleanVCFs ConcatCleanVCFs FilterVCFs
-        ConcatVCFs PopGenVCF samtoolsRealignedIndex
+        ConcatVCFs PopGenVCF
         RSummarizingFASTP RSummarizingBWA RQualPlotting
     )
 

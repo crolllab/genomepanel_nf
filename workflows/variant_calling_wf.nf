@@ -17,7 +17,6 @@ include { samtoolsSort } from '../modules/samtools_sort'
 include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
 include { loadBAMs } from '../modules/load_bams'
-include { samtoolsRealignedIndex } from '../modules/samtools_index'
 include { GATKHC } from '../modules/gatk4_hc'
 include { CombineGVCFs } from '../modules/combine_gvcfs'
 include { GenotypeGVCFs } from '../modules/genotype_gvcfs'
@@ -149,7 +148,7 @@ workflow variant_calling {
     // Only create SRA channel if SRA processing was enabled
     if (params.SRA_index) {
         // Simple channel formatting - downloads that succeed will have outputs
-        // Downloads that fail will not emit anything due to errorStrategy 'ignore'
+        // Downloads that still fail after retries will not emit anything
         // Add source tag to distinguish from local files
         sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, 'SRA'] }
         sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, 'SRA'] }

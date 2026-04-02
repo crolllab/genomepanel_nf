@@ -1,7 +1,8 @@
 process RQualPlotting {
-    time '7d'
+    time '24h'
     tag "Plotting qual metrics with R"
-    errorStrategy 'ignore'
+    errorStrategy 'retry'
+    maxRetries 3
     cpus 1
     memory '16GB'
     publishDir "${params.outdir}/qual_plots", mode: 'copy'

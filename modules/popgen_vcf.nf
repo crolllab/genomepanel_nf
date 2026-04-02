@@ -3,7 +3,8 @@ process PopGenVCF {
     tag "Generating VCF for pop. gen."
     cpus 1
     memory '1GB'
-    errorStrategy 'ignore'
+    errorStrategy 'retry'
+    maxRetries 3
     publishDir params.outdir, mode: 'copy'
 
     input:

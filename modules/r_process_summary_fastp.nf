@@ -1,7 +1,10 @@
 process RSummarizingFASTP {
-    time '7d'
+  time '1h'
     tag "Summarizing FASTP stats with R"
     cpus 1
+  memory '1GB'
+  errorStrategy 'retry'
+  maxRetries 3
     publishDir "${params.outdir}", mode: 'copy'
 
 

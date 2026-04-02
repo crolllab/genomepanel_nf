@@ -2,9 +2,9 @@ process CombineGVCFs {
     time '7d'
     tag "GATK4 Combine GVCFs"
     cpus 1
-    memory { 8.GB * task.attempt }
+    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 4
+    maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(gvcf_files)

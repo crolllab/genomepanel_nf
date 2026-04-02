@@ -1,8 +1,8 @@
 process samtoolsSort {
-    time '7d'
+    time '1d'
     tag "Sorting BAM files"
     cpus 1
-    memory { 8.GB * task.attempt }
+    memory { 2.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
     publishDir "${params.outdir}/bwa_stats", mode: 'copy', pattern: "*.json"

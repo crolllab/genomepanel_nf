@@ -1,7 +1,9 @@
 process loadBAMs {
-    time '7d'
+    time '1h'
     cpus 1
     memory '1GB'
+    errorStrategy 'retry'
+    maxRetries 3
     tag "Loading pre-existing BAM files"
     
     input:

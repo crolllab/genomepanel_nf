@@ -4,7 +4,7 @@ process GATKHC {
     cpus 1
     memory { 4.GB * task.attempt }
     errorStrategy 'retry'
-    maxRetries 4
+    maxRetries 3
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
