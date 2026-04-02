@@ -120,7 +120,7 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ### v1.0.4b *(April 2026)*
 
-- Fixed invalid `retryStrategy` process directive in `download_SRA.nf` and `fastp_trimming.nf` that caused a pipeline startup error with Nextflow ≥25.x.
+- Fixed invalid `retryStrategy` process.
 
 ### v1.0.4 *(April 2026)*
 
@@ -150,7 +150,7 @@ Questions, bug reports and feature requests are welcome on the [GitHub Issues](h
 
 If you use genomepanel_nf in your research, please cite:
 
-> Croll, D. (2026). *crolllab/genomepanel_nf* (v1.0.4b). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
+> Croll, D. (2026). _genomepanel_nf_ - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels (v1.0.4b). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 
