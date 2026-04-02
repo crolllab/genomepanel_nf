@@ -1,6 +1,6 @@
 ![genomepanel_nf logo](assets/logo.png){ .gp-logo }
 
-**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for reference genome mapping, variant (SNP) calling and quality control on large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with a rich HTML quality-control report.
+**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for reference genome mapping, variant (SNP/indel) calling and quality control on large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with an HTML quality-control report.
 
 The pipeline is designed to run on HPC clusters via SLURM or on a single local machine, and uses [Singularity](https://sylabs.io/singularity/) containers so all software dependencies are reproducible and portable.
 
@@ -133,6 +133,15 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ---
 
+## Questions and feature requests
+
+Questions, bug reports and feature requests are welcome on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
+
+!!! question "Questions? Found a bug? Feature requests?"
+    Go to the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page
+
+---
+
 ## How to cite
 
 If you use genomepanel_nf in your research, please cite:
@@ -143,11 +152,3 @@ If you use genomepanel_nf in your research, please cite:
 
 Please also cite the underlying tools listed in the [Software table](#software-used-by-genomepanel_nf) above.
 
----
-
-## Questions and feature requests
-
-Questions, bug reports and feature requests are welcome on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
-
-!!! question "Questions? Feature requests? Just ask!"
-    I'm glad to answer questions on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page for the project, as well as take suggestions for features or improvements!
