@@ -127,3 +127,12 @@ Please cite the underlying tools if you use them through this pipeline.
 - Added `--bam_input` alternative entry point for pre-processed BAM files.
 - Added `--min_contig_length` option to filter short reference contigs.
 - Added `--bwa_index` option to supply pre-built BWA-mem2 index files.
+
+---
+
+## Questions and feature requests
+
+Questions, bug reports and feature requests are welcome on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
+
+!!! question "Questions? Feature requests? Just ask!"
+    I'm glad to answer questions on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page for the project, as well as take suggestions for features or improvements!
