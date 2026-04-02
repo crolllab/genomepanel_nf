@@ -1,0 +1,43 @@
+/* ------------------------------------------------------------------ */
+/* Mermaid diagrams: fill width, prevent shrinking                     */
+/* ------------------------------------------------------------------ */
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Integrated TOC: differentiate heading levels in the left sidebar   */
+/* ------------------------------------------------------------------ */
+
+/* H2-level TOC entries: bold + primary colour */
+.md-nav--integrated .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item > .md-nav__link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--md-primary-fg-color--dark);
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
+}
+
+/* H3-level TOC entries: smaller, indented, lighter */
+.md-nav--integrated .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item > .md-nav__link {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.82;
+}
+
+/* Keep the active TOC link highlighted */
+.md-nav--integrated .md-nav__link--active {
+  color: var(--md-accent-fg-color) !important;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/* Landing page logo                                                   */
+/* ------------------------------------------------------------------ */
+.gp-logo {
+  display: block;
+  margin: 0.5rem auto 1.8rem;
+  height: 130px;
+  width: auto;
+}

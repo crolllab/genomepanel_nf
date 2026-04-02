@@ -1,78 +1,59 @@
 # Welcome to the documentation for genomepanel_nf
 
+![genomepanel_nf logo](assets/logo.png){ .gp-logo }
+
 **genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for reference genome mapping, variant (SNP) calling and quality control on large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with a rich HTML quality-control report.
 
 The pipeline is designed to run on HPC clusters via SLURM or on a single local machine, and uses [Singularity](https://sylabs.io/singularity/) containers so all software dependencies are reproducible and portable.
 
-[Get started :octicons-rocket-16:{ .icon }](getting-started.md){ .md-button .md-button--primary }
-[View on GitHub :octicons-mark-github-16:{ .icon }](https://github.com/crolllab/genomepanel_nf){ .md-button }
+[Get started :octicons-rocket-16:](getting-started.md){ .md-button .md-button--primary }
+[View on GitHub :octicons-mark-github-16:](https://github.com/crolllab/genomepanel_nf){ .md-button }
 
 ---
 
 ## Pipeline Summary
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "16px", "primaryColor": "#f0f7f5", "primaryBorderColor": "#1a7f6e", "primaryTextColor": "#1a1a1a", "lineColor": "#555"}}}%%
 flowchart TD
-    A1([Local FASTQ files\n--reads]) --> T
-    A2([NCBI/ENA SRA accessions\n--SRA_index]) --> SR[SRAresolve\nresolve accessions + URLs]
-    SR --> SD[SRAdownload PE / SE\nsra-tools / ENA HTTP]
-    SD --> T
+    classDef io fill:#1a7f6e,color:#fff,stroke:#0d5c50
+    classDef step fill:#f0f7f5,color:#1a1a1a,stroke:#1a7f6e,stroke-width:1.5px
 
-    style A1 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style A2 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style A3 fill:#1a7f6e,color:#fff,stroke:#0d5c50
+    A1([Local FASTQ\n--reads]):::io
+    A2([SRA / ENA\n--SRA_index]):::io
+    A3([BAM files\n--bam_input]):::io
+    REF([Reference genome\n--reference]):::io
 
-    T[fastp\ntrimming & QC] --> BM
-    A3([Pre-built BAM files\n--bam_input]) --> RG
+    T[fastp\ntrimming & QC]:::step
+    M[bwa-mem2\nread mapping]:::step
+    D[Picard\nread groups & deduplication]:::step
+    HC[GATK HaplotypeCaller\nper-sample GVCF]:::step
+    JG[GATK joint genotyping\nCombineGVCFs + GenotypeGVCFs]:::step
+    VF[VariantFiltration + bcftools\nflagging & filtering]:::step
+    PG[vcftools\npop-gen VCF]:::step
+    QC[R\npipeline_report.html]:::step
 
-    REF([Reference genome\n--reference]) --> RI[Reference indexing\nbwa-mem2 / GATK / SAMtools]
-    RI --> BM
-    RI --> HC
+    O1([final_variants.vcf.gz]):::io
+    O2([final_variants.clean.vcf.gz]):::io
+    O3([pop-gen VCF]):::io
+    O4([pipeline_report.html]):::io
 
-    subgraph Read processing
-        T
-        BM[bwa-mem2\nread mapping]
-        SS[samtools sort\ncoordinate sort]
-        RG[picard AddOrReplaceReadGroups\nadd read group tags]
-        DR[picard MarkDuplicates\nduplicate removal]
-        BM --> SS --> RG --> DR
-    end
-
-    DR --> HC
-
-    subgraph Variant calling per segment
-        HC[GATK HaplotypeCaller\nGVCF mode]
-        CG[CombineGVCFs\nmerge all samples]
-        GG[GenotypeGVCFs\njoint genotyping]
-        HC --> CG --> GG
-    end
-
-    GG --> FV[FilterVCFs\nGATK VariantFiltration]
-    FV --> CV[CleanVCFs\nPASS variants only\nbcftools]
-    FV --> CC[ConcatVCFs\nmerge segments]
-    CV --> CCL[ConcatCleanVCFs\nmerge segments]
-    CC --> PG[PopGenVCF\nthinned MAF-filtered VCF\nvcftools]
-
-    subgraph QC reporting
-        T --> SF[RSummarizingFASTP\nfastp summary TSV]
-        DR --> SB[RSummarizingBWA\nbwa-mem2 summary TSV]
-        SF --> RP[RQualPlotting\npipeline_report.html]
-        SB --> RP
-        CCL --> RP
-        CC --> PS[PipelineStatistics\nexecution statistics]
-    end
-
-    CC --> OUT1([final_variants.vcf.gz])
-    CCL --> OUT2([final_variants.clean.vcf.gz])
-    PG --> OUT3([final_variants.thin1000_maf0.05.vcf.gz])
-    RP --> OUT4([pipeline_report.html])
-    PS --> OUT5([pipeline_execution_stats.tsv])
-
-    style OUT1 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style OUT2 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style OUT3 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style OUT4 fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    style OUT5 fill:#1a7f6e,color:#fff,stroke:#0d5c50
+    A1 --> T
+    A2 --> T
+    T --> M
+    REF --> M
+    REF --> HC
+    M --> D
+    D --> HC
+    A3 --> HC
+    HC --> JG
+    JG --> VF
+    VF --> O1
+    VF --> O2
+    O1 --> PG
+    PG --> O3
+    O2 --> QC
+    QC --> O4
 ```
 
 The pipeline accepts three input modes that converge at the variant calling step:
