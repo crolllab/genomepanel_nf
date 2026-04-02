@@ -33,11 +33,11 @@ The following `maxForks` settings in `nextflow.config` prevent overloading stora
 
 | Process | Default `maxForks` | Notes |
 |---------|-------------------|-------|
-| SRA download | 10 | NCBI will throttle or block connections with too many parallel downloads |
-| fastp trimming | 20 | Very I/O-intensive; reduce if storage I/O is a bottleneck |
-| GATK HaplotypeCaller | 100 | High parallelism; reduce if the scheduler struggles under load |
+| SRA download | 10 | NCBI will throttle or block connections with too many parallel downloads (PE and SE separately) |
+| fastp trimming | 20 | Very I/O-intensive; reduce if storage I/O is a bottleneck (PE and SE separately) |
+| GATK HaplotypeCaller | 150 | High parallelism; reduce if the scheduler struggles under load |
 
-The executor is also rate-limited at 300 queued tasks and 10 submissions per minute (`executor.queueSize`, `executor.submitRateLimit`).
+The executor is also rate-limited at 300 queued tasks and 120 submissions per minute (`executor.queueSize`, `executor.submitRateLimit`).
 
 ---
 

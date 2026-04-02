@@ -86,10 +86,10 @@ These settings are found in `nextflow.config` and can be edited directly.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `executor.queueSize` | 300 | Maximum number of tasks submitted to SLURM at once. |
-| `executor.submitRateLimit` | `'10/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
-| SRA download `maxForks` | 10 | Maximum concurrent SRA downloads. Reduce if NCBI rate-limits your connection. |
-| fastp `maxForks` | 20 | Maximum concurrent trimming tasks (I/O intensive). |
-| GATK HC `maxForks` | 100 | Maximum concurrent HaplotypeCaller tasks. |
+| `executor.submitRateLimit` | `'120/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
+| SRA download `maxForks` | 10 | Maximum concurrent SRA downloads (PE and SE each). Reduce if NCBI rate-limits your connection. |
+| fastp `maxForks` | 20 | Maximum concurrent trimming tasks (PE and SE each; I/O intensive). |
+| GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. |
 
 !!! tip
     For very large runs (hundreds of samples), consider lowering `maxForks` for download and trimming tasks first, as these are the most I/O-intensive steps.
