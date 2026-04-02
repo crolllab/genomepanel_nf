@@ -119,6 +119,10 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.4 *(April 2026)*
+
+- Added GitHub Pages documentation site at [crolllab.github.io/genomepanel_nf](https://crolllab.github.io/genomepanel_nf/).
+
 ### v1.0.3 *(April 2026)*
 
 - Updated all Singularity container images to the latest Galaxy depot releases: sra-tools 3.4.1, fastp 1.3.1, bwa-mem2 2.3, samtools 1.23.1, bcftools 1.23.1, gatk4-spark 4.6.2.0 build 1.

@@ -1,0 +1,5 @@
+# Exclude documentation and CI from release tarballs (used by Zenodo, GitHub archive)
+docs/           export-ignore
+mkdocs.yml      export-ignore
+.github/        export-ignore
+.venv/          export-ignore

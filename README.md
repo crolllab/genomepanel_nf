@@ -27,9 +27,12 @@ Pipeline to variant call large genome panels
 
 ## Overview
 
-The `genomepanel_nf` Nextflow pipeline performs reference genome mapping, SNP calling and quality checks. The pipeline accepts either locally stored Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome for improved parallelization. 
+The `genomepanel_nf` Nextflow pipeline performs highly efficient reference genome mapping, SNP calling and quality checks. The pipeline accepts either locally stored Illumina fastq files, SRA accessions numbers or both simultaneously. The pipeline can be run locally or through the SLURM queuing system. Analyses are split by chromosome (and segments) for improved parallelization. Intermediate files are aggressively cleaned to allow large datasets to be processed with limited disk space.
 
 ## Release notes
+
+### v1.0.4
+- Added GitHub Pages documentation site at https://crolllab.github.io/genomepanel_nf/
 
 ### v1.0.3
 - Updated all Singularity container images to latest Galaxy depot releases: sra-tools 3.4.1, fastp 1.3.1, bwa-mem2 2.3, samtools 1.23.1, bcftools 1.23.1, gatk4-spark 4.6.2.0 (build rev 1).
