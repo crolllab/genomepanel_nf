@@ -27,7 +27,7 @@ process SRAdownloadPE {
 /repository/user/main/public/cache-enabled = "false"
 EOF
     
-    echo "Downloading $srr from $source (attempt $TASK_ATTEMPT of 4)"
+    echo "Downloading $srr from $source (attempt ${task.attempt} of 4)"
     
     # Retry loop: attempt download up to 4 times
     # Nextflow handles exponential backoff delays between retries
@@ -184,7 +184,7 @@ process SRAdownloadSE {
 /repository/user/main/public/cache-enabled = "false"
 EOF
     
-    echo "Downloading $srr from $source (attempt $TASK_ATTEMPT of 4)"
+    echo "Downloading $srr from $source (attempt ${task.attempt} of 4)"
     
     # Retry loop: attempt download up to 4 times
     # Nextflow handles exponential backoff delays between retries
