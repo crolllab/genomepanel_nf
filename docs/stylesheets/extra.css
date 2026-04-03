@@ -44,12 +44,18 @@
 
 /* ------------------------------------------------------------------ */
 /* Sidebar: show left nav/TOC at narrower viewport widths              */
-/* MkDocs Material has multiple intermediate states (nav-only sidebar   */
-/* without TOC, compressed sidebar, etc.). Force exactly 2 states:     */
-/* ≥76.1875em: full sidebar with integrated TOC                        */
-/* <76.1875em: no sidebar (mobile hamburger navigation)                */
+/* Force exactly 2 states:                                             */
+/* ≥900px (56.25em): full sidebar with integrated TOC                  */
+/* <900px: no sidebar (mobile hamburger navigation)                    */
 /* ------------------------------------------------------------------ */
-@media screen and (max-width: 76.125em) {
+@media screen and (min-width: 56.25em) {
+  .md-sidebar--primary {
+    display: block !important;
+    visibility: visible !important;
+    transform: none !important;
+  }
+}
+@media screen and (max-width: 56.1875em) {
   .md-sidebar--primary {
     display: none !important;
     visibility: hidden !important;
