@@ -116,7 +116,7 @@ Please cite the underlying tools if you use them through this pipeline.
 | [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration | Van der Auwera & O'Connor 2020 |
 | [BCFtools](https://www.htslib.org/) | 1.23.1 | VCF filtering and manipulation | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [vcftools](https://vcftools.github.io/) | 0.1.17 | Population-genetics VCF processing | Danecek et al. 2011, *Bioinformatics* [doi:10.1093/bioinformatics/btr330](https://doi.org/10.1093/bioinformatics/btr330) |
-| [sra-tools](https://github.com/ncbi/sra-tools) | 3.4.1 | NCBI SRA data download | NCBI |
+| [sra-tools](https://github.com/ncbi/sra-tools) | 3.2.1 | NCBI SRA data download | NCBI |
 | [entrez-direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/) | 24.0 | NCBI SRA accession resolution | NCBI |
 | [R / tidyverse](https://www.tidyverse.org/) | 1.2.1 | QC visualisation | R Core Team; Wickham et al. 2019, *JOSS* [doi:10.21105/joss.01686](https://doi.org/10.21105/joss.01686) |
 
@@ -124,9 +124,16 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.5 *(April 2026)*
+
+- Improved module resource requests: `CleanVCFs` base memory raised from 2 GB to 4 GB, preventing GATK JVM heap underrun on large intervals.
+- Improved process label readability: shortened `tag` strings across multiple modules for cleaner Nextflow log output.
+- Fixed HTML QC report generation: R plotting and summary scripts are now supplied as external files rather than here-documents, resolving character-escaping issues that could silently corrupt the report.
+- SRA downloader: pinned `sra-tools` to 3.2.1 (3.4.1 has known segfaults); replaced deprecated `--output-file` flag; added timeouts and exponential backoff retry delays (10 / 30 / 60 min).
+
 ### v1.0.4b *(April 2026)*
 
-- Removed invalid `retryStrategy` directive.
+- Fixed invalid `retryStrategy` process directive.
 
 ### v1.0.4 *(April 2026)*
 
@@ -156,7 +163,7 @@ Questions, bug reports and feature requests are welcome on the [GitHub Issues](h
 
 If you use genomepanel_nf in your research, please cite:
 
-> Croll, D. (2026). _genomepanel_nf_ - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels (v1.0.4b). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
+> Croll, D. (2026). _genomepanel_nf_ - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels (v1.0.5). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 

@@ -32,6 +32,12 @@ The `genomepanel_nf` Nextflow pipeline performs highly efficient reference genom
 
 ## Release notes
 
+### v1.0.5
+- Improved module resource requests: `CleanVCFs` base memory raised from 2 GB to 4 GB, preventing GATK JVM heap underrun on large intervals.
+- Improved process label readability: shortened `tag` strings across multiple modules for cleaner Nextflow log output.
+- Fixed HTML QC report generation: R plotting and summary scripts are now supplied as external files rather than here-documents, resolving character-escaping issues that could silently corrupt the report.
+- SRA downloader (`download_SRA.nf`): pinned `sra-tools` to 3.2.1 (3.4.1 has known segfaults); replaced deprecated `--output-file` with `--output-directory`; added `timeout 600` to `prefetch` and `fasterq-dump`; added exponential backoff retry delays (10 min / 30 min / 60 min) with random jitter.
+
 ### v1.0.4b
 - Fixed invalid `retryStrategy` process directive in `download_SRA.nf` and `fastp_trimming.nf` that caused a pipeline startup error with Nextflow ≥25.x.
 
@@ -80,7 +86,7 @@ cd singularity
 # entrez-direct
 singularity pull https://depot.galaxyproject.org/singularity/entrez-direct:24.0--he881be0_0
 # sratools
-singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.4.1--h4304569_0
+singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
 # fastp
 singularity pull https://depot.galaxyproject.org/singularity/fastp%3A1.3.1--h43da1c4_0
 # bwa
