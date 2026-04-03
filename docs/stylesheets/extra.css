@@ -48,11 +48,11 @@
 /* ------------------------------------------------------------------ */
 @media screen and (min-width: 39.375em) {
   .md-sidebar--primary {
-    display: block;
-  }
-}
-@media screen and (max-width: 39.3125em) {
-  .md-sidebar--primary {
-    display: none;
+    display: block !important;
+    visibility: visible !important;
+    transform: none !important;
+    position: sticky !important;
+    top: 3.8rem;
+    height: calc(100vh - 3.8rem);
   }
 }
