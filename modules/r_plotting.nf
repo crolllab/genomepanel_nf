@@ -324,5 +324,5 @@ the theoretical maximum equals 2 &times; the number of diploid samples.</p>
     REOF
 
     Rscript plot_pipeline.R
-    """
+    """.stripIndent()
 }

@@ -20,9 +20,9 @@ include { variant_calling } from './workflows/variant_calling_wf'
 
 
 log.info """
-   ===========================================
-   || GENOME PANEL VARIANT CALLING WORKFLOW ||
-   ===========================================
+   =============================================
+   || GENOMEPANEL_NF VARIANT CALLING WORKFLOW ||
+   =============================================
 
     Steps:
      1. SRA query and download
@@ -42,14 +42,14 @@ log.info """
        Min contig len : ${params.min_contig_length}
        BWA index      : ${params.bwa_index}
   
-     Input data
+   Input data
        Local fastq    : ${params.reads}
        SRA ID file    : ${params.SRA_index}
        SRR-sample map : ${params.SRR_sample_map}
        Local bam      : ${params.bam_input}
   
-     Output options
-      Working dir    : ${workflow.workDir}
+   Output options
+       Working dir    : ${workflow.workDir}
        Output dir     : ${params.outdir}
        Keep BAM       : ${params.keep_bam}
        Keep GVCF      : ${params.keep_gvcf}

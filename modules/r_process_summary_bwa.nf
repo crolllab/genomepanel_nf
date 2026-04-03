@@ -56,5 +56,5 @@ process RSummarizingBWA {
     EOF
 
     Rscript summarize.R
-    """
+    """.stripIndent()
 }

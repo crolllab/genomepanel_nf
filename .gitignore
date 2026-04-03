@@ -3,6 +3,6 @@
 IPO323.fasta
 singularity
 work
-nf_output
+*_output/
 site/
 .venv/

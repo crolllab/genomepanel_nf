@@ -1,8 +1,14 @@
 ![genomepanel_nf logo](assets/logo.png){ .gp-logo }
 
-**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for reference genome mapping, variant (SNP/indel) calling and quality control on large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with an HTML quality-control report.
+**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for highly efficient reference genome mapping, variant (SNP/indel) calling and quality control of large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with tabulated sample statistics and an HTML report.
 
-The pipeline is designed to run on HPC clusters via SLURM or on a single local machine, and uses [Singularity](https://sylabs.io/singularity/) containers so all software dependencies are reproducible and portable.
+We tested **genomepanel_nf** on 100s to 1000s of samples from plant, animal and fungal species with reference genomes in single-digit Gb sizes. Please report any issues or share feature requests on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
+
+The main design goals were to parallelize tasks as much as possible by splitting reference genomes into segments for variant calling and downstream processing, and to minimize SLURM resource requests dynamically depending on the dataset. Even very large datasets typically peak at single-digit TBs of temporary storage needs.
+
+**genomepanel_nf** emits by default only filtered and unfiltered VCF files to save disk space. Intermediate files (BAMs, GVCFs) can be optionally retained though. The pipeline can also be switched to emit confidence scores at invariant sites.
+
+The pipeline is designed to run both on HPC clusters via SLURM or on single machines, and uses [Singularity](https://sylabs.io/singularity/) containers so all software dependencies are reproducible and portable.
 
 [Get started :octicons-rocket-16:](getting-started.md){ .md-button .md-button--primary }
 [View on GitHub :octicons-mark-github-16:](https://github.com/crolllab/genomepanel_nf){ .md-button }
@@ -120,7 +126,7 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ### v1.0.4b *(April 2026)*
 
-- Fixed invalid `retryStrategy` process.
+- Removed invalid `retryStrategy` directive.
 
 ### v1.0.4 *(April 2026)*
 

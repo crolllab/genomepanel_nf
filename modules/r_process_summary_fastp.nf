@@ -58,5 +58,5 @@ process RSummarizingFASTP {
     EOF
 
     Rscript summarize.R
-    """
+    """.stripIndent()
 }
