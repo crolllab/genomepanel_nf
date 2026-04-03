@@ -44,15 +44,15 @@
 
 /* ------------------------------------------------------------------ */
 /* Sidebar: show left nav/TOC at narrower viewport widths              */
-/* MkDocs Material default is 76em; lowered to 39.375em (630px)       */
+/* MkDocs Material has multiple intermediate states (nav-only sidebar   */
+/* without TOC, compressed sidebar, etc.). Force exactly 2 states:     */
+/* ≥76.1875em: full sidebar with integrated TOC                        */
+/* <76.1875em: no sidebar (mobile hamburger navigation)                */
 /* ------------------------------------------------------------------ */
-@media screen and (min-width: 39.375em) {
+@media screen and (max-width: 76.125em) {
   .md-sidebar--primary {
-    display: block !important;
-    visibility: visible !important;
-    transform: none !important;
-    position: sticky !important;
-    top: 3.8rem;
-    height: calc(100vh - 3.8rem);
+    display: none !important;
+    visibility: hidden !important;
+    transform: translateX(-100%) !important;
   }
 }
