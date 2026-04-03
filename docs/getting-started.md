@@ -29,7 +29,7 @@ cd genomepanel_nf
     !!! note "Croll lab"
         On LEGcompute you can skip Steps 1–2 entirely by loading the module:
         ```bash
-        module load genomepanel-nf
+        module load genomepanel_nf
         ```
 
 === "micromamba / conda"

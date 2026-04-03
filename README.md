@@ -53,7 +53,7 @@ The `genomepanel_nf` Nextflow pipeline performs highly efficient reference genom
 
 ## Step 1: Repository, singularity and nextflow environment
 
-**NB: Step 1 can be skipped on LEGcompute by using `module load genomepanel-nf`**
+**NB: Step 1 can be skipped on LEGcompute by using `module load genomepanel_nf`**
 
 Cloning the repository 
 ```bash
