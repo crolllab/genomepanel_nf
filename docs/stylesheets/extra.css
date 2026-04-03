@@ -46,12 +46,12 @@
 /* Sidebar: show left nav/TOC at narrower viewport widths              */
 /* MkDocs Material default is 76em; lower to 60em                     */
 /* ------------------------------------------------------------------ */
-@media screen and (min-width: 60em) {
+@media screen and (min-width: 56.25em) {
   .md-sidebar--primary {
     display: block;
   }
 }
-@media screen and (max-width: 59.9375em) {
+@media screen and (max-width: 56.2375em) {
   .md-sidebar--primary {
     display: none;
   }
