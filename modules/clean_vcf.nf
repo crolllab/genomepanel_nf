@@ -2,7 +2,7 @@ process CleanVCFs {
     time '1d'
     tag "Remove low-qual SNPs"
     cpus 1
-    memory { 2.GB * task.attempt }
+    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
 

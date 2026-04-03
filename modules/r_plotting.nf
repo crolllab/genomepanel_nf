@@ -49,7 +49,7 @@ process RQualPlotting {
     # -----------------------------------------------
     # Helper: read a pipeline summary TSV (wide format, row names in col 1,
     # sample names in header). Handles duplicate row names safely.
-    # Returns list: $keys (character), $vals (numeric matrix), $samples (character)
+    # Returns list: \$keys (character), \$vals (numeric matrix), \$samples (character)
     # -----------------------------------------------
     read_summary_tsv <- function(f) {
       lines <- readLines(f, warn = FALSE)
