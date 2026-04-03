@@ -30,15 +30,26 @@ EOF
     echo "Downloading $srr from $source (attempt ${task.attempt} of 4)"
     
     # Retry loop: attempt download up to 4 times
-    # Nextflow handles exponential backoff delays between retries
+    # Includes in-process exponential backoff to avoid hammering remote servers
     max_attempts=4
     attempt=1
     success=false
     
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
-            # Nextflow exponential backoff handles the delay
+            # Long backoff with jitter to tolerate server-side outages/throttling:
+            # attempt 2: 10 min, attempt 3: 30 min, attempt 4: 60 min (+0-59s jitter)
+            case "\$attempt" in
+                2) base_delay=600 ;;
+                3) base_delay=1800 ;;
+                4) base_delay=3600 ;;
+                *) base_delay=600 ;;
+            esac
+            jitter=\$((RANDOM % 60))
+            sleep_seconds=\$((base_delay + jitter))
             echo "Retry attempt \$attempt of \$max_attempts..."
+            echo "Waiting \$sleep_seconds seconds before retry (long server cooldown)..."
+            sleep \$sleep_seconds
             # Clean up any partial files
             rm -f ${srr}_*.fastq* 2>/dev/null || true
             rm -rf ncbi_download 2>/dev/null || true
@@ -90,17 +101,21 @@ EOF
             mkdir -p ncbi_download
             mkdir -p fasterq_tmp
             
-            # Use explicit output file path (not --output-directory which creates subdirs)
-            # This ensures download happens in work directory, not /tmp/
-            # Set max-size to 100GB to handle large sequencing runs
-            if prefetch $srr --output-file ncbi_download/${srr}.sra --max-size 100G; then
+            # Download into a controlled directory; newer sra-tools deprecates --output-file.
+            # Set max-size to 100GB to handle large sequencing runs.
+            # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
+            # Some sra-tools builds can return non-zero despite a complete .sra being written,
+            # so gate on file presence rather than prefetch exit status alone.
+            timeout 600 prefetch $srr --output-directory ncbi_download --max-size 100G || true
+            sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            if [ -n "\$sra_file" ]; then
                 # Override TMPDIR to force fasterq-dump to use work directory
                 # Even with --temp, fasterq-dump may use system TMPDIR for buffers
                 export TMPDIR="\$PWD/fasterq_tmp"
                 
                 # Decompress with explicit temp directory in work location
-                # Check exit status explicitly
-                if fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp fasterq_tmp; then
+                # Check exit status explicitly; add timeout to prevent hangs
+                if timeout 600 fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>/tmp/fasterq_${srr}.err; then
                     # Clean up SRA file and temp directory immediately to save space
                     rm -rf ncbi_download fasterq_tmp
                     
@@ -137,9 +152,12 @@ EOF
                     fi
                 else
                     echo "⚠ NCBI fasterq-dump failed (attempt \$attempt)"
+                    if [ -f /tmp/fasterq_${srr}.err ]; then
+                        echo "   Error: \$(tail -2 /tmp/fasterq_${srr}.err 2>/dev/null)"
+                    fi
                 fi
             else
-                echo "⚠ NCBI prefetch failed (attempt \$attempt)"
+                echo "⚠ NCBI prefetch failed to produce .sra file (attempt \$attempt)"
                 rm -rf ncbi_download 2>/dev/null || true
             fi
         fi
@@ -187,15 +205,26 @@ EOF
     echo "Downloading $srr from $source (attempt ${task.attempt} of 4)"
     
     # Retry loop: attempt download up to 4 times
-    # Nextflow handles exponential backoff delays between retries
+    # Includes in-process exponential backoff to avoid hammering remote servers
     max_attempts=4
     attempt=1
     success=false
     
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
-            # Nextflow exponential backoff handles the delay
+            # Long backoff with jitter to tolerate server-side outages/throttling:
+            # attempt 2: 10 min, attempt 3: 30 min, attempt 4: 60 min (+0-59s jitter)
+            case "\$attempt" in
+                2) base_delay=600 ;;
+                3) base_delay=1800 ;;
+                4) base_delay=3600 ;;
+                *) base_delay=600 ;;
+            esac
+            jitter=\$((RANDOM % 60))
+            sleep_seconds=\$((base_delay + jitter))
             echo "Retry attempt \$attempt of \$max_attempts..."
+            echo "Waiting \$sleep_seconds seconds before retry (long server cooldown)..."
+            sleep \$sleep_seconds
             # Clean up any partial files
             rm -f ${srr}*.fastq* 2>/dev/null || true
             rm -rf ncbi_download 2>/dev/null || true
@@ -236,15 +265,20 @@ EOF
             mkdir -p ncbi_download
             mkdir -p fasterq_tmp
             
-            # Use explicit output file path to ensure download in work directory
-            # Set max-size to 100GB to handle large sequencing runs
-            if prefetch $srr --output-file ncbi_download/${srr}.sra --max-size 100G; then
+            # Download into a controlled directory; newer sra-tools deprecates --output-file.
+            # Set max-size to 100GB to handle large sequencing runs.
+            # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
+            # Some sra-tools builds can return non-zero despite a complete .sra being written,
+            # so gate on file presence rather than prefetch exit status alone.
+            timeout 600 prefetch $srr --output-directory ncbi_download --max-size 100G || true
+            sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            if [ -n "\$sra_file" ]; then
                 # Override TMPDIR to force fasterq-dump to use work directory
                 export TMPDIR="\$PWD/fasterq_tmp"
                 
                 # Decompress with explicit temp directory in work location
-                # Check exit status explicitly
-                if fasterq-dump ncbi_download/${srr}.sra --split-files -O . --temp fasterq_tmp; then
+                # Check exit status explicitly; add timeout to prevent hangs
+                if timeout 600 fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>/tmp/fasterq_${srr}.err; then
                     # Clean up SRA file and temp directory immediately
                     rm -rf ncbi_download fasterq_tmp
                     
@@ -263,7 +297,8 @@ EOF
                         else
                             echo "⚠ NCBI file empty (attempt \$attempt)"
                         fi
-                        elif [ -f "${srr}_1.fastq" ]; then
+                    fi
+                    if [ -f "${srr}_1.fastq" ]; then
                         echo "Found ${srr}_1.fastq, renaming to ${srr}.fastq"
                         mv ${srr}_1.fastq ${srr}.fastq
                         rm -f ${srr}_2.fastq 2>/dev/null || true
@@ -286,7 +321,7 @@ EOF
                     echo "⚠ NCBI fasterq-dump failed (attempt \$attempt)"
                 fi
             else
-                echo "⚠ NCBI prefetch failed (attempt \$attempt)"
+                echo "⚠ NCBI prefetch failed to produce .sra file (attempt \$attempt)"
                 rm -rf ncbi_download 2>/dev/null || true
             fi
         fi

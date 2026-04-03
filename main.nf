@@ -16,7 +16,7 @@ params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCall
 params.bam_input = ""  // Optional: path to pre-existing BAM files
 params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
 
-include { variant_calling } from './workflows/variant_calling_wf'
+include { gp_wf } from './workflows/gp_wf'
 
 
 log.info """
@@ -57,5 +57,5 @@ log.info """
 
 
 workflow {
-   variant_calling()
+   gp_wf()
 }

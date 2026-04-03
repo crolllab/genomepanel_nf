@@ -1,6 +1,6 @@
 process dupRemoval {
     time '1d'
-    tag "PICARD marking duplicates in BAM files"
+    tag "PICARD marking duplicates"
     cpus 1
     memory { 8.GB * task.attempt }
     errorStrategy 'retry'
