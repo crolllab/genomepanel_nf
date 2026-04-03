@@ -1,4 +1,4 @@
-![genomepanel_nf logo](assets/logo.png){ .gp-logo }
+![genomepanel_nf logo](assets/logo.png){ .gp-logo width=45 }
 
 **genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for reference genome mapping, variant (SNP/indel) calling and quality control on large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with an HTML quality-control report.
 
