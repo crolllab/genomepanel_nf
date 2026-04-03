@@ -54,7 +54,7 @@ cd singularity
 singularity pull https://depot.galaxyproject.org/singularity/entrez-direct:24.0--he881be0_0
 
 # sra-tools (SRA download)
-singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.4.1--h4304569_0
+singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
 
 # fastp (trimming & QC)
 singularity pull https://depot.galaxyproject.org/singularity/fastp%3A1.3.1--h43da1c4_0
