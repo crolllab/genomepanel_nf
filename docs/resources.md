@@ -7,7 +7,7 @@
 The pipeline aggressively deletes intermediate files after each step to minimise disk usage (`cleanup = true` in `nextflow.config`). Despite this, large runs can temporarily require **many TB** of scratch space. Always point `-work-dir` to a fast, high-capacity scratch filesystem:
 
 ```bash
-nextflow run main.nf ... -work-dir '/scratch/my_nf_tmp'
+nextflow run main.nf ... -work-dir '/path/to/scratch/genomepanel_work'
 ```
 
 !!! warning

@@ -17,7 +17,7 @@ All parameters are passed on the command line with `--param value`. Boolean flag
 
 ## Read input options
 
-Exactly one of `--reads`, `--SRA_index`, or `--bam_input` must be provided.
+Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `--bam_input` if you have pre-processed BAM files (can't be combined with `--reads` or `--SRA_index`). See below for details.
 
 ### Local FASTQ files
 
@@ -29,7 +29,7 @@ Exactly one of `--reads`, `--SRA_index`, or `--bam_input` must be provided.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--SRA_index` | `path` | — | Path to a plain-text file listing NCBI/ENA accessions (one per line). Accepts `SRR`, `SRX`, `SRP`, `PRJNA`, `ERR`, etc. |
+| `--SRA_index` | `path` | — | Path to a plain-text file listing NCBI/ENA single or paired-end Illumina read accessions (one per line). Accepts `SRR`, `SRX`, `SRP`, `PRJNA`, `ERR`, etc. |
 | `--NCBI_API_key` | `string` | — | **Required with `--SRA_index`.** Your personal [NCBI API key](https://account.ncbi.nlm.nih.gov/). |
 | `--SRR_sample_map` | `path` | `false` | CSV file mapping SRR IDs to sample names (`SRR_ID,Sample_Name`). Allows merging multiple runs per sample and renaming samples. See [Getting started](getting-started.md) for format. |
 

@@ -159,11 +159,9 @@ export NXF_OPTS='-Xms8g -Xmx64g'
 
 # Run with SLURM, mixed local + SRA input
 nextflow run main.nf -config nextflow.config -profile slurm \
-  -work-dir '/scratch/my_nf_tmp' \
-  --outdir './my_nf_run_output' \
   --NCBI_API_key $NCBI_API_KEY \
-  --reference $PWD/IPO323.fasta \
-  --ploidy 1 \
+  --reference /path/to/reference_genome.fasta \
+  --ploidy 2 \
   --reads '/path/to/reads/*{1,2}.fq.gz' \
   --SRA_index './SRA_accessions.txt'
 ```
