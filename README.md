@@ -11,4 +11,6 @@ The main design goals were to parallelize tasks as much as possible by splitting
 
 ## Installation and documentation
 
+All documentation is here on the [genomepanel_nf site](https://crolllab.github.io/genomepanel_nf/). 
+
 See the [Getting started](https://crolllab.github.io/genomepanel_nf/getting-started/) guide for installation instructions, example commands and input file formats. The [Configuration](https://crolllab.github.io/genomepanel_nf/configuration/) page has a detailed description of all parameters and options. The [Output files](https://crolllab.github.io/genomepanel_nf/output/) page describes the output files in detail. The [Resources](https://crolllab.github.io/genomepanel_nf/resources/) page has recommendations for hardware requirements and runtime.
