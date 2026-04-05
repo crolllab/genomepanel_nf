@@ -91,5 +91,3 @@ These settings are found in `nextflow.config` and can be edited directly.
 | fastp `maxForks` | 20 | Maximum concurrent trimming tasks (PE and SE each; I/O intensive). |
 | GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. |
 
-!!! tip
-    For very large runs (hundreds of samples), consider lowering `maxForks` for download and trimming tasks first, as these are the most I/O-intensive steps.
