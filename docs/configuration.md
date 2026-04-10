@@ -54,7 +54,7 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--reference` | `path` | — | **Required.** Absolute path to the reference genome in FASTA format. Must have the `.fasta` extension (not `.fa`, `.fna`, `.fas`). |
+| `--reference` | `path` | — | **Required.** Absolute path to the reference genome in FASTA format. Accepts `.fasta`, `.fa`, `.fna`, and `.fas` extensions. |
 | `--reference_segments` | `integer` | `0` | Size in bp of genome segments used for parallel variant calling. `0` disables segmentation. Smaller values increase parallelism at the cost of overhead. |
 | `--min_contig_length` | `integer` | `false` | Filter reference contigs shorter than this value (bp). Useful for excluding small scaffolds. `false` disables filtering. |
 | `--bwa_index` | `path` | — | Path prefix of pre-built BWA-mem2 index files. Skips BWA indexing. The pipeline expects the index files (`.amb`, `.ann`, `.bwt.2bit.64`, `.pac`, `.0123`) to be co-located with the path prefix. |

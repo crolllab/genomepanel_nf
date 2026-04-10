@@ -12,7 +12,7 @@ process fastaIndex {
     path reference
 
     output:
-    file "${reference.baseName}.fasta.fai"
+    file "${reference}.fai"
 
     script:
     """

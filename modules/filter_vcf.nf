@@ -6,7 +6,7 @@ process FilterVCFs {
     input:
     tuple val(chr), val(interval), path(vcf_ch)
     path reference
-    path "${reference.baseName}.fasta.fai"
+    path "${reference}.fai"
     path "${reference.baseName}.dict"
 
     output:

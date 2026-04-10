@@ -6,7 +6,7 @@ process CombineGVCFs {
     input:
     tuple val(chr), val(interval), path(gvcf_files)
     path reference
-    path "${reference.baseName}.fasta.fai"
+    path "${reference}.fai"
     path "${reference.baseName}.dict"
 
     output:

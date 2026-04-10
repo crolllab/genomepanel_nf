@@ -39,7 +39,7 @@ workflow gp_wf {
     // Input checks
     // ---------------------
     if (!params.reference) {
-       exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
+       exit 1, "ERROR: Reference genome is not specified (FASTA file required via --reference)."
     }
     
     if (!params.reads && !params.SRA_index && !params.bam_input) {
