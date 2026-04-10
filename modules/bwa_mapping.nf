@@ -1,7 +1,5 @@
 process bwaMap {
-    time '7d'
     tag "BWA-mem mapping"
-    memory { 16.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
         

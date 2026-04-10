@@ -1,8 +1,5 @@
 process PipelineStatistics {
-    time '4h'
     tag "Generating pipeline stats"
-    cpus 1
-    memory '1GB'
     errorStrategy 'retry'
     maxRetries 3
     

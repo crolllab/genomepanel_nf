@@ -1,8 +1,5 @@
 process FilterVCFs {
-    time '1d'
     tag "GATK apply VCF filter flags"
-    cpus 1
-    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
 

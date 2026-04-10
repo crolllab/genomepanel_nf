@@ -1,8 +1,5 @@
 process addRG {
-    time '1d'
     tag "PICARD adding ReadGroup"
-    cpus 1
-    memory { 8.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
        

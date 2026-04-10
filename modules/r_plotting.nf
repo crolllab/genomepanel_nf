@@ -1,10 +1,7 @@
 process RQualPlotting {
-    time '24h'
     tag "Generating QC report"
     errorStrategy 'retry'
     maxRetries 3
-    cpus 1
-    memory '16GB'
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

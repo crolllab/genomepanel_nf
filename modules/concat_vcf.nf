@@ -1,8 +1,5 @@
 process ConcatVCFs {
-    time '1d'
     tag "BCFtools concat VCFs + qual metrics"
-    cpus 1
-    memory { 2.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
     publishDir "${params.outdir}", mode: 'copy'

@@ -1,9 +1,7 @@
 process trimSequencesPE {
-    time '1d'
     tag "FASTP PE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 3
-    memory { 2.GB * task.attempt }
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
         
     input:
@@ -44,12 +42,9 @@ process trimSequencesPE {
 }
 
 process trimSequencesSE {
-    time '1d'
     tag "FASTP SE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 3
-    memory { 2.GB * task.attempt }
-    cpus 4
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
 
     beforeScript """
