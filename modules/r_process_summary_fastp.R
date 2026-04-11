@@ -1,38 +1,51 @@
-# Collect input files (both PE and SE patterns)
+library(jsonlite)
+
+# Keys from summary.before_filtering / summary.after_filtering (appear twice,
+# once for each section; duplicate row names are intentional so that
+# r_plotting.R can call get_row(key, n=1) for before and get_row(key, n=2)
+# for after).
+SUMMARY_KEYS <- c("total_reads", "total_bases", "q20_bases", "q30_bases",
+                  "q20_rate", "q30_rate", "read1_mean_length",
+                  "read2_mean_length", "gc_content")
+
+# Keys from filtering_result (appear once)
+FILTER_KEYS <- c("passed_filter_reads", "low_quality_reads",
+                 "too_many_N_reads", "too_short_reads", "too_long_reads")
+
 files <- list.files(pattern = "_(PE|SE)_fastp.json$")
+if (length(files) == 0) quit(save = "no", status = 0)
 
-data_list <- list()
+samples <- sub("_(PE|SE)_fastp.json$", "", files)
 
-for (f in files) {
-  txt <- readLines(f, warn = FALSE)
-  txt <- paste(txt, collapse = "")
-  txt <- gsub('[{}"]', '', txt)
+# Row layout: before_filtering keys, then after_filtering keys (same names),
+# then filtering_result keys, then duplication_rate and insert_size_peak.
+row_names <- c(SUMMARY_KEYS, SUMMARY_KEYS, FILTER_KEYS,
+               "duplication_rate", "insert_size_peak")
 
-  kv <- unlist(strsplit(txt, ','))
-  flat <- numeric(0)
-  names_vec <- character(0)
+mat <- matrix(NA_real_, nrow = length(row_names), ncol = length(files),
+              dimnames = list(row_names, samples))
 
-  for (pair in kv) {
-    parts <- unlist(strsplit(pair, ':'))
-    key <- trimws(parts[1])
-    value <- as.numeric(trimws(parts[2]))
-    if (is.na(value)) value <- 0
-    flat <- c(flat, value)
-    names_vec <- c(names_vec, key)
+n_sum    <- length(SUMMARY_KEYS)
+n_filter <- length(FILTER_KEYS)
+
+for (i in seq_along(files)) {
+  j  <- fromJSON(files[[i]], simplifyVector = TRUE)
+  bf <- j$summary$before_filtering
+  af <- j$summary$after_filtering
+  fr <- j$filtering_result
+
+  for (k in seq_along(SUMMARY_KEYS)) {
+    key <- SUMMARY_KEYS[[k]]
+    mat[k,          i] <- if (!is.null(bf[[key]])) as.numeric(bf[[key]]) else NA_real_
+    mat[k + n_sum,  i] <- if (!is.null(af[[key]])) as.numeric(af[[key]]) else NA_real_
   }
-
-  data_list[[f]] <- flat
-  names(data_list[[f]]) <- names_vec
+  for (k in seq_along(FILTER_KEYS)) {
+    key <- FILTER_KEYS[[k]]
+    mat[2*n_sum + k, i] <- if (!is.null(fr[[key]])) as.numeric(fr[[key]]) else NA_real_
+  }
+  base <- 2*n_sum + n_filter
+  mat[base + 1, i] <- tryCatch(as.numeric(j$duplication$rate), error = function(e) NA_real_)
+  mat[base + 2, i] <- tryCatch(as.numeric(j$insert_size$peak),  error = function(e) NA_real_)
 }
 
-max_rows <- max(sapply(data_list, length))
-for (i in seq_along(data_list)) {
-  length(data_list[[i]]) <- max_rows
-}
-
-df <- do.call(cbind, data_list)
-rownames(df) <- names(data_list[[1]])
-# Strip both _PE_fastp.json and _SE_fastp.json suffixes
-colnames(df) <- sub('_(PE|SE)_fastp.json', '', files)
-
-write.table(df, file = 'fastp_summary.tsv', sep = "\t", quote = FALSE, col.names = NA)
+write.table(mat, file = "fastp_summary.tsv", sep = "\t", quote = FALSE, col.names = NA)

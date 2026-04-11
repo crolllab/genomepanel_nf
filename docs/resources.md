@@ -27,6 +27,24 @@ Keep the Nextflow process alive in a `tmux` or `screen` session — even when us
 
 All SLURM tasks request a **7-day** time limit by default. If your cluster enforces shorter queue limits, edit the `time` directive in the relevant module files (e.g. `modules/bwa_mapping.nf`).
 
+### Singularity / Apptainer
+
+**Image cache** — by default, images are pulled to `$HOME/.singularity/cache`. Worker nodes must have read access to this path. If `/home` is not shared across nodes, set `cacheDir` in the `singularity {}` block of `nextflow.config` to a path on a shared filesystem:
+
+```groovy
+singularity {
+    cacheDir = "/scratch/$USER/.singularity/cache"
+}
+```
+
+**Bind mounts** — on clusters running Apptainer (the successor to Singularity), automatic bind-mounting can be disabled by the sysadmin via `/etc/apptainer/apptainer.conf` (`mount hostfs = no`). If tasks fail with "file not found" errors inside the container, add explicit bind paths in `nextflow.config`:
+
+```groovy
+singularity.runOptions = "--bind /scratch,/data"
+```
+
+---
+
 ### Concurrency and rate limits
 
 The following `maxForks` settings in `nextflow.config` prevent overloading storage and compute:

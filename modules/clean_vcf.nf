@@ -1,15 +1,12 @@
 process CleanVCFs {
-    time '1d'
     tag "Remove low-qual SNPs"
-    cpus 1
-    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(fvcf_ch)
     path reference
-    path "${reference.baseName}.fasta.fai"
+    path "${reference}.fai"
     path "${reference.baseName}.dict"
 
     output:

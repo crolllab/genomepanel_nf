@@ -39,7 +39,7 @@ workflow gp_wf {
     // Input checks
     // ---------------------
     if (!params.reference) {
-       exit 1, "ERROR: Reference genome is not specified (.fasta file required)."
+       exit 1, "ERROR: Reference genome is not specified (FASTA file required via --reference)."
     }
     
     if (!params.reads && !params.SRA_index && !params.bam_input) {
@@ -386,7 +386,9 @@ workflow gp_wf {
         RSummarizingFASTP(fastp_json_ch, fastp_summary_script)
         RSummarizingBWA(bam_reports_ch, bwa_summary_script)
         // Pass TSV summary files to the plotting process
-        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out, qual_plot_script)
+        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out, qual_plot_script,
+            Channel.value(workflow.manifest.version),
+            Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         // Mix all final outputs including R summaries and the HTML report
         all_done = concat_clean_vcf.mix(concat_vcf)
@@ -396,7 +398,9 @@ workflow gp_wf {
             .collect()
     } else {
         // For BAM input, no FASTP/BWA TSV files available
-        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]), qual_plot_script)
+        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]), qual_plot_script,
+            Channel.value(workflow.manifest.version),
+            Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         all_done = concat_clean_vcf.mix(concat_vcf)
             .mix(RQualPlotting.out.report)

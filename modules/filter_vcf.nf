@@ -1,15 +1,12 @@
 process FilterVCFs {
-    time '1d'
     tag "GATK apply VCF filter flags"
-    cpus 1
-    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
 
     input:
     tuple val(chr), val(interval), path(vcf_ch)
     path reference
-    path "${reference.baseName}.fasta.fai"
+    path "${reference}.fai"
     path "${reference.baseName}.dict"
 
     output:

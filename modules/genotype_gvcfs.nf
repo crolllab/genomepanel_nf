@@ -1,8 +1,5 @@
 process GenotypeGVCFs {
-    time '7d'
     tag "GATK4 Genotype GVCFs"
-    cpus 1
-    memory { 8.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
 
@@ -10,7 +7,7 @@ process GenotypeGVCFs {
     input:
     tuple val(chr), val(interval), path(cgvcf)
     path reference
-    path "${reference.baseName}.fasta.fai"
+    path "${reference}.fai"
     path "${reference.baseName}.dict"
 
     output:

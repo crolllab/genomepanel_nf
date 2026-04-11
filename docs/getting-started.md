@@ -42,67 +42,47 @@ cd genomepanel_nf
 
 ---
 
-## Step 3: Pull Singularity images
+## Step 3: Singularity images
 
-The `singularity/` folder must be in the same directory as `main.nf`.
+All container images are pulled automatically by Nextflow on the first run. No manual download is required. Images are fetched from [quay.io/biocontainers](https://quay.io/organization/biocontainers) and cached locally so subsequent runs reuse them without re-downloading.
 
-```bash
-mkdir -p singularity
-cd singularity
+By default the cache is stored in `$HOME/.singularity/cache`. On HPC clusters where `/home` is not shared across worker nodes, point the cache to a shared filesystem in `nextflow.config`:
 
-# entrez-direct (SRA accession resolution)
-singularity pull https://depot.galaxyproject.org/singularity/entrez-direct:24.0--he881be0_0
+Example `nextflow.config` snippet if only `/scratch` is shared:
 
-# sra-tools (SRA download)
-singularity pull https://depot.galaxyproject.org/singularity/sra-tools%3A3.2.1--h4304569_1
-
-# fastp (trimming & QC)
-singularity pull https://depot.galaxyproject.org/singularity/fastp%3A1.3.1--h43da1c4_0
-
-# bwa-mem2 (read mapping)
-singularity pull https://depot.galaxyproject.org/singularity/bwa-mem2%3A2.3--he70b90d_0
-
-# samtools (BAM sorting & indexing)
-singularity pull https://depot.galaxyproject.org/singularity/samtools%3A1.23.1--ha83d96e_0
-
-# picard (read groups, duplicate removal)
-singularity pull https://depot.galaxyproject.org/singularity/picard%3A3.4.0--hdfd78af_0
-
-# gatk4-spark (HaplotypeCaller, GenomicsDBImport, VariantFiltration)
-singularity pull https://depot.galaxyproject.org/singularity/gatk4-spark%3A4.6.2.0--hdfd78af_1
-
-# bcftools (VCF filtering)
-singularity pull https://depot.galaxyproject.org/singularity/bcftools%3A1.23.1--hb2cee57_0
-
-# R with tidyverse (QC plots)
-singularity pull https://depot.galaxyproject.org/singularity/r-tidyverse%3A1.2.1
-
-# vcftools (population-genetics VCF)
-singularity pull https://depot.galaxyproject.org/singularity/vcftools%3A0.1.17--pl5321h077b44d_0
-
-cd ..
+```groovy
+singularity {
+    cacheDir = "/scratch/$USER/.singularity/cache"
+}
 ```
 
-!!! note "Croll lab"
-    A copy of all compatible images is available on the file server:
-    ```bash
-    rsync -va /legserv/Temp/Shared/genomepanel_nf/singularity .
-    ```
+See [HPC usage & utilities](resources.md#singularity--apptainer) for further Singularity/Apptainer configuration notes.
 
 ---
 
-## Step 4: Prepare your inputs
+## Step 4: Try the example dataset
+
+The repository ships with a small *E. coli* LTEE dataset that lets you verify your setup end-to-end before working with your own data. The input files live in `example/` and are not stored in git (reference genome and FASTQ files are excluded via `.gitignore`). See [`example/README.md`](https://github.com/crolllab/genomepanel_nf/blob/main/example/README.md) for download instructions and full details.
+
+Once the files are in place, run from the repository root:
+
+```bash
+nextflow run main.nf \
+    --reference example/ecoli_REL606.fasta \
+    --reads "example/fastq/SRR*_{1,2}.fastq.gz" \
+    --ploidy 1 \
+    --outdir example/output
+```
+
+The run completes in roughly 30–60 minutes on a local machine and produces output in `example/output/`.
+
+---
+
+## Step 5: Prepare your inputs
 
 ### Reference genome
 
-The reference genome must have the `.fasta` extension (not `.fa`, `.fna`, or `.fas`).
-
-```bash
-# Example: Zymoseptoria tritici IPO323 from Ensembl Fungi
-wget http://ftp.ensemblgenomes.org/pub/fungi/current/fasta/zymoseptoria_tritici/dna/Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
-gunzip Zymoseptoria_tritici.MG2.dna.toplevel.fa.gz
-mv Zymoseptoria_tritici.MG2.dna.toplevel.fa IPO323.fasta
-```
+The reference genome must be in FASTA format (`.fasta`, `.fa`, `.fna`, or `.fas` extensions are all accepted).
 
 ### Local FASTQ files
 
@@ -149,9 +129,9 @@ Pass it with `--SRR_sample_map sample_map.csv`. The repository includes an examp
 
 ---
 
-## Step 5: Run the pipeline
+## Step 6: Run the pipeline
 
-Start the pipeline inside a `tmux` or `screen` session — the Nextflow process must stay alive until completion, even with `--profile slurm`.
+Start the pipeline inside a `tmux` or `screen` session — the Nextflow process must stay alive until completion, even with `-profile slurm`.
 
 ```bash
 # Set Java heap size for Nextflow

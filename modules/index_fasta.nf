@@ -1,8 +1,5 @@
 process fastaIndex {
-    time '1d'
     tag "Reference FASTA index building"    
-    cpus 1
-    memory { 2.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
     
@@ -15,7 +12,7 @@ process fastaIndex {
     path reference
 
     output:
-    file "${reference.baseName}.fasta.fai"
+    file "${reference}.fai"
 
     script:
     """

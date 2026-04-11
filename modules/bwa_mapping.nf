@@ -1,17 +1,15 @@
 process bwaMap {
-    time '7d'
     tag "BWA-mem mapping"
-    memory { 16.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
         
     input:
     path reference
-    file "${reference.baseName}.fasta.amb"
-    file "${reference.baseName}.fasta.ann"
-    file "${reference.baseName}.fasta.bwt.2bit.64"
-    file "${reference.baseName}.fasta.pac"
-    file "${reference.baseName}.fasta.0123"
+    file "${reference}.amb"
+    file "${reference}.ann"
+    file "${reference}.bwt.2bit.64"
+    file "${reference}.pac"
+    file "${reference}.0123"
     tuple val(sample_id), path(trimmed_reads)
     
     output:

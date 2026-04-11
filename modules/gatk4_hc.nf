@@ -1,8 +1,5 @@
 process GATKHC {
-    time '7d'
     tag "GATK4 HaplotypeCaller"
-    cpus 1
-    memory { 4.GB * task.attempt }
     errorStrategy 'retry'
     maxRetries 3
     publishDir "${params.outdir}/gvcf_files",
@@ -12,13 +9,13 @@ process GATKHC {
     
     input:
     path reference
-    file "${reference.baseName}.fasta.fai"
+    file "${reference}.fai"
     file "${reference.baseName}.dict"
-    file "${reference.baseName}.fasta.amb"
-    file "${reference.baseName}.fasta.ann"
-    file "${reference.baseName}.fasta.bwt.2bit.64"
-    file "${reference.baseName}.fasta.pac"
-    file "${reference.baseName}.fasta.0123"
+    file "${reference}.amb"
+    file "${reference}.ann"
+    file "${reference}.bwt.2bit.64"
+    file "${reference}.pac"
+    file "${reference}.0123"
     tuple val(sample_id), path(dedup_bam), path(dedup_bai), val(interval), val(chr)
     
     output:

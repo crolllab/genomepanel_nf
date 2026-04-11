@@ -71,6 +71,7 @@ nav:
   - Configuration: configuration.md
   - Output: output.md
   - HPC & utilities: resources.md
+  - Changelog: changelog.md
 
 extra_css:
   - stylesheets/extra.css

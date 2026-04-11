@@ -1,8 +1,5 @@
 process SRAresolve {
-    time '7d'
     tag "Querying SRA/ENA for $accessions_file"
-    cpus 1
-    memory '1GB'
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
     errorStrategy 'retry'
     maxRetries 3
