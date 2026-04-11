@@ -34,14 +34,18 @@ Each file was streamed from ENA FTP and truncated to 300,000 read pairs
 
 ### Additional SRA accessions (downloaded by the pipeline)
 
-Three further small LTEE runs from different populations are listed in
-`sra_accessions.txt` and will be fetched automatically at runtime.
+Three accessions are listed in `sra_accessions.txt`. The pipeline resolves each
+accession to all associated runs, yielding **six** SRR downloads (two runs per
+clone).
 
-| SRR accession | Clone | Population | Generation | Total size |
-|--------------|-------|------------|-----------|-----------|
-| SRR2591045 | REL7180A | Ara−4 | 15,000 | ~130 MB |
-| SRR2584867 | REL765A  | Ara−4 | 500    | ~137 MB |
-| SRR2591036 | REL4532A | Ara+3 | 10,000 | ~137 MB |
+| SRR accession | Listed in file | Clone | Population | Generation |
+|--------------|:--------------:|-------|------------|------------|
+| SRR2591045 | ✓ | REL7180A | Ara−4 | 15,000 |
+| SRR2584880 |   | REL7180A | Ara−4 | 15,000 |
+| SRR2584867 | ✓ | REL765A  | Ara−4 | 500 |
+| SRR2589047 |   | REL765A  | Ara−4 | 500 |
+| SRR2591036 | ✓ | REL4532A | Ara+3 | 10,000 |
+| SRR2584679 |   | REL4532A | Ara+3 | 10,000 |
 
 
 ## Running the example
@@ -58,7 +62,7 @@ nextflow run main.nf \
     --outdir example/output
 ```
 
-**Option 2 — local FASTQ files + 3 additional SRA downloads (6 samples total):**
+**Option 2 — local FASTQ files + 6 SRA downloads (9 samples total):**
 
 ```bash
 nextflow run main.nf \

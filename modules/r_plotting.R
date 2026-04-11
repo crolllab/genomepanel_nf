@@ -54,32 +54,80 @@ get_row <- function(tsv, key, n = 1L) {
   as.numeric(tsv[["vals"]][idx[[n]], ])
 }
 
+# -----------------------------------------------
+# Accessible color palette (Okabe-Ito based, colorblind-safe)
+# -----------------------------------------------
+COL_BLUE      <- "#0072B2"   # primary blue
+COL_SKYBLUE   <- "#56B4E9"   # light blue
+COL_ORANGE    <- "#E69F00"   # orange
+COL_AMBER     <- "#F5D270"   # light amber
+COL_BLUE_DARK <- "#00456E"   # dark blue (jitter/borders)
+COL_THRESH    <- "#D55E00"   # vermilion (threshold lines)
+
+# -----------------------------------------------
+# Read pipeline metadata written by r_plotting.nf
+# -----------------------------------------------
+meta_lines <- if (file.exists("pipeline_meta.txt")) readLines("pipeline_meta.txt", warn = FALSE) else character(0)
+get_meta <- function(key, default) {
+  m <- grep(paste0("^", key, "\t"), meta_lines, value = TRUE)
+  if (length(m)) trimws(sub(paste0("^", key, "\t"), "", m[1])) else default
+}
+pipeline_version <- get_meta("version", "unknown")
+report_date      <- get_meta("report_date", format(Sys.time(), "%Y-%m-%d %H:%M"))
+pipeline_start   <- get_meta("pipeline_start", NA_character_)
+
+# Compute approximate runtime
+if (!is.na(pipeline_start)) {
+  t0 <- as.POSIXct(pipeline_start, format = "%Y-%m-%d %H:%M")
+  elapsed_min <- as.numeric(difftime(Sys.time(), t0, units = "mins"))
+  if (elapsed_min < 60) {
+    runtime_str <- sprintf("Runtime: ~%d min", round(elapsed_min))
+  } else {
+    runtime_str <- sprintf("Runtime: ~%.1f h", elapsed_min / 60)
+  }
+} else {
+  runtime_str <- NULL
+}
+
 con <- file("pipeline_report.html", "w")
 
-cat('<!DOCTYPE html>
+cat(paste0('<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pipeline QC Report</title>
+<title>Variant calling QC report \u2014 genomepanel_nf v', pipeline_version, '</title>
 <style>
 body   { font-family: Arial, Helvetica, sans-serif; max-width: 1400px;
          margin: auto; padding: 20px 40px; color: #333; }
-h1     { color: #1a237e; border-bottom: 2px solid #1a237e;
-         padding-bottom: 8px; margin-bottom: 24px; }
+h1     { color: #1a237e; border-bottom: none;
+         padding-bottom: 4px; margin-bottom: 4px; }
 h2     { color: #283593; margin-top: 40px; margin-bottom: 8px; }
 p      { max-width: 860px; line-height: 1.6; color: #555;
          margin-bottom: 20px; }
 section { margin-bottom: 50px; }
+.subtitle { font-size: 0.9em; color: #777; margin-top: 0; margin-bottom: 28px;
+            border-bottom: 2px solid #1a237e; padding-bottom: 8px; }
+.subtitle a { color: #5c6bc0; text-decoration: none; }
+.subtitle a:hover { text-decoration: underline; }
 .plot-row { display: flex; gap: 24px; align-items: flex-start;
             flex-wrap: wrap; }
 img    { max-width: 100%; height: auto; }
+table.summary { border-collapse: collapse; margin: 16px 0; min-width: 320px; }
+table.summary th, table.summary td { border: 1px solid #ccc; padding: 8px 18px;
+  text-align: left; font-size: 0.95em; }
+table.summary thead tr { background: #e8eaf6; font-weight: bold; }
+table.summary tbody tr:nth-child(even) { background: #f5f5f5; }
+table.summary td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 footer { margin-top: 60px; font-size: 0.85em; color: #aaa;
          border-top: 1px solid #eee; padding-top: 12px; }
 </style>
 </head>
 <body>
-<h1>Genome Panel Pipeline - Quality Control Report</h1>
-', file = con)
+<h1>Variant calling QC report</h1>
+<p class="subtitle">genomepanel_nf <span style="color:#5c6bc0">v', pipeline_version, '</span> &middot; Generated: ', report_date,
+  if (!is.null(runtime_str)) paste0(' &middot; ', runtime_str) else '',
+  ' &middot; <a href="https://crolllab.github.io/genomepanel_nf/" target="_blank">Documentation</a></p>
+'), file = con)
 
 # =====================================================
 # SECTION 1: Fastp base filtering (from fastp_summary.tsv)
@@ -124,8 +172,8 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
 
   p1a <- ggplot(flong, aes(x = short, y = value, fill = category)) +
     geom_col() +
-    scale_fill_manual(values = c("Retained" = "#43A047",
-                                 "Filtered out" = "#E53935")) +
+    scale_fill_manual(values = c("Retained" = COL_BLUE,
+                                 "Filtered out" = COL_ORANGE)) +
     labs(x = NULL, y = "Gigabases", fill = NULL,
          title = "Bases retained per sample (fastp)") +
     theme_bw(base_size = 12) +
@@ -150,10 +198,10 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
                          group = metric)) +
     geom_line(alpha = 0.5) +
     geom_point(size = 2.5) +
-    scale_color_manual(values = c("Q20 (before)" = "#AED6F1",
-                                  "Q20 (after)" = "#1A73E8",
-                                  "Q30 (before)" = "#FADBD8",
-                                  "Q30 (after)" = "#C0392B")) +
+    scale_color_manual(values = c("Q20 (before)" = COL_SKYBLUE,
+                                  "Q20 (after)" = COL_BLUE,
+                                  "Q30 (before)" = COL_AMBER,
+                                  "Q30 (after)" = COL_ORANGE)) +
     scale_y_continuous(limits = c(0, 100)) +
     labs(x = NULL, y = "Rate (%)", color = NULL,
          title = "Q20/Q30 base quality rates") +
@@ -163,7 +211,7 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
 
   cat('<section>
 <h2>Read filtering summary (fastp)</h2>
-<p>Stacked bars show bases retained (green) and filtered out (red) per sample,
+<p>Stacked bars show bases retained (blue) and filtered out (orange) per sample,
 sorted by total input gigabases in descending order.
 The line plot shows Q20 and Q30 base-quality rates before and after adapter
 trimming and quality filtering for each sample.</p>
@@ -199,12 +247,18 @@ if (!is.null(bt) && length(bt[["samples"]]) > 0) {
   bdf <- bdf[order(bdf[["short"]]), ]
   bdf[["short"]] <- factor(bdf[["short"]], levels = bdf[["short"]])
 
+  # Auto-zoom y-axis: start just below the minimum value, cap at 100
+  y_min <- max(0, floor(min(bdf[["mapped_pct"]], na.rm = TRUE) / 5) * 5 - 5)
+  y_max <- 100
+
+  y_pad <- (y_max - y_min) * 0.08
+
   p2a <- ggplot(bdf, aes(x = short, y = mapped_pct,
                          size = primary / 1e6)) +
-    geom_point(shape = 21, fill = "#1E88E5",
-               color = "black", alpha = 0.75) +
-    scale_size_continuous(name = "Primary reads (M)", range = c(4, 18)) +
-    scale_y_continuous(limits = c(0, 100), expand = c(0, 2)) +
+    geom_point(shape = 21, fill = COL_BLUE,
+               color = COL_BLUE_DARK, alpha = 0.75) +
+    scale_size_continuous(name = "Primary reads (M)", range = c(4, 14)) +
+    coord_cartesian(ylim = c(y_min, y_max + y_pad)) +
     labs(x = NULL, y = "Mapping rate (%)",
          title = "BWA-MEM2 mapping rate per sample") +
     theme_bw(base_size = 12) +
@@ -212,11 +266,11 @@ if (!is.null(bt) && length(bt[["samples"]]) > 0) {
           legend.position = "bottom")
 
   p2b <- ggplot(bdf, aes(x = factor(1), y = mapped_pct)) +
-    geom_violin(fill = "#1E88E5", alpha = 0.45, color = NA,
+    geom_violin(fill = COL_BLUE, alpha = 0.45, color = NA,
                 trim = FALSE) +
     geom_jitter(width = 0.09, size = 2.5, alpha = 0.8,
-                color = "#0D47A1") +
-    scale_y_continuous(limits = c(0, 100), expand = c(0.02, 0)) +
+                color = COL_BLUE_DARK) +
+    coord_cartesian(ylim = c(y_min, y_max + y_pad)) +
     labs(x = NULL, y = "Mapping rate (%)",
          title = "Distribution of\nmapping rates") +
     theme_bw(base_size = 12) +
@@ -237,7 +291,30 @@ The violin plot shows the distribution of mapping rates across all samples.</p>
 }
 
 # =====================================================
-# SECTION 3: Variant quality metrics
+# =====================================================
+# SECTION 3: Variant summary table
+# =====================================================
+if (file.exists("final_variants.variant_stats.tsv")) {
+  vstats <- tryCatch(
+    read.table("final_variants.variant_stats.tsv", header = TRUE, sep = "\t",
+               stringsAsFactors = FALSE, check.names = FALSE),
+    error = function(e) NULL
+  )
+  if (!is.null(vstats) && nrow(vstats) > 0) {
+    cat('<section>\n<h2>Variant summary</h2>\n', file = con)
+    cat('<p>Counts of SNPs and indels before and after hard-filter quality thresholds.
+PASS variants passed all filters and are written to the final clean VCF.</p>\n', file = con)
+    cat('<table class="summary">\n<thead><tr><th>Category</th><th>Count</th></tr></thead>\n<tbody>\n', file = con)
+    for (i in seq_len(nrow(vstats))) {
+      cat(sprintf('<tr><td>%s</td><td>%s</td></tr>\n',
+                  vstats[i, 1], format(as.integer(vstats[i, 2]), big.mark = ",")), file = con)
+    }
+    cat('</tbody>\n</table>\n</section>\n', file = con)
+  }
+}
+
+# =====================================================
+# SECTION 4: Variant quality metrics
 # Skip gracefully if metrics file is empty or malformed.
 # =====================================================
 df <- NULL
@@ -254,35 +331,35 @@ if (!is.null(df) && nrow(df) > 0 && ncol(df) >= 7) {
   df[["QD"]] <- suppressWarnings(as.numeric(df[["QD"]]))
 
   p3a <- ggplot(df, aes(x = QUAL)) +
-    geom_density(fill = "#8E24AA", alpha = 0.4, colour = "#4A148C") +
+    geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
     scale_x_log10() +
-    geom_vline(xintercept = 1000, colour = "red",
-               linetype = "dashed", size = 0.7) +
+    geom_vline(xintercept = 1000, colour = COL_THRESH,
+               linetype = "dashed", linewidth = 0.7) +
     labs(x = "QUAL (log10)", y = "Density") +
     theme_bw(base_size = 12)
 
   p3b <- ggplot(df, aes(x = AN)) +
-    geom_density(fill = "#8E24AA", alpha = 0.4, colour = "#4A148C") +
+    geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
     labs(x = "AN", y = "Density") +
     theme_bw(base_size = 12)
 
   p3c <- ggplot(df, aes(x = MQ)) +
-    geom_density(fill = "#8E24AA", alpha = 0.4, colour = "#4A148C") +
-    geom_vline(xintercept = 30, colour = "red",
-               linetype = "dashed", size = 0.7) +
+    geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
+    geom_vline(xintercept = 30, colour = COL_THRESH,
+               linetype = "dashed", linewidth = 0.7) +
     labs(x = "MQ", y = "Density") +
     theme_bw(base_size = 12)
 
   p3d <- ggplot(df, aes(x = DP)) +
-    geom_density(fill = "#8E24AA", alpha = 0.4, colour = "#4A148C") +
+    geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
     scale_x_log10() +
     labs(x = "DP (log10)", y = "Density") +
     theme_bw(base_size = 12)
 
   p3e <- ggplot(df, aes(x = QD)) +
-    geom_density(fill = "#8E24AA", alpha = 0.4, colour = "#4A148C") +
-    geom_vline(xintercept = 20, colour = "red",
-               linetype = "dashed", size = 0.7) +
+    geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
+    geom_vline(xintercept = 20, colour = COL_THRESH,
+               linetype = "dashed", linewidth = 0.7) +
     labs(x = "QD", y = "Density") +
     theme_bw(base_size = 12)
 
