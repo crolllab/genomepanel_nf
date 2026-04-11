@@ -9,12 +9,18 @@
 
 ---
 
-## Step 1: Clone the repository
+## Step 1: Download the latest release
 
 ```bash
-git clone git@github.com:crolllab/genomepanel_nf.git
+curl -sL https://github.com/crolllab/genomepanel_nf/archive/refs/tags/latest.tar.gz | tar xz
+mv genomepanel_nf-latest genomepanel_nf
 cd genomepanel_nf
 ```
+
+The `latest` tag is automatically updated with every new release.
+
+!!! tip "Alternative"
+    You can also browse all releases at [github.com/crolllab/genomepanel_nf/releases](https://github.com/crolllab/genomepanel_nf/releases) and download a specific version.
 
 ---
 
