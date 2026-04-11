@@ -124,12 +124,15 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.6 *(April 2026)*
+
+- Switch to automatic Singularity image pulling. No manual action required.
+- Included fully functional example dataset.
+
 ### v1.0.5 *(April 2026)*
 
-- Improved module resource requests: `CleanVCFs` base memory raised from 2 GB to 4 GB, preventing GATK JVM heap underrun on large intervals.
-- Improved process label readability: shortened `tag` strings across multiple modules for cleaner Nextflow log output.
-- Fixed HTML QC report generation: R plotting and summary scripts are now supplied as external files rather than here-documents, resolving character-escaping issues that could silently corrupt the report.
-- SRA downloader: pinned `sra-tools` to 3.2.1 (3.4.1 has known segfaults); replaced deprecated `--output-file` flag; added timeouts and exponential backoff retry delays (10 / 30 / 60 min).
+- Fixed HTML QC report generation
+- Improved stability of SRA downloader
 
 ### v1.0.4b *(April 2026)*
 
@@ -141,12 +144,9 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ### v1.0.3 *(April 2026)*
 
-- Updated all Singularity container images to the latest Galaxy depot releases: sra-tools 3.4.1, fastp 1.3.1, bwa-mem2 2.3, samtools 1.23.1, bcftools 1.23.1, gatk4-spark 4.6.2.0 build 1.
+- Updated all Singularity container images to the latest Galaxy depot releases.
 - Redesigned QC report (`pipeline_report.html`): unified fastp, BWA and variant quality sections into a single HTML report with inline PDF plots (font-independent, works in all containers and browsers).
 - Optimised SLURM resource requests across all pipeline modules.
-- Added `--bam_input` alternative entry point for pre-processed BAM files.
-- Added `--min_contig_length` option to filter short reference contigs.
-- Added `--bwa_index` option to supply pre-built BWA-mem2 index files.
 
 ---
 
