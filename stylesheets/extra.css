@@ -1,0 +1,64 @@
+/* ------------------------------------------------------------------ */
+/* Mermaid diagrams: fill width, prevent shrinking                     */
+/* ------------------------------------------------------------------ */
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Integrated TOC: differentiate heading levels in the left sidebar   */
+/* ------------------------------------------------------------------ */
+
+/* H2-level TOC entries: bold + primary colour */
+.md-nav--integrated .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item > .md-nav__link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--md-primary-fg-color--dark);
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
+}
+
+/* H3-level TOC entries: smaller, indented, lighter */
+.md-nav--integrated .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item .md-nav__list > .md-nav__item > .md-nav__link {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.82;
+}
+
+/* Keep the active TOC link highlighted */
+.md-nav--integrated .md-nav__link--active {
+  color: var(--md-accent-fg-color) !important;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/* Landing page logo                                                   */
+/* ------------------------------------------------------------------ */
+.gp-logo {
+  display: block;
+  margin: 0.5rem auto 1.8rem;
+  height: 65px;
+  width: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar: show left nav/TOC at narrower viewport widths              */
+/* Force exactly 2 states:                                             */
+/* ≥900px (56.25em): full sidebar with integrated TOC                  */
+/* <900px: no sidebar (mobile hamburger navigation)                    */
+/* ------------------------------------------------------------------ */
+@media screen and (min-width: 56.25em) {
+  .md-sidebar--primary {
+    display: block !important;
+    visibility: visible !important;
+    transform: none !important;
+  }
+}
+@media screen and (max-width: 56.1875em) {
+  .md-sidebar--primary {
+    display: none !important;
+    visibility: hidden !important;
+    transform: translateX(-100%) !important;
+  }
+}
