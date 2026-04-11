@@ -156,6 +156,10 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
                     before_gb = before_gb,
                     after_gb = after_gb,
                     ret_pct = after_gb / before_gb * 100,
+                    q20_before = q20_before,
+                    q20_after  = q20_after,
+                    q30_before = q30_before,
+                    q30_after  = q30_after,
                     stringsAsFactors = FALSE)
   fdf <- fdf[order(fdf[["before_gb"]], decreasing = TRUE), ]
   fdf[["short"]] <- factor(fdf[["short"]], levels = fdf[["short"]])
@@ -181,14 +185,10 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
           legend.position = "bottom")
 
   qdf <- rbind(
-    data.frame(short = fdf[["short"]], rate = q20_before[order(fdf[["before_gb"]], decreasing = TRUE)],
-               metric = "Q20 (before)"),
-    data.frame(short = fdf[["short"]], rate = q20_after[order(fdf[["before_gb"]], decreasing = TRUE)],
-               metric = "Q20 (after)"),
-    data.frame(short = fdf[["short"]], rate = q30_before[order(fdf[["before_gb"]], decreasing = TRUE)],
-               metric = "Q30 (before)"),
-    data.frame(short = fdf[["short"]], rate = q30_after[order(fdf[["before_gb"]], decreasing = TRUE)],
-               metric = "Q30 (after)")
+    data.frame(short = fdf[["short"]], rate = fdf[["q20_before"]], metric = "Q20 (before)"),
+    data.frame(short = fdf[["short"]], rate = fdf[["q20_after"]],  metric = "Q20 (after)"),
+    data.frame(short = fdf[["short"]], rate = fdf[["q30_before"]], metric = "Q30 (before)"),
+    data.frame(short = fdf[["short"]], rate = fdf[["q30_after"]],  metric = "Q30 (after)")
   )
   qdf[["metric"]] <- factor(qdf[["metric"]],
                              levels = c("Q20 (before)", "Q20 (after)",
@@ -244,7 +244,7 @@ if (!is.null(bt) && length(bt[["samples"]]) > 0) {
                     primary = primary,
                     mapped_pct = mapped_pct,
                     stringsAsFactors = FALSE)
-  bdf <- bdf[order(bdf[["short"]]), ]
+  bdf <- bdf[order(bdf[["mapped_pct"]], decreasing = TRUE), ]
   bdf[["short"]] <- factor(bdf[["short"]], levels = bdf[["short"]])
 
   # Auto-zoom y-axis: start just below the minimum value, cap at 100
@@ -279,7 +279,7 @@ if (!is.null(bt) && length(bt[["samples"]]) > 0) {
 
   cat('<section>
 <h2>Alignment statistics (BWA-MEM2)</h2>
-<p>Each circle represents one sample. Circle area scales with the total number
+<p>Each circle represents one sample, sorted by mapping rate in descending order. Circle area scales with the total number
 of primary reads (QC-passed). The y-axis shows the percentage of primary reads
 that mapped to the reference genome.
 The violin plot shows the distribution of mapping rates across all samples.</p>
