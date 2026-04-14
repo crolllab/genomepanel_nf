@@ -109,10 +109,11 @@ workflow gp_wf {
     // Local FASTQ reads
     // ---------------------
     if (params.reads) {
+        // Support semicolon-separated list of glob patterns (e.g. 'path1/**/{1,2}.fastq.gz;path2/**/{1,2}.fastq.gz')
+        def reads_patterns = params.reads.tokenize(';').collect { it.trim() }
         // Create channel from read pairs - let Nextflow handle the pairing
         read_pairs_local_ch = Channel.fromFilePairs(
-            params.reads,
-            checkIfExists: true,
+            reads_patterns,
             flat: false, // keeps paired R1/R2 in a tuple
             size: 2  // expect exactly 2 files per pair
         )
