@@ -50,7 +50,7 @@ clone).
 
 ## Running the example
 
-Run from the repository root directory.
+Run from the repository root directory. Make sure nextflow is available.
 
 **Option 1 — local FASTQ files only (3 samples):**
 
@@ -58,17 +58,19 @@ Run from the repository root directory.
 nextflow run main.nf \
     --reference example/ecoli_REL606.fasta \
     --reads "example/fastq/SRR*_{1,2}.fastq.gz" \
+    --SRR_sample_map example/sample_map.csv \
     --ploidy 1 \
     --outdir example/output
 ```
 
-**Option 2 — local FASTQ files + 6 SRA downloads (9 samples total):**
+**Option 2 — local FASTQ files + 6 SRA downloads (9 read sets for 6 samples total):**
 
 ```bash
 nextflow run main.nf \
     --reference example/ecoli_REL606.fasta \
     --reads "example/fastq/SRR*_{1,2}.fastq.gz" \
     --SRA_index example/sra_accessions.txt \
+    --SRR_sample_map example/sample_map.csv \
     --ploidy 1 \
     --outdir example/output
 ```
