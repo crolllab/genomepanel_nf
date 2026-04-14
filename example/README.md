@@ -50,7 +50,7 @@ clone).
 
 ## Running the example
 
-Run from the repository root directory. Make sure nextflow is available.
+Run from the repository root directory. Make sure nextflow is available. The `--SRR_sample_map` option is not required and impacts only sample names (or sample merging) in the VCF output files.
 
 **Option 1 — local FASTQ files only (3 samples):**
 
