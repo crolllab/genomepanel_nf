@@ -18,7 +18,7 @@ include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
 include { loadBAMs } from '../modules/load_bams'
 include { GATKHC } from '../modules/gatk4_hc'
-include { CombineGVCFs } from '../modules/combine_gvcfs'
+include { GenomicsDBImport } from '../modules/genomicsdb_import'
 include { GenotypeGVCFs } from '../modules/genotype_gvcfs'
 include { FilterVCFs } from '../modules/filter_vcf'
 include { CleanVCFs } from '../modules/clean_vcf'
@@ -342,12 +342,12 @@ workflow gp_wf {
             [chr_list[0], interval, file_lists.flatten()]
         }
     
-    // Run CombineGVCFs - process each 1 Mb segment independently
-    // Output: tuple val(chr), val(interval), path(combined_gvcf_file)
-    cgvcf = CombineGVCFs(gvcf_grouped, reference_to_use, fai_index, gatk_index)
+    // Import all GVCFs per interval into a GenomicsDB workspace (batch-aware, scales to 1000s of samples)
+    // Output: tuple val(chr), val(interval), path(genomicsdb_dir)
+    genomicsdb = GenomicsDBImport(gvcf_grouped, reference_to_use, fai_index, gatk_index)
 
-    // Run GenotypeGVCF - processes each 1 Mb segment independently
-    vcf = GenotypeGVCFs(cgvcf, reference_to_use, fai_index, gatk_index)
+    // Run GenotypeGVCFs against the GenomicsDB workspace
+    vcf = GenotypeGVCFs(genomicsdb, reference_to_use, fai_index, gatk_index)
 
     // ---------------------
     // Run FilterVCFs based on hard filters - process each 1 Mb segment independently

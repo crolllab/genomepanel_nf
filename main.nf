@@ -13,6 +13,7 @@ params.bwa_index = ""  // Optional: path to pre-built BWA index files
 params.min_contig_length = false  // Filter reference contigs shorter than this value (bp)
 params.reference_segments = 0  // Genome segment size for parallel variant calling (bp)
 params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCaller
+params.genomicsdb_batch_size = 50   // GenomicsDBImport batch size (samples per batch). 50 is the Broad production default; ~20 MB/sample in heap, so 50 costs ~1 GB leaving ~2.5 GB for TileDB buffers within the default 8 GB process memory.
 params.bam_input = ""  // Optional: path to pre-existing BAM files
 params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
 
