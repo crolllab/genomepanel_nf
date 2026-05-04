@@ -505,10 +505,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-1-clone-the-repository" class="md-nav__link">
+  <a href="#step-1-download-the-latest-release" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Clone the repository
+        Step 1: Download the latest release
       
     </span>
   </a>
@@ -770,10 +770,16 @@
 <li>An <a href="https://account.ncbi.nlm.nih.gov/">NCBI API key</a> (required when using <code>--SRA_index</code>)</li>
 </ul>
 <hr />
-<h2 id="step-1-clone-the-repository">Step 1: Clone the repository<a class="headerlink" href="#step-1-clone-the-repository" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:crolllab/genomepanel_nf.git
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>genomepanel_nf
+<h2 id="step-1-download-the-latest-release">Step 1: Download the latest release<a class="headerlink" href="#step-1-download-the-latest-release" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-sL<span class="w"> </span>https://github.com/crolllab/genomepanel_nf/archive/refs/tags/latest.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>mv<span class="w"> </span>genomepanel_nf-latest<span class="w"> </span>genomepanel_nf
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">cd</span><span class="w"> </span>genomepanel_nf
 </span></code></pre></div>
+<p>The <code>latest</code> tag is automatically updated with every new release.</p>
+<div class="admonition tip">
+<p class="admonition-title">Alternative</p>
+<p>You can also browse all releases at <a href="https://github.com/crolllab/genomepanel_nf/releases">github.com/crolllab/genomepanel_nf/releases</a> and download a specific version.</p>
+</div>
 <hr />
 <h2 id="step-2-set-up-nextflow">Step 2: Set up Nextflow<a class="headerlink" href="#step-2-set-up-nextflow" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Module (recommended on HPC)</label><label for="__tabbed_1_2">micromamba / conda</label></div>

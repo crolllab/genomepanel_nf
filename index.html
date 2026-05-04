@@ -506,6 +506,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#v107-may-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0.7 (May 2026)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#v106-april-2026" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -918,6 +929,14 @@ flowchart TD
 </table>
 <hr />
 <h2 id="release-notes">Release notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h2>
+<h3 id="v107-may-2026">v1.0.7 <em>(May 2026)</em><a class="headerlink" href="#v107-may-2026" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Replaced <code>CombineGVCFs</code> with <code>GenomicsDBImport</code> for GVCF consolidation. Eliminates in-memory GC-thrashing at large sample counts; batch size tunable via <code>--genomicsdb_batch_size</code>.</li>
+<li>Nextflow ≥ 26.x compatibility: moved <code>log.info</code> inside the <code>workflow</code> block, replaced C-style loops with Groovy functional expressions, and updated <code>nextflow.config</code> env-var syntax.</li>
+<li>Added JVM flags <code>-XX:-UsePerfData --enable-native-access=ALL-UNNAMED</code> to all GATK processes to suppress Java 17+ warnings.</li>
+<li>Fixed <code>gatkIndex</code> memory to prevent a <code>-Xmx0g</code> crash on first attempt.</li>
+<li>Fixed single-end sample crash in <code>r_process_summary_fastp.R</code> (<code>insert_size$peak</code> is absent for SE data).</li>
+</ul>
 <h3 id="v106-april-2026">v1.0.6 <em>(April 2026)</em><a class="headerlink" href="#v106-april-2026" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Switch to automatic Singularity image pulling. No manual action required.</li>

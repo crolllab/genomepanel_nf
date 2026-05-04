@@ -600,15 +600,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#v106-2026-04-10" class="md-nav__link">
+  <a href="#v107-2026-05-05" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v1.0.6 — 2026-04-10
+        v1.0.7 — 2026-05-05
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="v1.0.6 — 2026-04-10">
+    <nav class="md-nav" aria-label="v1.0.7 — 2026-05-05">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -623,7 +623,57 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#compatibility-fixes-nextflow-26x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility fixes (Nextflow ≥ 26.x)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v106-2026-04-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0.6 — 2026-04-10
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1.0.6 — 2026-04-10">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-features_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improvements_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Improvements
@@ -683,8 +733,27 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="v106-2026-04-10">v1.0.6 — 2026-04-10<a class="headerlink" href="#v106-2026-04-10" title="Permanent link">&para;</a></h2>
+<h2 id="v107-2026-05-05">v1.0.7 — 2026-05-05<a class="headerlink" href="#v107-2026-05-05" title="Permanent link">&para;</a></h2>
 <h3 id="new-features">New features<a class="headerlink" href="#new-features" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Replaced <code>CombineGVCFs</code> with <code>GenomicsDBImport</code> for GVCF consolidation.</strong><br />
+  The legacy <code>CombineGVCFs</code> step has been replaced by GATK's <code>GenomicsDBImport</code>, which uses on-disk TileDB storage instead of in-memory merging. This eliminates GC-thrashing at large sample counts (tested at 1,605 samples). Batch size is configurable via <code>--genomicsdb_batch_size</code> (default: 50, the Broad production default).</li>
+</ul>
+<h3 id="compatibility-fixes-nextflow-26x">Compatibility fixes (Nextflow ≥ 26.x)<a class="headerlink" href="#compatibility-fixes-nextflow-26x" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>log.info</code> banner moved inside the <code>workflow</code> block — top-level executable statements are no longer permitted in Nextflow 26.x.</li>
+<li>C-style <code>for (int i = ...)</code> and <code>while</code> loops replaced with Groovy functional expressions (<code>takeWhile</code>/<code>collect</code>, <code>.step().each</code>).</li>
+<li><code>${HOME}</code> environment variable interpolation in <code>nextflow.config</code> replaced with <code>env('HOME')</code> — bare env-var interpolation was removed in Nextflow 26.x.</li>
+</ul>
+<h3 id="improvements">Improvements<a class="headerlink" href="#improvements" title="Permanent link">&para;</a></h3>
+<ul>
+<li>JVM flags <code>-XX:-UsePerfData --enable-native-access=ALL-UNNAMED</code> added to all GATK processes to suppress Java 17+ module-restriction warnings and <code>/tmp/hsperfdata_*</code> lock conflicts under concurrent Singularity jobs.</li>
+<li><code>gatkIndex</code> base memory increased from 2 GB to 4 GB to prevent a <code>-Xmx0g</code> crash on the first attempt.</li>
+<li>Fixed <code>r_process_summary_fastp.R</code> crash on single-end samples: <code>j$insert_size$peak</code> is <code>NULL</code> for SE data; <code>as.numeric(NULL)</code> produces a zero-length vector that silently failed the matrix assignment. Now handled with an explicit length check.</li>
+</ul>
+<hr />
+<h2 id="v106-2026-04-10">v1.0.6 — 2026-04-10<a class="headerlink" href="#v106-2026-04-10" title="Permanent link">&para;</a></h2>
+<h3 id="new-features_1">New features<a class="headerlink" href="#new-features_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>Automatic Singularity image download.</strong><br />
@@ -695,7 +764,7 @@
   The repository ships with a ready-to-run <em>E. coli</em> LTEE example (<code>example/</code>) that lets you verify your setup end-to-end. Three public SRA samples (SRR2589044, SRR2584863, SRR2584866) mapped against the REL606 reference genome serve as the test case. See <a href="../getting-started/#step-4-try-the-example-dataset">Getting started → Step 4</a> for instructions.</p>
 </li>
 </ul>
-<h3 id="improvements">Improvements<a class="headerlink" href="#improvements" title="Permanent link">&para;</a></h3>
+<h3 id="improvements_1">Improvements<a class="headerlink" href="#improvements_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Switched all R processes to <code>rocker/tidyverse:4.4.3</code> for a reliable, actively maintained R environment.</li>
 <li>Improved QC HTML report: accessible Okabe-Ito colour palette, version and runtime metadata in the header, auto-zoomed BWA mapping-rate axis, violin + jitter distribution plot.</li>
