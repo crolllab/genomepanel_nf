@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.0.7 — 2026-05-05
+
+### New features
+
+- **Replaced `CombineGVCFs` with `GenomicsDBImport` for GVCF consolidation.**  
+  The legacy `CombineGVCFs` step has been replaced by GATK's `GenomicsDBImport`, which uses on-disk TileDB storage instead of in-memory merging. This eliminates GC-thrashing at large sample counts (tested at 1,605 samples). Batch size is configurable via `--genomicsdb_batch_size` (default: 50, the Broad production default).
+
+### Compatibility fixes (Nextflow ≥ 26.x)
+
+- `log.info` banner moved inside the `workflow` block — top-level executable statements are no longer permitted in Nextflow 26.x.
+- C-style `for (int i = ...)` and `while` loops replaced with Groovy functional expressions (`takeWhile`/`collect`, `.step().each`).
+- `${HOME}` environment variable interpolation in `nextflow.config` replaced with `env('HOME')` — bare env-var interpolation was removed in Nextflow 26.x.
+
+### Improvements
+
+- JVM flags `-XX:-UsePerfData --enable-native-access=ALL-UNNAMED` added to all GATK processes to suppress Java 17+ module-restriction warnings and `/tmp/hsperfdata_*` lock conflicts under concurrent Singularity jobs.
+- `gatkIndex` base memory increased from 2 GB to 4 GB to prevent a `-Xmx0g` crash on the first attempt.
+- Fixed `r_process_summary_fastp.R` crash on single-end samples: `j$insert_size$peak` is `NULL` for SE data; `as.numeric(NULL)` produces a zero-length vector that silently failed the matrix assignment. Now handled with an explicit length check.
+
+---
+
 ## v1.0.6 — 2026-04-10
 
 ### New features
