@@ -126,15 +126,8 @@ workflow gp_wf {
             def name2 = reads_list[1].name.replaceAll(/\.(fastq|fq)(\.gz)?$/, '')
             
             // Find longest common prefix (this is the true sample ID)
-            def commonPrefix = ""
             def minLen = Math.min(name1.length(), name2.length())
-            for (int i = 0; i < minLen; i++) {
-                if (name1[i] == name2[i]) {
-                    commonPrefix += name1[i]
-                } else {
-                    break
-                }
-            }
+            def commonPrefix = (0..<minLen).takeWhile { name1[it] == name2[it] }.collect { name1[it] }.join('')
             
             // Remove trailing separators (_, ., -)
             commonPrefix = commonPrefix.replaceAll(/[._-]+$/, '')
@@ -275,7 +268,7 @@ workflow gp_wf {
     // Parse FAI file to create intervals based on params.reference_segments
     // FAI format: chr_name, length, offset, linebases, linewidth
     // If reference_segments is 0, use full chromosomes (no segmentation)
-    segment_size = params.reference_segments
+    segment_size = params.reference_segments as Integer
     
     intervals_ch = fai_index
         .splitCsv(sep: '\t')
@@ -291,7 +284,7 @@ workflow gp_wf {
                 intervals.add([chr, interval_name, interval_key])
             } else {
                 // Generate segments for this chromosome
-                for (int start = 1; start <= chr_length; start += segment_size) {
+                (1..chr_length).step(segment_size).each { start ->
                     def end = Math.min(start + segment_size - 1, chr_length)
                     def interval_name = "${chr}:${start}-${end}"
                     def interval_key = "${chr}_${start}_${end}"  // For grouping later

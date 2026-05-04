@@ -20,7 +20,8 @@ params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample name
 include { gp_wf } from './workflows/gp_wf'
 
 
-log.info """
+workflow {
+   log.info """
    =============================================
    || GENOMEPANEL_NF VARIANT CALLING WORKFLOW ||
    =============================================
@@ -55,8 +56,5 @@ log.info """
        Keep BAM       : ${params.keep_bam}
        Keep GVCF      : ${params.keep_gvcf}
     """
-
-
-workflow {
    gp_wf()
 }
