@@ -24,7 +24,7 @@ process CombineGVCFs {
         fi
     done
 
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" \
+    gatk --java-options "-Xmx${task.memory.toGiga()-2}g -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" \
         CombineGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \

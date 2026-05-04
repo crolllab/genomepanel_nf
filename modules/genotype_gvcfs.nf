@@ -30,7 +30,7 @@ process GenotypeGVCFs {
         INVAR_OPTS=""
     fi
     
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" GenotypeGVCFs \
+    gatk --java-options "-Xmx${task.memory.toGiga()-2}g -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" GenotypeGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${combined_file} \

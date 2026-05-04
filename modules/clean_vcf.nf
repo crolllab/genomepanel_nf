@@ -29,7 +29,7 @@ process CleanVCFs {
         NON_VAR_OPTS="--exclude-non-variants"
     fi
     
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g" SelectVariants \
+    gatk --java-options "-Xmx${task.memory.toGiga()-2}g -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" SelectVariants \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V \${input_file} \
