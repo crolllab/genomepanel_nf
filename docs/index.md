@@ -124,6 +124,14 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.7 *(May 2026)*
+
+- Replaced `CombineGVCFs` with `GenomicsDBImport` for GVCF consolidation. Eliminates in-memory GC-thrashing at large sample counts; batch size tunable via `--genomicsdb_batch_size`.
+- Nextflow ≥ 26.x compatibility: moved `log.info` inside the `workflow` block, replaced C-style loops with Groovy functional expressions, and updated `nextflow.config` env-var syntax.
+- Added JVM flags `-XX:-UsePerfData --enable-native-access=ALL-UNNAMED` to all GATK processes to suppress Java 17+ warnings.
+- Fixed `gatkIndex` memory to prevent a `-Xmx0g` crash on first attempt.
+- Fixed single-end sample crash in `r_process_summary_fastp.R` (`insert_size$peak` is absent for SE data).
+
 ### v1.0.6 *(April 2026)*
 
 - Switch to automatic Singularity image pulling. No manual action required.
