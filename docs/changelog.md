@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.8 — 2026-05-06
+
+### Bug fixes
+
+- **BAM files are now deleted mid-run after all GATKHC tasks complete.**  
+  A new `cleanupBAMs` process receives a count-based sentinel that resolves only after every `GATKHC` task across all intervals has emitted. This guarantees that no BAM is removed while any interval job still needs it, yet reclaims the space as soon as the last GATKHC finishes — without waiting for the full pipeline to succeed. BAMs from `--bam_input` runs are never touched.
+- **Fixed zero-length vector crash in `r_process_summary_fastp.R` for SE samples.**  
+  `as.numeric(NULL)` produces a zero-length vector, which silently corrupted the summary matrix. Both `duplication$rate` and `insert_size$peak` now use an explicit `length(v) == 0` guard before assignment.
+
+---
+
 ## v1.0.7 — 2026-05-05
 
 ### New features

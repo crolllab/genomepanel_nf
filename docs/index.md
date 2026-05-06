@@ -124,6 +124,11 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.8 *(May 2026)*
+
+- BAM files are now deleted mid-run once all GATKHC tasks have finished, freeing disk space without risking premature removal.
+- Fixed zero-length vector crash in `r_process_summary_fastp.R` for single-end samples (`duplication$rate` / `insert_size$peak` null guard).
+
 ### v1.0.7 *(May 2026)*
 
 - Replaced `CombineGVCFs` with `GenomicsDBImport` for GVCF consolidation. Eliminates in-memory GC-thrashing at large sample counts; batch size tunable via `--genomicsdb_batch_size`.

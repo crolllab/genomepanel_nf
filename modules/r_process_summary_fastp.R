@@ -44,8 +44,8 @@ for (i in seq_along(files)) {
     mat[2*n_sum + k, i] <- if (!is.null(fr[[key]])) as.numeric(fr[[key]]) else NA_real_
   }
   base <- 2*n_sum + n_filter
-  mat[base + 1, i] <- tryCatch(as.numeric(j$duplication$rate), error = function(e) NA_real_)
-  mat[base + 2, i] <- tryCatch(as.numeric(j$insert_size$peak),  error = function(e) NA_real_)
+  mat[base + 1, i] <- tryCatch({ v <- as.numeric(j$duplication$rate); if (length(v) == 0) NA_real_ else v }, error = function(e) NA_real_)
+  mat[base + 2, i] <- tryCatch({ v <- as.numeric(j$insert_size$peak);  if (length(v) == 0) NA_real_ else v }, error = function(e) NA_real_)
 }
 
 write.table(mat, file = "fastp_summary.tsv", sep = "\t", quote = FALSE, col.names = NA)

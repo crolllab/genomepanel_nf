@@ -47,9 +47,8 @@ process GATKHC {
         -output ${sample_id}_\${interval_safe}.g.vcf.gz \
         -ERC \${ERC_MODE} \
         --create-output-variant-index
-    
-    # NOTE: Do NOT delete BAM files here!
-    # When processing by chromosome, the same BAM is used by multiple GATKHC tasks.
-    # Nextflow will handle cleanup automatically after all tasks using the BAM complete.
+
+    # BAM cleanup is handled by the cleanupBAMs process in the workflow,
+    # which runs only after ALL GATKHC tasks across every interval complete.
     """
 }

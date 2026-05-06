@@ -18,6 +18,7 @@ include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
 include { loadBAMs } from '../modules/load_bams'
 include { GATKHC } from '../modules/gatk4_hc'
+include { cleanupBAMs } from '../modules/cleanup_bams'
 include { GenomicsDBImport } from '../modules/genomicsdb_import'
 include { GenotypeGVCFs } from '../modules/genotype_gvcfs'
 include { FilterVCFs } from '../modules/filter_vcf'
@@ -227,6 +228,7 @@ workflow gp_wf {
     addRG(bam_sorted, sample_map_file)
     dedup_bams = dupRemoval(addRG.out.bam)
     dedup_with_index = dedup_bams.bam
+    bams_to_cleanup = dedup_with_index   // pipeline-generated BAMs; deleted after all GATKHC tasks complete
     
     } else {
     // ---------------------
@@ -246,6 +248,7 @@ workflow gp_wf {
         }
     
     dedup_with_index = loadBAMs(bam_ch).bam
+    bams_to_cleanup = Channel.empty()   // user-provided BAMs are never deleted by the pipeline
     
     // When using BAM input, BWA indices aren't needed but GATKHC module expects them
     // Use the same BWA index logic as for read processing
@@ -306,7 +309,20 @@ workflow gp_wf {
         [sample_id, bam, bai, interval_name, chr]
     }
     
-    gvcf = GATKHC(reference_to_use, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
+    // Split GATKHC output: one sub-channel for downstream VCF processing, one to count
+    // completions. .count() only resolves after ALL GATKHC tasks emit, making it a safe
+    // barrier that proves every BAM has finished being used before we delete it.
+    gvcf_mmap = GATKHC(reference_to_use, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
+        .multiMap { chr, files ->
+            main:     [chr, files]
+            sentinel: chr
+        }
+    gvcf        = gvcf_mmap.main
+    gatkhc_done = gvcf_mmap.sentinel.count()
+
+    // Delete dedup BAM files once ALL GATKHC tasks have completed.
+    // bams_to_cleanup is empty for --bam_input runs (user files are never deleted).
+    cleanupBAMs(bams_to_cleanup, gatkhc_done)
 
     // ---------------------
     // Combine, genotype, filter VCFs (per 1 Mb segment)
