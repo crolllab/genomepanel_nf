@@ -13,14 +13,6 @@ nextflow run main.nf ... -work-dir '/path/to/scratch/genomepanel_work'
 !!! warning
     Because intermediate files are removed on task completion, `-resume` may not skip many steps once variant calling is underway. It is most useful for resuming after the reference indexing stage.
 
-### Memory for the Nextflow process itself
-
-For large runs, the Java VM managing Nextflow can require significant memory. Set the heap size before running:
-
-```bash
-export NXF_OPTS='-Xms8g -Xmx64g'
-```
-
 Keep the Nextflow process alive in a `tmux` or `screen` session — even when using `--profile slurm`, the Nextflow process must remain running until all jobs complete.
 
 ### SLURM time limits
@@ -47,7 +39,7 @@ singularity.runOptions = "--bind /scratch,/data"
 
 ### Concurrency and rate limits
 
-The following `maxForks` settings in `nextflow.config` prevent overloading storage and compute:
+The following `maxForks` settings in `nextflow.config` prevent overloading external connections and storage capabilities:
 
 | Process | Default `maxForks` | Notes |
 |---------|-------------------|-------|
@@ -55,7 +47,7 @@ The following `maxForks` settings in `nextflow.config` prevent overloading stora
 | fastp trimming | 20 | Very I/O-intensive; reduce if storage I/O is a bottleneck (PE and SE separately) |
 | GATK HaplotypeCaller | 150 | High parallelism; reduce if the scheduler struggles under load |
 
-The executor is also rate-limited at 300 queued tasks and 120 submissions per minute (`executor.queueSize`, `executor.submitRateLimit`).
+The executor is also rate-limited at 300 queued tasks and 240 submissions per minute (`executor.queueSize`, `executor.submitRateLimit`).
 
 ---
 
@@ -63,7 +55,7 @@ The executor is also rate-limited at 300 queued tasks and 120 submissions per mi
 
 ### Download SRA files manually
 
-If `sra-tools` encounters connection resets or other SRA-side errors, download files manually with `fastq-dump` and use `--reads` instead:
+If `sra-tools` encounters connection resets or other SRA-side errors, download files manually with `fastq-dump` and use `--reads` to pass the downloaded files instead:
 
 ```bash
 # Install sra-tools via micromamba
@@ -94,7 +86,9 @@ nextflow run main.nf ... --reads '/path/to/downloads/*{1,2}.fastq.gz'
 
 ### Rename samples in the final VCF
 
-Use `bcftools reheader` with a two-column whitespace-delimited lookup table:
+Note that you can define custom names among the configuration options. 
+
+If you need to change sample names in the final VCF, use `bcftools reheader` with a two-column whitespace-delimited lookup table:
 
 ```bash
 bcftools reheader --samples id_lookup.txt input.vcf.gz -Oz > output_reheadered.vcf.gz
@@ -115,7 +109,7 @@ oldname3 newname3
 If you have already-processed BAM files (e.g., from a previous pipeline run), you can skip all read-processing steps:
 
 ```bash
-nextflow run main.nf -config nextflow.config -profile slurm \
+nextflow run main.nf -config nextflow.config \
   --reference $REF --ploidy 1 \
   --bam_input '/path/to/bams/*_RG_dedup.bam'
 ```

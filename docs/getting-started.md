@@ -5,7 +5,7 @@
 - **Nextflow** ≥ 23.0
 - **Singularity** (or Apptainer) — all pipeline software runs in containers
 - A POSIX-compatible file system accessible from all compute nodes (for SLURM execution)
-- An [NCBI API key](https://account.ncbi.nlm.nih.gov/) (required when using `--SRA_index`)
+- An [NCBI API key](https://account.ncbi.nlm.nih.gov/) (highly recommended when using `--SRA_index`)
 
 ---
 
@@ -33,7 +33,7 @@ The `latest` tag is automatically updated with every new release.
     ```
 
     !!! note "Croll lab"
-        On LEGcompute you can skip Steps 1–3 entirely by loading the module:
+        On LEGcompute you can skip Steps 1–2 entirely by loading the module:
         ```bash
         module load genomepanel_nf
         ```
@@ -68,9 +68,9 @@ See [HPC usage & utilities](resources.md#singularity--apptainer) for further Sin
 
 ## Step 4: Try the example dataset
 
-The repository ships with a small *E. coli* LTEE dataset that lets you verify your setup end-to-end before working with your own data. The input files live in `example/` and are not stored in git (reference genome and FASTQ files are excluded via `.gitignore`). See [`example/README.md`](https://github.com/crolllab/genomepanel_nf/blob/main/example/README.md) for download instructions and full details.
+The repository ships with a small *E. coli* LTEE dataset that lets you verify your setup end-to-end before working with your own data. The input files live in `example/`.
 
-Once the files are in place, run from the repository root:
+Run from the repository root:
 
 ```bash
 nextflow run main.nf \
@@ -80,7 +80,7 @@ nextflow run main.nf \
     --outdir example/output
 ```
 
-The run completes in roughly 30–60 minutes on a local machine and produces output in `example/output/`.
+The run completes in roughly 10–60 minutes on a local machine and produces output in `example/output/`.
 
 ---
 
@@ -140,10 +140,9 @@ Pass it with `--SRR_sample_map sample_map.csv`. The repository includes an examp
 Start the pipeline inside a `tmux` or `screen` session — the Nextflow process must stay alive until completion, even with `-profile slurm`.
 
 ```bash
-# Set Java heap size for Nextflow
-export NXF_OPTS='-Xms8g -Xmx64g'
+# Run with SLURM, mixed local fastq (e.g. named _1.fq.gz and _2.fq.gz) + SRA input
+export NCBI_API_KEY=your_ncbi_api_key_here
 
-# Run with SLURM, mixed local + SRA input
 nextflow run main.nf -config nextflow.config -profile slurm \
   --NCBI_API_key $NCBI_API_KEY \
   --reference /path/to/reference_genome.fasta \
@@ -152,12 +151,7 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --SRA_index './SRA_accessions.txt'
 ```
 
-To resume a previous run (if the `work-dir` is still intact):
-
-```bash
-nextflow run main.nf -config nextflow.config -profile slurm -resume \
-  ...
-```
+To resume a previous run (if the `work-dir` is still intact), simply add `-resume` to the command. Nextflow will skip completed steps and only execute missing ones.
 
 !!! warning "Storage"
     The pipeline can require many TB of temporary storage during execution. Point `-work-dir` to a fast scratch filesystem. The pipeline aggressively cleans up temporary files to minimise final storage, but this makes `-resume` less effective after variants have been called.

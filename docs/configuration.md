@@ -30,7 +30,7 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `--SRA_index` | `path` | — | Path to a plain-text file listing NCBI/ENA single or paired-end Illumina read accessions (one per line). Accepts `SRR`, `SRX`, `SRP`, `PRJNA`, `ERR`, etc. |
-| `--NCBI_API_key` | `string` | — | **Required with `--SRA_index`.** Your personal [NCBI API key](https://account.ncbi.nlm.nih.gov/). |
+| `--NCBI_API_key` | `string` | — | **Highly recommended with `--SRA_index`.** Get your personal [NCBI API key](https://account.ncbi.nlm.nih.gov/). |
 | `--SRR_sample_map` | `path` | `false` | CSV file mapping SRR IDs to sample names (`SRR_ID,Sample_Name`). Allows merging multiple runs per sample and renaming samples. See [Getting started](getting-started.md) for format. |
 
 ### Pre-processed BAM files
@@ -86,8 +86,8 @@ These settings are found in `nextflow.config` and can be edited directly.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `executor.queueSize` | 300 | Maximum number of tasks submitted to SLURM at once. |
-| `executor.submitRateLimit` | `'120/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
+| `executor.submitRateLimit` | `'240/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
 | SRA download `maxForks` | 10 | Maximum concurrent SRA downloads (PE and SE each). Reduce if NCBI rate-limits your connection. |
 | fastp `maxForks` | 20 | Maximum concurrent trimming tasks (PE and SE each; I/O intensive). |
-| GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. |
+| GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. Very I/O intensive. Adjust depending on storage performance. |
 
