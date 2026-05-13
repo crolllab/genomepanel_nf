@@ -16,11 +16,16 @@ params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCall
 params.genomicsdb_batch_size = 50   // GenomicsDBImport batch size (samples per batch). 50 is the Broad production default; ~20 MB/sample in heap, so 50 costs ~1 GB leaving ~2.5 GB for TileDB buffers within the default 8 GB process memory.
 params.bam_input = ""  // Optional: path to pre-existing BAM files
 params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
+params.slurm_queue = ""  // Required when using -profile slurm: SLURM partition name
 
 include { gp_wf } from './workflows/gp_wf'
 
 
 workflow {
+   if (workflow.profile.tokenize(',').contains('slurm') && !params.slurm_queue) {
+       error """\n    ERROR: --slurm_queue is required when using -profile slurm.\n    Specify the SLURM partition name on your cluster, e.g.:\n        --slurm_queue long\n    The partition should allow a maximum walltime of at least 7 days for large\n    datasets. Shorter limits (1-2 days) may still work for smaller genomes\n    or low-depth sequencing, but jobs exceeding the partition limit will fail.\n    """
+   }
+
    log.info """
    =============================================
    || GENOMEPANEL_NF VARIANT CALLING WORKFLOW ||
@@ -55,6 +60,9 @@ workflow {
        Output dir     : ${params.outdir}
        Keep BAM       : ${params.keep_bam}
        Keep GVCF      : ${params.keep_gvcf}
+
+   SLURM
+       Queue          : ${params.slurm_queue ?: '(not set — not using SLURM)'}
     """
    gp_wf()
 }

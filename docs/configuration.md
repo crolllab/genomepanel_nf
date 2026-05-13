@@ -8,10 +8,11 @@ All parameters are passed on the command line with `--param value`. Boolean flag
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `-profile` | `string` | `local` | Execution profile. `local` — up to 4 threads per task. `local_highCPU` — up to 24 threads. `slurm` — submit all tasks as SLURM jobs. |
+| `-profile` | `string` | `local` | Execution profile. `local` — up to 4 threads per task. `local_highCPU` — up to 24 threads. `slurm` — submit all tasks as SLURM jobs (requires `--slurm_queue`). |
 | `-resume` | flag | — | Resume from the last completed step. Requires the `work-dir` to be intact. |
 | `-work-dir` | `path` | `./work` | Directory for temporary and intermediate files. Use a fast scratch filesystem for large datasets. |
 | `--outdir` | `path` | `./nf_output` | Directory for final output files. |
+| `--slurm_queue` | `string` | — | **Required with `-profile slurm`.** Name of the SLURM partition to submit all jobs to. The partition should allow a maximum walltime of at least 7 days for large datasets. Shorter limits (1–2 days) may work for smaller genomes or low-depth sequencing, but any job exceeding the partition's walltime limit will fail. |
 
 ---
 
@@ -90,4 +91,28 @@ These settings are found in `nextflow.config` and can be edited directly.
 | SRA download `maxForks` | 10 | Maximum concurrent SRA downloads (PE and SE each). Reduce if NCBI rate-limits your connection. |
 | fastp `maxForks` | 20 | Maximum concurrent trimming tasks (PE and SE each; I/O intensive). |
 | GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. Very I/O intensive. Adjust depending on storage performance. |
+
+!!! note "SLURM partition walltime requirements"
+    Several pipeline processes request up to **7 days** of walltime (e.g. BWA mapping, GATK HaplotypeCaller, GenomicsDB import). When using `-profile slurm`, all jobs are submitted to the partition specified with `--slurm_queue`. This partition must allow a maximum walltime sufficient for the longest-running jobs.
+
+    **Recommended:** use a partition with a 7-day (or unlimited) walltime limit.
+
+    **Shorter partitions (1–2 days)** may still work if:
+
+    - Your reference genome is small (e.g. bacteria, fungi)
+    - Sequencing depth is low
+    - The number of samples is modest
+
+    If a job exceeds the partition's walltime limit, SLURM will kill it and the pipeline will fail at that step. Use `-resume` to restart from the last completed task after switching to a longer partition.
+
+    To list available partitions and their maximum walltimes on your cluster:
+    ```bash
+    scontrol show partition | grep -E "PartitionName|MaxTime"
+    ```
+    This prints each partition name alongside its `MaxTime` limit. A value of `UNLIMITED` means no walltime cap.
+
+    Example usage:
+    ```bash
+    nextflow run main.nf -profile slurm --slurm_queue long [other params]
+    ```
 
