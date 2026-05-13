@@ -124,6 +124,10 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.9 *(May 2026)*
+
+- Added required `--slurm_queue` parameter when using `-profile slurm`. The pipeline now validates this at startup and exits with a clear error if it is missing. The specified partition should allow a walltime of at least 7 days.
+
 ### v1.0.8 *(May 2026)*
 
 - BAM files are now deleted mid-run once all GATKHC tasks have finished, freeing disk space without risking premature removal.

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.9 — 2026-05-13
+
+### Improvements
+
+- **SLURM partition compatibility.** Added `--slurm_queue` parameter (required with `-profile slurm`) to specify the target SLURM partition. The pipeline now exits immediately with a clear error message if this parameter is missing when running on SLURM. The partition should allow a maximum walltime of at least 7 days; shorter limits (1–2 days) may work for small genomes or low-depth sequencing.
+
+---
+
 ## v1.0.8 — 2026-05-06
 
 ### Bug fixes
