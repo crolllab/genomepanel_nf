@@ -5,7 +5,7 @@ process GATKHC {
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",
-        enabled: params.keep_gvcf
+        enabled: params.keep_gvcf && (params.reference_segments as Integer) == 0
     
     input:
     path reference
@@ -19,7 +19,7 @@ process GATKHC {
     tuple val(sample_id), path(dedup_bam), path(dedup_bai), val(interval), val(chr)
     
     output:
-    tuple val(chr), path("${sample_id}_${interval.replaceAll('[:\\-]', '_')}.g.vcf.gz*")
+    tuple val(sample_id), val(chr), path("${sample_id}_${interval.replaceAll('[:\\-]', '_')}.g.vcf.gz*")
     
     script:
     """

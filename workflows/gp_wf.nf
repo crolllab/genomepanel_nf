@@ -29,6 +29,7 @@ include { RQualPlotting } from '../modules/r_plotting'
 include { PopGenVCF } from '../modules/popgen_vcf'
 include { RSummarizingBWA } from '../modules/r_process_summary_bwa'
 include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
+include { MergeGVCFs } from '../modules/merge_gvcfs'
 include { PipelineStatistics } from '../modules/pipeline_statistics'
 
 // ---------------------
@@ -313,8 +314,8 @@ workflow gp_wf {
     // completions. .count() only resolves after ALL GATKHC tasks emit, making it a safe
     // barrier that proves every BAM has finished being used before we delete it.
     gvcf_mmap = GATKHC(reference_to_use, fai_index, gatk_index, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, dedup_for_gatk)
-        .multiMap { chr, files ->
-            main:     [chr, files]
+        .multiMap { sample_id, chr, files ->
+            main:     [sample_id, chr, files]
             sentinel: chr
         }
     gvcf        = gvcf_mmap.main
@@ -325,6 +326,18 @@ workflow gp_wf {
     cleanupBAMs(bams_to_cleanup, gatkhc_done)
 
     // ---------------------
+    // Merge per-segment GVCFs into single per-sample GVCF
+    // Only when keep_gvcf is enabled AND reference_segments > 0 (sub-chromosomal segmentation)
+    // ---------------------
+    if (params.keep_gvcf && segment_size > 0) {
+        gvcf_by_sample = gvcf
+            .map { sample_id, chr, files -> [sample_id, files] }
+            .groupTuple(by: 0)
+            .map { sample_id, file_lists -> [sample_id, file_lists.flatten()] }
+        MergeGVCFs(gvcf_by_sample)
+    }
+
+    // ---------------------
     // Combine, genotype, filter VCFs (per 1 Mb segment)
     // ---------------------
 
@@ -333,12 +346,12 @@ workflow gp_wf {
     // We need to group by [chr, interval] to keep segments separate
     // First, add back interval information for grouping
     gvcf_with_interval = gvcf.combine(intervals_ch)
-        .filter { gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+        .filter { sample_id, gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
             // Match GVCF files with their corresponding interval
             // Check if any file contains the interval key
             gvcf_chr == int_chr && gvcf_files.any { it.name.contains(int_key.replaceAll('[:\\-]', '_')) }
         }
-        .map { gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+        .map { sample_id, gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
             // Return [interval_name, chr, files] for processing
             [int_name, int_chr, gvcf_files]
         }

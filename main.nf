@@ -22,6 +22,22 @@ include { gp_wf } from './workflows/gp_wf'
 
 
 workflow {
+
+   // ---------------------
+   // Validate parameters — catch unknown CLI options before running
+   // ---------------------
+   def knownParams = [
+       'outdir', 'workdir', 'reference', 'reads', 'SRA_index', 'ploidy',
+       'NCBI_API_key', 'keep_bam', 'keep_gvcf', 'bwa_index', 'min_contig_length',
+       'reference_segments', 'call_invar_sites', 'genomicsdb_batch_size',
+       'bam_input', 'SRR_sample_map', 'slurm_queue'
+   ] as Set
+
+   def unknownParams = params.keySet() - knownParams
+   if (unknownParams) {
+       error """\n    ERROR: Unknown parameter(s) supplied: ${unknownParams.sort().join(', ')}\n\n    Valid parameters are:\n        ${knownParams.sort().join('\n        ')}\n\n    Check for typos in your nextflow run command.\n    """
+   }
+
    if (workflow.profile.tokenize(',').contains('slurm') && !params.slurm_queue) {
        error """\n    ERROR: --slurm_queue is required when using -profile slurm.\n    Specify the SLURM partition name on your cluster, e.g.:\n        --slurm_queue long\n    The partition should allow a maximum walltime of at least 7 days for large\n    datasets. Shorter limits (1-2 days) may still work for smaller genomes\n    or low-depth sequencing, but jobs exceeding the partition limit will fail.\n    """
    }
