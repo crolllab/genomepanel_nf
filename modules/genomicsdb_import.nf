@@ -1,6 +1,6 @@
 process GenomicsDBImport {
     tag "GATK4 GenomicsDB Import"
-    errorStrategy 'retry'
+    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
     maxRetries 3
 
     input:

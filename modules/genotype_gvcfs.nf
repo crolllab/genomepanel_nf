@@ -1,6 +1,6 @@
 process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
-    errorStrategy 'retry'
+    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
     maxRetries 3
 
 
@@ -15,6 +15,7 @@ process GenotypeGVCFs {
 
     script:
     def interval_safe = interval.replaceAll('[:\\-]', '_')
+    def avail_mem = (task.memory.mega * 0.8).intValue()
     """
     mkdir -p ./gatk_tmp
 
@@ -27,7 +28,7 @@ process GenotypeGVCFs {
         INVAR_OPTS=""
     fi
 
-    gatk --java-options "-Xmx${task.memory.toGiga()-2}g -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" GenotypeGVCFs \
+    gatk --java-options "-Xmx${avail_mem}m -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" GenotypeGVCFs \
         --tmp-dir ./gatk_tmp \
         -R $reference \
         -V gendb://${db_dir} \
