@@ -1,7 +1,7 @@
 process GenomicsDBImport {
     tag "GATK4 GenomicsDB Import"
     errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
-    maxRetries 3
+    maxRetries 6
 
     input:
     tuple val(chr), val(interval), path(gvcf_files)

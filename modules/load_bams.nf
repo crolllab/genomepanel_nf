@@ -1,6 +1,6 @@
 process loadBAMs {
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     tag "Loading pre-existing BAM files"
     
     input:

@@ -1,7 +1,7 @@
 process FilterVCFs {
     tag "GATK apply VCF filter flags"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     input:
     tuple val(chr), val(interval), path(vcf_ch)

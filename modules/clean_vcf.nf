@@ -1,7 +1,7 @@
 process CleanVCFs {
     tag "Remove low-qual SNPs"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     input:
     tuple val(chr), val(interval), path(fvcf_ch)

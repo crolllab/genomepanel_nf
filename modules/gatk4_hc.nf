@@ -1,7 +1,7 @@
 process GATKHC {
     tag "GATK4 HaplotypeCaller"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     publishDir "${params.outdir}/gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*",

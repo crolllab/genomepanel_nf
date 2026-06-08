@@ -1,7 +1,7 @@
 process trimSequencesPE {
     tag "FASTP PE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
-    maxRetries 3
+    maxRetries 6
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
         
     input:
@@ -44,7 +44,7 @@ process trimSequencesPE {
 process trimSequencesSE {
     tag "FASTP SE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
-    maxRetries 3
+    maxRetries 6
     publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
 
     beforeScript """

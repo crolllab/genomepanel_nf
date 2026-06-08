@@ -2,7 +2,7 @@
 process SRAdownloadPE {
     tag "Downloading PE: $srr"
     errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
-    maxRetries 4
+    maxRetries 6
     
     input:
     tuple val(srr), val(url1), val(url2), val(source)
@@ -174,7 +174,7 @@ EOF
 process SRAdownloadSE {
     tag "Downloading SE: $srr"
     errorStrategy { task.attempt <= 4 ? 'retry' : 'ignore' }
-    maxRetries 4
+    maxRetries 6
     
     input:
     tuple val(srr), val(url1), val(source)

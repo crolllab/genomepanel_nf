@@ -1,7 +1,7 @@
 process ConcatCleanVCFs {
     tag "BCFtools concat clean VCFs"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     publishDir params.outdir, mode: 'copy'
 
     input:

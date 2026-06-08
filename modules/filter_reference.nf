@@ -1,6 +1,6 @@
 process filterReference {
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     publishDir "${params.outdir}/reference", mode: 'copy'
     

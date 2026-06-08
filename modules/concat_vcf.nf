@@ -1,7 +1,7 @@
 process ConcatVCFs {
     tag "BCFtools concat VCFs + qual metrics"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

@@ -1,7 +1,7 @@
 process dupRemoval {
     tag "PICARD marking duplicates"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     publishDir "${params.outdir}/bam_files",
         mode: 'copy',

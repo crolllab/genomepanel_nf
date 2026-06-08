@@ -2,7 +2,7 @@ process SRAresolve {
     tag "Querying SRA/ENA for $accessions_file"
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     input:
     path accessions_file

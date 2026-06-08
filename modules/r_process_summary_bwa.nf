@@ -1,7 +1,7 @@
 process RSummarizingBWA {
     tag "Summarizing BWA stats"
   errorStrategy 'retry'
-  maxRetries 3
+  maxRetries 6
     publishDir "${params.outdir}", mode: 'copy'
 
     input:

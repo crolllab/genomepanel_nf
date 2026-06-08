@@ -1,7 +1,7 @@
 process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
     errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
-    maxRetries 3
+    maxRetries 6
 
 
     input:

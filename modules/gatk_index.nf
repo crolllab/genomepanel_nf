@@ -1,7 +1,7 @@
 process gatkIndex {
     tag "Reference GATK index building"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
 
     input:
     path reference

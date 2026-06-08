@@ -1,7 +1,7 @@
 process addRG {
     tag "PICARD adding ReadGroup"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
        
     input:
     tuple val(sample_id), path(sorted_bam), path(sorted_bai)

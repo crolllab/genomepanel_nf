@@ -1,7 +1,7 @@
 process PipelineStatistics {
     tag "Generating pipeline stats"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     
     publishDir params.outdir, mode: 'copy'
     

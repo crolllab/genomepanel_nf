@@ -1,7 +1,7 @@
 process bwaMap {
     tag "BWA-mem mapping"
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
         
     input:
     path reference

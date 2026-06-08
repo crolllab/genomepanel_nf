@@ -1,7 +1,7 @@
 process fastaIndex {
     tag "Reference FASTA index building"    
     errorStrategy 'retry'
-    maxRetries 3
+    maxRetries 6
     
     beforeScript """
         mkdir -p "\$PWD/tmp"
