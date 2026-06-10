@@ -57,7 +57,7 @@ workflow gp_wf {
     // ---------------------
     if (params.min_contig_length && params.min_contig_length != false) {
         // Filter reference by contig length
-        filterReference(params.reference, params.min_contig_length)
+        filterReference(Channel.fromPath(params.reference), params.min_contig_length)
         reference_to_use = filterReference.out.filtered_fasta
     } else {
         // Use original reference
