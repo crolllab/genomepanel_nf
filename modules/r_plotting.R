@@ -22,9 +22,13 @@ plot_to_embed <- function(p, width = 7, height = 5) {
 }
 
 # -----------------------------------------------
-# Helper: shorten sample names (keep prefix before first underscore)
+# Helper: shorten sample names (keep prefix before first underscore).
+# Falls back to full names if abbreviation would produce duplicates.
 # -----------------------------------------------
-short_name <- function(x) sub("_.*", "", x)
+short_name <- function(x) {
+  short <- sub("_.*", "", x)
+  if (anyDuplicated(short)) x else short
+}
 
 # -----------------------------------------------
 # Helper: read a pipeline summary TSV (wide format, row names in col 1,
