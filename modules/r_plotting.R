@@ -162,7 +162,7 @@ if (!is.null(ft) && length(ft[["samples"]]) > 0) {
                     q30_after  = q30_after,
                     stringsAsFactors = FALSE)
   fdf <- fdf[order(fdf[["before_gb"]], decreasing = TRUE), ]
-  fdf[["short"]] <- factor(fdf[["short"]], levels = fdf[["short"]])
+  fdf[["short"]] <- factor(fdf[["short"]], levels = unique(fdf[["short"]]))
 
   flong <- rbind(
     data.frame(short = fdf[["short"]], value = fdf[["after_gb"]],
@@ -245,7 +245,7 @@ if (!is.null(bt) && length(bt[["samples"]]) > 0) {
                     mapped_pct = mapped_pct,
                     stringsAsFactors = FALSE)
   bdf <- bdf[order(bdf[["mapped_pct"]], decreasing = TRUE), ]
-  bdf[["short"]] <- factor(bdf[["short"]], levels = bdf[["short"]])
+  bdf[["short"]] <- factor(bdf[["short"]], levels = unique(bdf[["short"]]))
 
   # Auto-zoom y-axis: start just below the minimum value, cap at 100
   y_min <- max(0, floor(min(bdf[["mapped_pct"]], na.rm = TRUE) / 5) * 5 - 5)
