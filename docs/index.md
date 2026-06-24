@@ -124,6 +124,15 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.10 *(June 2026)*
+
+- **Fixed VCF sample names with `--SRR_sample_map`**: `GenomicsDBImport` was reassigning names from gVCF filenames, discarding biological names set by Picard.
+- **Fixed `filterReference`** rewritten as a streaming parser to avoid loading the entire genome into RAM.
+- **Fixed QC report crash** when sample names share a common prefix.
+- Memory scaling broadened; `GenomicsDBImport` and `GenotypeGVCFs` start at 16 GB.
+- `genomicsdb_batch_size` default raised to 200; pipeline exits immediately on unrecognised `--params`.
+- Added `MergeGVCFs` module for `--keep_gvcf` runs with sub-chromosomal segmentation.
+
 ### v1.0.9 *(May 2026)*
 
 - Added required `--slurm_queue` parameter when using `-profile slurm`. The pipeline now validates this at startup and exits with a clear error if it is missing. The specified partition should allow a walltime of at least 7 days.

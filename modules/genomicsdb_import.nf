@@ -21,12 +21,20 @@ process GenomicsDBImport {
     mkdir -p ./gatk_tmp
 
     # Build sample-name map (samplename TAB absolute_gvcf_path)
-    # Extract sample name by stripping the _<interval_safe>.g.vcf.gz suffix
+    # Read sample name from each gVCF header to preserve RGSM-based naming
+    # set by upstream BAM read groups (e.g. from --SRR_sample_map).
     for f in ${gvcf_files}; do
         if [[ "\$f" == *.g.vcf.gz ]]; then
-            base=\$(basename "\$f" .g.vcf.gz)
-            sample=\${base%_${interval_safe}}
-            echo -e "\${sample}\\t\$(readlink -f \$f)" >> sample_map.txt
+            sample=\$(gzip -cd "\$f" | awk -F'\t' '/^#CHROM/{print \$10; exit}')
+
+            # Fallback to filename-based extraction only if header parsing fails.
+            if [ -z "\$sample" ]; then
+                base=\$(basename "\$f" .g.vcf.gz)
+                sample=\${base%_${interval_safe}}
+                echo "WARNING: Could not parse sample from gVCF header for \$f; using filename-derived sample '\$sample'" >&2
+            fi
+
+            echo -e "\${sample}\t\$(readlink -f "\$f")" >> sample_map.txt
         fi
     done
 

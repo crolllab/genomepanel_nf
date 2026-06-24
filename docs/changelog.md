@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.0.10 — 2026-06-24
+
+### Bug fixes
+
+- **VCF sample names now correctly follow `--SRR_sample_map`.** `GenomicsDBImport` was reassigning names from gVCF filenames, discarding the biological names set by Picard.
+- **`filterReference` rewritten as a two-pass streaming parser** to avoid loading the entire genome into RAM.
+- **Fixed QC report crash** when sample names share a common prefix (duplicate factor levels in `r_plotting.R`).
+
+### Improvements
+
+- Memory scaling broadened across all processes; `GenomicsDBImport` and `GenotypeGVCFs` start at 16 GB.
+- `genomicsdb_batch_size` default raised from 50 → 200.
+- Pipeline exits immediately on unrecognised `--params`.
+- Added `MergeGVCFs` module for `--keep_gvcf` runs with sub-chromosomal segmentation.
+
+---
+
 ## v1.0.9 — 2026-05-13
 
 ### Improvements
