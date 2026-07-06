@@ -68,6 +68,7 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 |-----------|------|---------|-------------|
 | `--ploidy` | `integer` | — | **Required.** Ploidy level for GATK HaplotypeCaller. `1` for haploid (fungi, bacteria), `2` for diploid. Higher values can represent pooled samples. |
 | `--call_invar_sites` | `boolean` | `false` | When `true`, GATK HaplotypeCaller also emits invariant (monomorphic) sites. Substantially increases output size. Useful for some downstream analyses requiring full genome coverage. |
+| `--use_duplicate_reads` | `boolean` | `false` | When `true`, disables GATK HaplotypeCaller's `NotDuplicateReadFilter`, so reads flagged as duplicates by the `dupRemoval` process are still used for variant calling. |
 
 ---
 

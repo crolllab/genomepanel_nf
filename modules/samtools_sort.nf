@@ -14,8 +14,8 @@ process samtoolsSort {
     script:
     """
     samtools flagstat -O json $sample_sam > ${sample_id}_flagstat.json
-    # Convert SAM to BAM, filter out low-quality alignments (MAPQ < 10)
-    samtools view -Sb -q 10 $sample_sam | samtools sort --threads $task.cpus -o ${sample_id}_sorted.bam -
+    # Convert SAM to BAM (no MAPQ filtering; all reads retained)
+    samtools view -Sb $sample_sam | samtools sort --threads $task.cpus -o ${sample_id}_sorted.bam -
     samtools index ${sample_id}_sorted.bam
     
     # Delete the SAM file (resolve symlink to actual file)

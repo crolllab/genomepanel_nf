@@ -23,7 +23,7 @@ process dupRemoval {
         -INPUT $rg_bam \
         -OUTPUT ${sample_id}_RG_dedup.bam \
         -METRICS_FILE ${sample_id}_DUP_metrics.txt \
-        -REMOVE_DUPLICATES true \
+        -REMOVE_DUPLICATES false \
         --VALIDATION_STRINGENCY SILENT
 
     picard -Xmx${task.memory.toGiga()-2}g BuildBamIndex \

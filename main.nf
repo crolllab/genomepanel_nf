@@ -13,6 +13,7 @@ params.bwa_index = ""  // Optional: path to pre-built BWA index files
 params.min_contig_length = false  // Filter reference contigs shorter than this value (bp)
 params.reference_segments = 0  // Genome segment size for parallel variant calling (bp)
 params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCaller
+params.use_duplicate_reads = false  // Include reads flagged as duplicates by dupRemoval in GATK HaplotypeCaller calling
 params.genomicsdb_batch_size = 200  // GenomicsDBImport batch size (samples per batch). Default 200 targets a single pass for typical panels; raise if import still batches across retries with increased memory.
 params.bam_input = ""  // Optional: path to pre-existing BAM files
 params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
@@ -29,7 +30,7 @@ workflow {
    def knownParams = [
        'outdir', 'workdir', 'reference', 'reads', 'SRA_index', 'ploidy',
        'NCBI_API_key', 'keep_bam', 'keep_gvcf', 'bwa_index', 'min_contig_length',
-       'reference_segments', 'call_invar_sites', 'genomicsdb_batch_size',
+       'reference_segments', 'call_invar_sites', 'use_duplicate_reads', 'genomicsdb_batch_size',
        'bam_input', 'SRR_sample_map', 'slurm_queue'
    ] as Set
 
@@ -59,6 +60,7 @@ workflow {
        NCBI API key   : ${params.NCBI_API_key}
        Ploidy         : ${params.ploidy}
        Inv. site calls: ${params.call_invar_sites}
+       Use dup. reads : ${params.use_duplicate_reads}
   
        Reference      : ${params.reference}
        Ref segments   : ${params.reference_segments}

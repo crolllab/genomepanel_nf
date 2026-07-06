@@ -37,7 +37,16 @@ process GATKHC {
     else
         ERC_MODE="GVCF"
     fi
-    
+
+    # By default GATK HaplotypeCaller applies NotDuplicateReadFilter, excluding
+    # reads flagged as duplicates by the dupRemoval process. When
+    # --use_duplicate_reads is set, disable that filter so flagged duplicate
+    # reads are still used for calling.
+    DUPLICATE_READ_FILTER_ARGS=""
+    if [ "${params.use_duplicate_reads}" = "true" ]; then
+        DUPLICATE_READ_FILTER_ARGS="--disable-read-filter NotDuplicateReadFilter"
+    fi
+
     gatk --java-options "-Xmx${task.memory.toGiga()-2}g -XX:-UsePerfData --enable-native-access=ALL-UNNAMED" HaplotypeCaller \
         --tmp-dir ./gatk_tmp \
         -R $reference \
@@ -46,6 +55,7 @@ process GATKHC {
         -input ${dedup_bam} \
         -output ${sample_id}_\${interval_safe}.g.vcf.gz \
         -ERC \${ERC_MODE} \
+        \${DUPLICATE_READ_FILTER_ARGS} \
         --create-output-variant-index
 
     # BAM cleanup is handled by the cleanupBAMs process in the workflow,
