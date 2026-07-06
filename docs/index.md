@@ -124,6 +124,11 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.0.11 *(July 2026)*
+
+- Stopped Samtools and Picard from filtering out low-quality or duplicate reads; all reads are now retained in BAM files.
+- New `--use_duplicate_reads` option to use duplicate reads in GATK HaplotypeCaller (e.g. for ddRAD or RAD-seq data).
+
 ### v1.0.10 *(June 2026)*
 
 - **Fixed VCF sample names with `--SRR_sample_map`**: `GenomicsDBImport` was reassigning names from gVCF filenames, discarding biological names set by Picard.

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.11 — 2026-07-06
+
+### Changes
+
+- **Samtools and Picard no longer filter out reads before variant calling.** `samtoolsSort` no longer discards alignments below MAPQ 10, and `dupRemoval` now only marks duplicates (`REMOVE_DUPLICATES false`) instead of removing them. All reads are retained in the BAM files.
+
+### New features
+
+- **`--use_duplicate_reads` option.** Disables GATK HaplotypeCaller's default `NotDuplicateReadFilter`, allowing reads flagged as duplicates by `dupRemoval` to be used in variant calling. Useful for reduced-representation sequencing (e.g. ddRAD, RAD-seq) where shared fragment start/end positions are expected and do not indicate PCR duplication.
+
+---
+
 ## v1.0.10 — 2026-06-24
 
 ### Bug fixes

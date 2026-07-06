@@ -68,7 +68,6 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 |-----------|------|---------|-------------|
 | `--ploidy` | `integer` | — | **Required.** Ploidy level for GATK HaplotypeCaller. `1` for haploid (fungi, bacteria), `2` for diploid. Higher values can represent pooled samples. |
 | `--call_invar_sites` | `boolean` | `false` | When `true`, GATK HaplotypeCaller also emits invariant (monomorphic) sites. Substantially increases output size. Useful for some downstream analyses requiring full genome coverage. |
-| `--use_duplicate_reads` | `boolean` | `false` | When `true`, disables GATK HaplotypeCaller's `NotDuplicateReadFilter`, so reads flagged as duplicates by the `dupRemoval` process are still used for variant calling. |
 
 ---
 
@@ -78,6 +77,16 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 |-----------|------|---------|-------------|
 | `--keep_bam` | `boolean` | `false` | When `true`, saves final per-sample BAM files (after duplicate marking) to `<outdir>/bam_files/`. |
 | `--keep_gvcf` | `boolean` | `false` | When `true`, saves per-sample GVCF files to `<outdir>/gvcf_files/`. |
+
+---
+
+## Advanced options
+
+Minor, rarely-needed settings for special use cases.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--use_duplicate_reads` | `boolean` | `false` | When `true`, disables GATK HaplotypeCaller's `NotDuplicateReadFilter`, so reads flagged as duplicates by the `dupRemoval` process are still used for variant calling. By default, duplicate-flagged reads are excluded from calling. |
 
 ---
 
