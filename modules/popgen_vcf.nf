@@ -2,7 +2,7 @@ process PopGenVCF {
     tag "Generating VCF for pop. gen."
     errorStrategy 'retry'
     maxRetries 6
-    publishDir params.outdir, mode: 'copy'
+    publishDir "${params.outdir}/8_popgen_vcf", mode: 'copy'
 
     input:
     path vcf_files

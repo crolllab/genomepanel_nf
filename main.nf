@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
+params.help = false
 params.outdir = "./nf_output/"
-params.workdir = "./work"
 params.reference = ""
 params.reads = ""
 params.SRA_index = ""
@@ -16,32 +16,36 @@ params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCall
 params.use_duplicate_reads = false  // Include reads flagged as duplicates by dupRemoval in GATK HaplotypeCaller calling
 params.genomicsdb_batch_size = 200  // GenomicsDBImport batch size (samples per batch). Default 200 targets a single pass for typical panels; raise if import still batches across retries with increased memory.
 params.bam_input = ""  // Optional: path to pre-existing BAM files
-params.SRR_sample_map = ""  // Optional: TSV file mapping SRR IDs to sample names
+params.SRR_sample_map = ""  // Optional: CSV file mapping run IDs to sample names (Run_ID,Sample_Name)
 params.slurm_queue = ""  // Required when using -profile slurm: SLURM partition name
+params.plink_pca = false  // PCA on the pop. gen. VCF (plink2)
+params.plink_relationships = false  // GRM and KING relationship matrices on the pop. gen. VCF (plink2)
+params.plink_ld_prune = false  // LD pruning of the pop. gen. VCF (plink2)
 
 include { gp_wf } from './workflows/gp_wf'
+include { validateParams; formatProblems; helpMessage } from './modules/validate_params'
 
 
 workflow {
 
-   // ---------------------
-   // Validate parameters — catch unknown CLI options before running
-   // ---------------------
-   def knownParams = [
-       'outdir', 'workdir', 'reference', 'reads', 'SRA_index', 'ploidy',
-       'NCBI_API_key', 'keep_bam', 'keep_gvcf', 'bwa_index', 'min_contig_length',
-       'reference_segments', 'call_invar_sites', 'use_duplicate_reads', 'genomicsdb_batch_size',
-       'bam_input', 'SRR_sample_map', 'slurm_queue'
-   ] as Set
-
-   def unknownParams = params.keySet() - knownParams
-   if (unknownParams) {
-       error """\n    ERROR: Unknown parameter(s) supplied: ${unknownParams.sort().join(', ')}\n\n    Valid parameters are:\n        ${knownParams.sort().join('\n        ')}\n\n    Check for typos in your nextflow run command.\n    """
+   if (params.help) {
+       log.info helpMessage()
+       return
    }
 
-   if (workflow.profile.tokenize(',').contains('slurm') && !params.slurm_queue) {
-       error """\n    ERROR: --slurm_queue is required when using -profile slurm.\n    Specify the SLURM partition name on your cluster, e.g.:\n        --slurm_queue long\n    The partition should allow a maximum walltime of at least 7 days for large\n    datasets. Shorter limits (1-2 days) may still work for smaller genomes\n    or low-depth sequencing, but jobs exceeding the partition limit will fail.\n    """
+   // ---------------------
+   // Validate every parameter before anything is submitted.
+   // See modules/validate_params.nf; all problems are reported in one block.
+   // ---------------------
+   // `args` holds any positional arguments Nextflow would otherwise discard --
+   // the tell-tale of an unquoted glob that the shell expanded.
+   def check = validateParams(args)
+
+   if (check.problems) {
+       error formatProblems(check.problems)
    }
+
+   check.warnings.each { log.warn it }
 
    log.info """
    =============================================
@@ -57,7 +61,7 @@ workflow {
      6. Variant quality plotting, read and mapping stats   
    
    Configuration:
-       NCBI API key   : ${params.NCBI_API_key}
+       NCBI API key   : ${params.NCBI_API_key ? '(set)' : '(not set)'}
        Ploidy         : ${params.ploidy}
        Inv. site calls: ${params.call_invar_sites}
        Use dup. reads : ${params.use_duplicate_reads}
@@ -73,14 +77,23 @@ workflow {
        SRR-sample map : ${params.SRR_sample_map}
        Local bam      : ${params.bam_input}
   
+   Resolved inputs
+${check.summary.collect { k, v -> "       ${k.padRight(15)}: ${v}" }.join('\n')}
+  
    Output options
        Working dir    : ${workflow.workDir}
        Output dir     : ${params.outdir}
        Keep BAM       : ${params.keep_bam}
        Keep GVCF      : ${params.keep_gvcf}
 
+   Pop. gen. analyses
+       PLINK PCA      : ${params.plink_pca}
+       PLINK relation.: ${params.plink_relationships}
+       PLINK LD prune : ${params.plink_ld_prune}
+
    SLURM
        Queue          : ${params.slurm_queue ?: '(not set — not using SLURM)'}
     """
+
    gp_wf()
 }

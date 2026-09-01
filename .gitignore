@@ -1,6 +1,5 @@
 .DS_Store
 .nextflow*
-IPO323.fasta
 singularity
 work
 *_output*

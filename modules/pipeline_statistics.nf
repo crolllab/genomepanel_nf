@@ -3,7 +3,7 @@ process PipelineStatistics {
     errorStrategy 'retry'
     maxRetries 6
     
-    publishDir params.outdir, mode: 'copy'
+    publishDir "${params.outdir}/10_reports", mode: 'copy'
     
     input:
     val ready

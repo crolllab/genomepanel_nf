@@ -57,7 +57,7 @@ Run from the repository root directory. Make sure nextflow is available. The `--
 ```bash
 nextflow run main.nf \
     --reference example/ecoli_REL606.fasta \
-    --reads "example/fastq/SRR*_{1,2}.fastq.gz" \
+    --reads 'example/fastq/SRR*_{1,2}.fastq.gz' \
     --SRR_sample_map example/sample_map.csv \
     --ploidy 1 \
     --outdir example/output
@@ -68,10 +68,28 @@ nextflow run main.nf \
 ```bash
 nextflow run main.nf \
     --reference example/ecoli_REL606.fasta \
-    --reads "example/fastq/SRR*_{1,2}.fastq.gz" \
+    --reads 'example/fastq/SRR*_{1,2}.fastq.gz' \
     --SRA_index example/sra_accessions.txt \
     --SRR_sample_map example/sample_map.csv \
     --ploidy 1 \
     --outdir example/output
 ```
+
+**Option 3 — local FASTQ files with the optional PLINK analyses:**
+
+```bash
+nextflow run main.nf \
+    --reference example/ecoli_REL606.fasta \
+    --reads 'example/fastq/SRR*_{1,2}.fastq.gz' \
+    --SRR_sample_map example/sample_map.csv \
+    --ploidy 1 \
+    --outdir example/output \
+    --plink_pca --plink_relationships --plink_ld_prune
+```
+
+Results are written to `example/output/9_plink/`. Note that this dataset is haploid and has only
+three samples, so it exercises the analyses mechanically rather than producing meaningful
+population-genetic results — in particular, the KING matrix is `-inf` because these clonal genomes
+carry no heterozygous calls (running the same data with `--ploidy 2` does not change this), and
+PCA and LD estimates from three samples are not interpretable.
 

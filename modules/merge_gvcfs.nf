@@ -2,7 +2,7 @@ process MergeGVCFs {
     tag "Merge GVCFs: ${sample_id}"
     errorStrategy 'retry'
     maxRetries 6
-    publishDir "${params.outdir}/gvcf_files",
+    publishDir "${params.outdir}/6_gvcf_files",
         mode: 'copy',
         pattern: "*.g.vcf.gz*"
 

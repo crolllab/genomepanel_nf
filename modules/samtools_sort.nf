@@ -2,7 +2,7 @@ process samtoolsSort {
     tag "Sorting BAM files"
     errorStrategy 'retry'
     maxRetries 6
-    publishDir "${params.outdir}/bwa_stats", mode: 'copy', pattern: "*.json"
+    publishDir "${params.outdir}/4_bwa_mapping", mode: 'copy', pattern: "*.json"
        
     input:
     tuple val(sample_id), path(sample_sam)

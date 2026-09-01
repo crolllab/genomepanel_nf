@@ -2,7 +2,7 @@ process filterReference {
     errorStrategy 'retry'
     maxRetries 6
 
-    publishDir "${params.outdir}/reference", mode: 'copy'
+    publishDir "${params.outdir}/2_reference", mode: 'copy'
     
     input:
     path reference
@@ -19,6 +19,8 @@ process filterReference {
     
     import sys
     
+    # min_length is validated as a whole number in validateParams() before the
+    # workflow starts, so this interpolation is always a literal integer.
     min_length = ${min_length}
     input_fasta = "${reference}"
     output_fasta = "${base_name}.red.fasta"
@@ -68,9 +70,13 @@ process filterReference {
         for contig_id, length in removed.items():
             stats.write(f"  {contig_id}: {length} bp\\n")
         
-        if len(kept_set) == 0:
-            stats.write("\\nWARNING: No contigs passed the filter!\\n")
-            sys.exit(1)
+    if len(kept_set) == 0:
+        longest = max(contig_lengths.values()) if contig_lengths else 0
+        sys.stderr.write(
+            "\\nERROR: --min_contig_length ${min_length} removed every contig from the reference.\\n"
+            f"The longest contig in {input_fasta} is {longest} bp, so nothing passes the filter.\\n"
+            "Lower --min_contig_length, or drop it to use the reference unfiltered.\\n\\n")
+        sys.exit(3)
     
     print(f"Filtered reference: kept {len(kept_set)} contigs, removed {len(removed)} contigs")
     """

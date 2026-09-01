@@ -2,7 +2,7 @@ process ConcatVCFs {
     tag "BCFtools concat VCFs + qual metrics"
     errorStrategy 'retry'
     maxRetries 6
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}/7_variants", mode: 'copy'
 
     input:
     path fvcf_ch

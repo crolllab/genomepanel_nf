@@ -122,6 +122,14 @@ table.summary th, table.summary td { border: 1px solid #ccc; padding: 8px 18px;
 table.summary thead tr { background: #e8eaf6; font-weight: bold; }
 table.summary tbody tr:nth-child(even) { background: #f5f5f5; }
 table.summary td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.alert { background: #fff3e0; border-left: 5px solid #ef6c00; padding: 4px 20px 14px;
+         margin: 16px 0; border-radius: 3px; }
+.alert p { color: #6d4c41; margin-bottom: 12px; }
+.ok    { background: #e8f5e9; border-left: 5px solid #2e7d32; padding: 12px 20px;
+         margin: 16px 0; border-radius: 3px; color: #1b5e20; }
+ul.samples { columns: 4; -webkit-columns: 4; -moz-columns: 4; max-width: 860px;
+             color: #555; line-height: 1.7; font-family: monospace;
+             margin: 0 0 8px 0; padding-left: 20px; }
 footer { margin-top: 60px; font-size: 0.85em; color: #aaa;
          border-top: 1px solid #eee; padding-top: 12px; }
 </style>
@@ -132,6 +140,74 @@ footer { margin-top: 60px; font-size: 0.85em; color: #aaa;
   if (!is.null(runtime_str)) paste0(' &middot; ', runtime_str) else '',
   ' &middot; <a href="https://crolllab.github.io/genomepanel_nf/" target="_blank">Documentation</a></p>
 '), file = con)
+
+# =====================================================
+# SECTION 0: Samples dropped during the run
+# =====================================================
+# Downloading and trimming fall back to an 'ignore' error strategy once their
+# retries are exhausted, so a failed sample disappears from the run without
+# failing it. ReportIgnoredSamples writes the names it detected; surface them
+# here so a green run does not hide a shrunken panel.
+if (file.exists("ignored_samples.txt")) {
+  ig_lines   <- readLines("ignored_samples.txt", warn = FALSE)
+  ig_section <- NA_character_
+  ig_dl      <- character(0)
+  ig_trim    <- character(0)
+
+  for (ln in ig_lines) {
+    if (grepl("^## Failed to download", ln))          { ig_section <- "dl";   next }
+    if (grepl("^## Failed during read trimming", ln)) { ig_section <- "trim"; next }
+    if (grepl("^\\s*#", ln) || !nzchar(trimws(ln)))    next
+    if (identical(ig_section, "dl"))   ig_dl   <- c(ig_dl,   trimws(ln))
+    if (identical(ig_section, "trim")) ig_trim <- c(ig_trim, trimws(ln))
+  }
+
+  n_drop <- length(ig_dl) + length(ig_trim)
+
+  sample_list <- function(ids) {
+    esc <- gsub("&", "&amp;", ids, fixed = TRUE)
+    esc <- gsub("<", "&lt;",  esc, fixed = TRUE)
+    esc <- gsub(">", "&gt;",  esc, fixed = TRUE)
+    paste0('<ul class="samples">',
+           paste0("<li>", esc, "</li>", collapse = ""),
+           '</ul>\n')
+  }
+
+  cat('<section>\n<h2>Sample completeness</h2>\n', file = con)
+
+  if (n_drop == 0) {
+    cat('<div class="ok">Every sample that entered the run completed read
+         processing. No samples were dropped.</div>\n', file = con)
+  } else {
+    cat(sprintf('<p><strong>%d sample(s) were dropped before variant calling
+      and are absent from the final VCF.</strong> These steps give up rather than
+      abort the run, so the pipeline still reports success. The same list is
+      written to <code>1_sra_downloads/ignored_samples.txt</code>.</p>\n',
+      n_drop), file = con)
+
+    if (length(ig_dl) > 0) {
+      cat('<div class="alert">\n', file = con)
+      cat(sprintf('<p><strong>Failed to download (%d)</strong> &mdash; the
+        accession was resolved, but the download exhausted its retries. Re-run to
+        try again, or fetch the reads manually and pass them with
+        <code>--reads</code>.</p>\n', length(ig_dl)), file = con)
+      cat(sample_list(ig_dl), file = con)
+      cat('</div>\n', file = con)
+    }
+
+    if (length(ig_trim) > 0) {
+      cat('<div class="alert">\n', file = con)
+      cat(sprintf('<p><strong>Failed during read trimming (%d)</strong> &mdash;
+        reads were available but trimming exhausted its retries. Usually a
+        truncated or corrupt FASTQ, or an out-of-memory kill.</p>\n',
+        length(ig_trim)), file = con)
+      cat(sample_list(ig_trim), file = con)
+      cat('</div>\n', file = con)
+    }
+  }
+
+  cat('</section>\n', file = con)
+}
 
 # =====================================================
 # SECTION 1: Fastp base filtering (from fastp_summary.tsv)

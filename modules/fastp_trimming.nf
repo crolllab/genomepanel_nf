@@ -2,7 +2,7 @@ process trimSequencesPE {
     tag "FASTP PE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 6
-    publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
+    publishDir "${params.outdir}/3_fastq_stats", mode: 'copy', pattern: "*.json"
         
     input:
     tuple val(sample_id), path(read1), path(read2), val(source)
@@ -45,7 +45,7 @@ process trimSequencesSE {
     tag "FASTP SE trimming"
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     maxRetries 6
-    publishDir "${params.outdir}/fastp_stats", mode: 'copy', pattern: "*.json"
+    publishDir "${params.outdir}/3_fastq_stats", mode: 'copy', pattern: "*.json"
 
     beforeScript """
         mkdir -p "\$PWD/tmp"

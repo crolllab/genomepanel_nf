@@ -31,7 +31,13 @@ EOF
     max_attempts=4
     attempt=1
     success=false
-    
+
+    # Timeouts (seconds) for the two long sra-tools steps. A ~8 GB .sra needs
+    # well over ten minutes both to fetch and to convert, more again when the
+    # work directory sits on network storage, so keep these generous.
+    prefetch_timeout=3600
+    fasterq_timeout=3600
+
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
             # Long backoff with jitter to tolerate server-side outages/throttling:
@@ -47,9 +53,10 @@ EOF
             echo "Retry attempt \$attempt of \$max_attempts..."
             echo "Waiting \$sleep_seconds seconds before retry (long server cooldown)..."
             sleep \$sleep_seconds
-            # Clean up any partial files
+            # Clean up partial FASTQ output, but keep ncbi_download: a complete
+            # .sra is reused below when only the extraction step failed.
             rm -f ${srr}_*.fastq* 2>/dev/null || true
-            rm -rf ncbi_download 2>/dev/null || true
+            rm -rf fasterq_tmp 2>/dev/null || true
         fi
         
         # Try ENA direct download if URLs are available
@@ -98,21 +105,35 @@ EOF
             mkdir -p ncbi_download
             mkdir -p fasterq_tmp
             
-            # Download into a controlled directory; newer sra-tools deprecates --output-file.
-            # Set max-size to 100GB to handle large sequencing runs.
-            # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
-            # Some sra-tools builds can return non-zero despite a complete .sra being written,
-            # so gate on file presence rather than prefetch exit status alone.
-            timeout 600 prefetch $srr --output-directory ncbi_download --max-size 100G || true
+            # Reuse a .sra left behind by an earlier attempt. Extraction can fail
+            # on its own (timeout, disk), and re-fetching several GB every round
+            # costs far more than it saves. prefetch only writes the final
+            # .sra name once the transfer completes, so a partial download is
+            # never picked up here.
             sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            if [ -n "\$sra_file" ]; then
+                echo "Reusing .sra fetched on an earlier attempt: \$sra_file"
+            else
+                # Download into a controlled directory; newer sra-tools deprecates --output-file.
+                # Set max-size to 100GB to handle large sequencing runs.
+                # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
+                # Some sra-tools builds can return non-zero despite a complete .sra being written,
+                # so gate on file presence rather than prefetch exit status alone.
+                timeout \$prefetch_timeout prefetch $srr --output-directory ncbi_download --max-size 100G || true
+                sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            fi
             if [ -n "\$sra_file" ]; then
                 # Override TMPDIR to force fasterq-dump to use work directory
                 # Even with --temp, fasterq-dump may use system TMPDIR for buffers
                 export TMPDIR="\$PWD/fasterq_tmp"
-                
-                # Decompress with explicit temp directory in work location
-                # Check exit status explicitly; add timeout to prevent hangs
-                if timeout 600 fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>/tmp/fasterq_${srr}.err; then
+
+                # Decompress with explicit temp directory in work location.
+                # Capture the status rather than testing it inline: a timeout kill
+                # exits 124 and writes nothing to stderr, which is indistinguishable
+                # from a silent failure unless the code itself is reported.
+                timeout \$fasterq_timeout fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>fasterq_${srr}.err
+                fq_status=\$?
+                if [ \$fq_status -eq 0 ]; then
                     # Clean up SRA file and temp directory immediately to save space
                     rm -rf ncbi_download fasterq_tmp
                     
@@ -148,9 +169,14 @@ EOF
                         echo "⚠ NCBI PE files not found (attempt \$attempt)"
                     fi
                 else
-                    echo "⚠ NCBI fasterq-dump failed (attempt \$attempt)"
-                    if [ -f /tmp/fasterq_${srr}.err ]; then
-                        echo "   Error: \$(tail -2 /tmp/fasterq_${srr}.err 2>/dev/null)"
+                    if [ \$fq_status -eq 124 ]; then
+                        echo "⚠ NCBI fasterq-dump timed out after \${fasterq_timeout}s (attempt \$attempt)"
+                        echo "   The .sra is kept for the next attempt; raise fasterq_timeout if this repeats"
+                    else
+                        echo "⚠ NCBI fasterq-dump failed with exit status \$fq_status (attempt \$attempt)"
+                    fi
+                    if [ -s fasterq_${srr}.err ]; then
+                        echo "   Error: \$(tail -2 fasterq_${srr}.err 2>/dev/null)"
                     fi
                 fi
             else
@@ -203,7 +229,13 @@ EOF
     max_attempts=4
     attempt=1
     success=false
-    
+
+    # Timeouts (seconds) for the two long sra-tools steps. A ~8 GB .sra needs
+    # well over ten minutes both to fetch and to convert, more again when the
+    # work directory sits on network storage, so keep these generous.
+    prefetch_timeout=3600
+    fasterq_timeout=3600
+
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
             # Long backoff with jitter to tolerate server-side outages/throttling:
@@ -219,9 +251,10 @@ EOF
             echo "Retry attempt \$attempt of \$max_attempts..."
             echo "Waiting \$sleep_seconds seconds before retry (long server cooldown)..."
             sleep \$sleep_seconds
-            # Clean up any partial files
+            # Clean up partial FASTQ output, but keep ncbi_download: a complete
+            # .sra is reused below when only the extraction step failed.
             rm -f ${srr}*.fastq* 2>/dev/null || true
-            rm -rf ncbi_download 2>/dev/null || true
+            rm -rf fasterq_tmp 2>/dev/null || true
         fi
         
         # Try ENA direct download if URL is available
@@ -259,20 +292,34 @@ EOF
             mkdir -p ncbi_download
             mkdir -p fasterq_tmp
             
-            # Download into a controlled directory; newer sra-tools deprecates --output-file.
-            # Set max-size to 100GB to handle large sequencing runs.
-            # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
-            # Some sra-tools builds can return non-zero despite a complete .sra being written,
-            # so gate on file presence rather than prefetch exit status alone.
-            timeout 600 prefetch $srr --output-directory ncbi_download --max-size 100G || true
+            # Reuse a .sra left behind by an earlier attempt. Extraction can fail
+            # on its own (timeout, disk), and re-fetching several GB every round
+            # costs far more than it saves. prefetch only writes the final
+            # .sra name once the transfer completes, so a partial download is
+            # never picked up here.
             sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            if [ -n "\$sra_file" ]; then
+                echo "Reusing .sra fetched on an earlier attempt: \$sra_file"
+            else
+                # Download into a controlled directory; newer sra-tools deprecates --output-file.
+                # Set max-size to 100GB to handle large sequencing runs.
+                # Use timeout to prevent hangs (prefetch occasionally hangs on network timeouts).
+                # Some sra-tools builds can return non-zero despite a complete .sra being written,
+                # so gate on file presence rather than prefetch exit status alone.
+                timeout \$prefetch_timeout prefetch $srr --output-directory ncbi_download --max-size 100G || true
+                sra_file=\$(find ncbi_download -type f -name "${srr}.sra" 2>/dev/null | head -n 1)
+            fi
             if [ -n "\$sra_file" ]; then
                 # Override TMPDIR to force fasterq-dump to use work directory
                 export TMPDIR="\$PWD/fasterq_tmp"
-                
-                # Decompress with explicit temp directory in work location
-                # Check exit status explicitly; add timeout to prevent hangs
-                if timeout 600 fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>/tmp/fasterq_${srr}.err; then
+
+                # Decompress with explicit temp directory in work location.
+                # Capture the status rather than testing it inline: a timeout kill
+                # exits 124 and writes nothing to stderr, which is indistinguishable
+                # from a silent failure unless the code itself is reported.
+                timeout \$fasterq_timeout fasterq-dump "\$sra_file" --split-files -O . --temp fasterq_tmp 2>fasterq_${srr}.err
+                fq_status=\$?
+                if [ \$fq_status -eq 0 ]; then
                     # Clean up SRA file and temp directory immediately
                     rm -rf ncbi_download fasterq_tmp
                     
@@ -312,7 +359,15 @@ EOF
                         echo "⚠ NCBI file not found (attempt \$attempt)"
                     fi
                 else
-                    echo "⚠ NCBI fasterq-dump failed (attempt \$attempt)"
+                    if [ \$fq_status -eq 124 ]; then
+                        echo "⚠ NCBI fasterq-dump timed out after \${fasterq_timeout}s (attempt \$attempt)"
+                        echo "   The .sra is kept for the next attempt; raise fasterq_timeout if this repeats"
+                    else
+                        echo "⚠ NCBI fasterq-dump failed with exit status \$fq_status (attempt \$attempt)"
+                    fi
+                    if [ -s fasterq_${srr}.err ]; then
+                        echo "   Error: \$(tail -2 fasterq_${srr}.err 2>/dev/null)"
+                    fi
                 fi
             else
                 echo "⚠ NCBI prefetch failed to produce .sra file (attempt \$attempt)"

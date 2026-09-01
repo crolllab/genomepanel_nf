@@ -2,12 +2,13 @@ process RQualPlotting {
     tag "Generating QC report"
     errorStrategy 'retry'
     maxRetries 6
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}/10_reports", mode: 'copy'
 
     input:
     path concat_vcf
     path fastp_tsv
     path bwa_tsv
+    path ignored_samples
     path r_script
     val  pipeline_version
     val  pipeline_start

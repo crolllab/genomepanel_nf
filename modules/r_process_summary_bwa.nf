@@ -2,7 +2,7 @@ process RSummarizingBWA {
     tag "Summarizing BWA stats"
   errorStrategy 'retry'
   maxRetries 6
-    publishDir "${params.outdir}", mode: 'copy'
+    publishDir "${params.outdir}/4_bwa_mapping", mode: 'copy'
 
     input:
     path json_files

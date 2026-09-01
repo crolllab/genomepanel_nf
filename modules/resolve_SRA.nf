@@ -1,6 +1,6 @@
 process SRAresolve {
     tag "Querying SRA/ENA for $accessions_file"
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/1_sra_downloads", mode: 'copy', overwrite: true
     errorStrategy 'retry'
     maxRetries 6
 
@@ -15,6 +15,13 @@ process SRAresolve {
     script:
     """
     #!/bin/bash
+    
+    # An NCBI API key raises the E-utilities rate limit from 3 to 10 requests/second.
+    # entrez-direct reads it from NCBI_API_KEY.
+    if [ -n "${params.NCBI_API_key}" ]; then
+        export NCBI_API_KEY="${params.NCBI_API_key}"
+        echo "Using NCBI API key for E-utilities requests"
+    fi
     
     # Clear output files
     > NCBI_SRR_PE_accessions.txt
@@ -106,6 +113,20 @@ process SRAresolve {
     pe_count=\$(wc -l < NCBI_SRR_PE_accessions.txt)
     se_count=\$(wc -l < NCBI_SRR_SE_accessions.txt)
     ena_count=\$(grep -c "ENA" NCBI_download_urls.tsv || echo "0")
+
+    if [ "\$pe_count" -eq 0 ] && [ "\$se_count" -eq 0 ]; then
+        echo "" >&2
+        echo "ERROR: none of the accessions in ${accessions_file} could be resolved to" >&2
+        echo "sequencing runs, so there is nothing to download and the pipeline would" >&2
+        echo "otherwise finish without calling any variants." >&2
+        echo "" >&2
+        echo "Check that:" >&2
+        echo "  * the accessions exist and are public (try one in https://www.ncbi.nlm.nih.gov/sra)" >&2
+        echo "  * they are run/experiment/project IDs (SRR, ERR, DRR, SRX, SRP, PRJNA), not sample IDs" >&2
+        echo "  * this machine can reach eutils.ncbi.nlm.nih.gov and www.ebi.ac.uk" >&2
+        echo "" >&2
+        exit 3
+    fi
 
     echo "Done! Found \$pe_count paired-end and \$se_count single-end SRR accessions (after deduplication)"
     echo "ENA URLs available for \$ena_count accessions"

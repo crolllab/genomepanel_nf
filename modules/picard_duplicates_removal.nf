@@ -3,7 +3,7 @@ process dupRemoval {
     errorStrategy 'retry'
     maxRetries 6
 
-    publishDir "${params.outdir}/bam_files",
+    publishDir "${params.outdir}/5_bam_files",
         mode: 'copy',
         pattern: "*_RG_dedup.bam*",
         enabled: params.keep_bam

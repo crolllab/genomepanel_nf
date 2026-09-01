@@ -36,12 +36,14 @@ flowchart TD
     JG[GATK joint genotyping\nCombineGVCFs + GenotypeGVCFs]:::step
     VF[VariantFiltration + bcftools\nflagging & filtering]:::step
     PG[vcftools\npop-gen VCF]:::step
+    PL[PLINK\nPCA, relatedness, LD pruning\noptional]:::step
     QC[R\npipeline_report.html]:::step
 
     O1([final_variants.vcf.gz]):::io
     O2([final_variants.clean.vcf.gz]):::io
     O3([pop-gen VCF]):::io
     O4([pipeline_report.html]):::io
+    O5([plink/ results]):::io
 
     A1 --> T
     A2 --> T
@@ -57,6 +59,8 @@ flowchart TD
     VF --> O2
     O1 --> PG
     PG --> O3
+    O3 --> PL
+    PL --> O5
     O2 --> QC
     QC --> O4
 ```
@@ -67,7 +71,7 @@ The pipeline accepts three input modes that converge at the variant calling step
 2. **SRA/ENA accessions** (`--SRA_index`): accessions are resolved to run IDs and download URLs; paired-end and single-end runs are handled automatically before joining the same read-processing path.
 3. **Pre-processed BAM files** (`--bam_input`): coordinate-sorted, read-group annotated BAMs skip directly to variant calling.
 
-After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools. All QC metrics are collected into a single `pipeline_report.html`.
+After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. All QC metrics are collected into a single `pipeline_report.html`.
 
 ---
 
@@ -116,6 +120,7 @@ Please cite the underlying tools if you use them through this pipeline.
 | [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration | Van der Auwera & O'Connor 2020 |
 | [BCFtools](https://www.htslib.org/) | 1.23.1 | VCF filtering and manipulation | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [vcftools](https://vcftools.github.io/) | 0.1.17 | Population-genetics VCF processing | Danecek et al. 2011, *Bioinformatics* [doi:10.1093/bioinformatics/btr330](https://doi.org/10.1093/bioinformatics/btr330) |
+| [PLINK 2](https://www.cog-genomics.org/plink/2.0/) | 2.0.0-a.6.9 | PCA, GRM and KING relatedness, LD pruning | Chang et al. 2015, *GigaScience* [doi:10.1186/s13742-015-0047-8](https://doi.org/10.1186/s13742-015-0047-8) |
 | [sra-tools](https://github.com/ncbi/sra-tools) | 3.2.1 | NCBI SRA data download | NCBI |
 | [entrez-direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/) | 24.0 | NCBI SRA accession resolution | NCBI |
 | [R / tidyverse](https://www.tidyverse.org/) | 1.2.1 | QC visualisation | R Core Team; Wickham et al. 2019, *JOSS* [doi:10.21105/joss.01686](https://doi.org/10.21105/joss.01686) |
@@ -123,6 +128,12 @@ Please cite the underlying tools if you use them through this pipeline.
 ---
 
 ## Release notes
+
+### v1.1.0 *(September 2026)*
+
+- Optional PLINK 2 analyses on the pop-gen VCF: `--plink_pca`, `--plink_relationships` (GRM and KING matrices) and `--plink_ld_prune`, published to `9_plink/`.
+- All parameters and input files are validated before any task is submitted, with every problem reported in one block and a `Resolved inputs` summary in the startup banner. Added `--help`; `--reads` and `--bam_input` now accept several semicolon-separated patterns.
+- Outputs reorganised into numbered directories (`1_sra_downloads/` through `10_reports/`), and samples silently dropped by the download or trimming steps are now listed in `pipeline_report.html`.
 
 ### v1.0.11 *(July 2026)*
 

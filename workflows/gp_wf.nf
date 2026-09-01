@@ -27,8 +27,12 @@ include { ConcatVCFs } from '../modules/concat_vcf'
 include { ConcatCleanVCFs } from '../modules/concat_clean_vcf'
 include { RQualPlotting } from '../modules/r_plotting'
 include { PopGenVCF } from '../modules/popgen_vcf'
+include { PlinkPCA } from '../modules/plink_pca'
+include { PlinkRelationships } from '../modules/plink_relationships'
+include { PlinkLDPrune } from '../modules/plink_ld_prune'
 include { RSummarizingBWA } from '../modules/r_process_summary_bwa'
 include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
+include { ReportIgnoredSamples } from '../modules/report_ignored'
 include { MergeGVCFs } from '../modules/merge_gvcfs'
 include { PipelineStatistics } from '../modules/pipeline_statistics'
 
@@ -40,28 +44,23 @@ workflow gp_wf {
     // ---------------------
     // Input checks
     // ---------------------
-    if (!params.reference) {
-       exit 1, "ERROR: Reference genome is not specified (FASTA file required via --reference)."
-    }
-    
-    if (!params.reads && !params.SRA_index && !params.bam_input) {
-       exit 1, "ERROR: No input provided. Supply local FASTQ files (--reads), SRA accessions (--SRA_index), or BAM files (--bam_input)."
-    }
-    
-    if (params.bam_input && (params.reads || params.SRA_index)) {
-       exit 1, "ERROR: Cannot use --bam_input with --reads or --SRA_index. Choose either BAM input or read-based processing."
-    }
-    
+    // Parameter and input-file validation happens up front in main.nf, via
+    // validateParams() in modules/validate_params.nf, so that every problem is
+    // reported in one block before any task is submitted. The `checkIfExists`
+    // flags below are a second line of defence: without them a missing file is
+    // staged as a broken symlink and surfaces as a container error six retries
+    // later, rather than as a Nextflow message naming the file.
+
     // ---------------------
     // Reference filtering (optional)
     // ---------------------
     if (params.min_contig_length && params.min_contig_length != false) {
         // Filter reference by contig length
-        filterReference(Channel.fromPath(params.reference), params.min_contig_length)
+        filterReference(Channel.fromPath(params.reference, checkIfExists: true), params.min_contig_length)
         reference_to_use = filterReference.out.filtered_fasta.collect()
     } else {
         // Use original reference
-        reference_to_use = Channel.fromPath(params.reference).collect()
+        reference_to_use = Channel.fromPath(params.reference, checkIfExists: true).collect()
     }
 
     // ---------------------
@@ -83,7 +82,7 @@ workflow gp_wf {
 
     // Input SRA index file
     // Step 0: Make a channel from the SRA index file
-    sra_file_ch = Channel.fromPath(params.SRA_index)
+    sra_file_ch = Channel.fromPath(params.SRA_index, checkIfExists: true)
     
     // First run SRAresolve to get SRR IDs and URLs
     SRAresolve(sra_file_ch)
@@ -101,10 +100,16 @@ workflow gp_wf {
         .filter { it.Layout == 'SE' }
         .map { tuple(it.SRR_ID, it.URL_1 ?: "", it.Source ?: "NCBI") }
 
+    // Every accession SRAresolve managed to resolve. Kept so that accessions
+    // lost to the download step's 'ignore' strategy can be named at the end.
+    sra_expected_ids = pe_with_urls.map { it[0] }.mix(se_with_urls.map { it[0] })
+
     // Now run downloads with URL information for hybrid approach
     SRAdownloadPE(pe_with_urls)
     SRAdownloadSE(se_with_urls)
 
+    } else {
+        sra_expected_ids = Channel.empty()
     }
 
     // ---------------------
@@ -117,7 +122,8 @@ workflow gp_wf {
         read_pairs_local_ch = Channel.fromFilePairs(
             reads_patterns,
             flat: false, // keeps paired R1/R2 in a tuple
-            size: 2  // expect exactly 2 files per pair
+            size: 2,  // expect exactly 2 files per pair
+            checkIfExists: true
         )
         
         // Reformat to extract proper sample IDs
@@ -180,6 +186,26 @@ workflow gp_wf {
     // Merge SE + PE trimmed reads into one channel
     trimmed_ch = pe_trimmed.mix(se_trimmed)
 
+    // ---------------------
+    // Track silently dropped samples
+    // ---------------------
+    // Downloading and trimming both switch to 'ignore' once their retries run
+    // out, so a failed sample vanishes from the channel instead of stopping the
+    // run. Compare the IDs entering each stage with those leaving it, and write
+    // the difference to 1_sra_downloads/ignored_samples.txt. Sample renaming
+    // via --SRR_sample_map happens later (at addRG), so IDs are directly
+    // comparable here.
+    entered_trimming_ids = combined_pe_ch.map { it[0] }.mix(sra_se_formatted.map { it[0] })
+    downloaded_ids       = sra_pe_formatted.map { it[0] }.mix(sra_se_formatted.map { it[0] })
+
+    ReportIgnoredSamples(
+        sra_expected_ids.collect().ifEmpty([]),
+        downloaded_ids.collect().ifEmpty([]),
+        entered_trimming_ids.collect().ifEmpty([]),
+        trimmed_ch.map { it[0] }.collect().ifEmpty([])
+    )
+    ignored_report_ch = ReportIgnoredSamples.out.report
+
 
     // ---------------------
     // BWA index (only needed for read input)
@@ -188,11 +214,11 @@ workflow gp_wf {
     if (params.bwa_index) {
         // Use provided BWA index files
         // Collect into value channels that can be reused for each sample
-        bwa_amb = Channel.fromPath("${params.bwa_index}.amb").collect()
-        bwa_ann = Channel.fromPath("${params.bwa_index}.ann").collect()
-        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64").collect()
-        bwa_pac = Channel.fromPath("${params.bwa_index}.pac").collect()
-        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
+        bwa_amb = Channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
+        bwa_ann = Channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
+        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
+        bwa_pac = Channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
+        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
     } else {
         // Build BWA index from reference - returns 5 separate outputs
         (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
@@ -220,7 +246,7 @@ workflow gp_wf {
     // If a sample map file is provided, use it; otherwise use an empty placeholder file
     // The placeholder file must exist so Channel.fromPath can stage it properly
     if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
-        sample_map_file = Channel.fromPath(params.SRR_sample_map).collect()
+        sample_map_file = Channel.fromPath(params.SRR_sample_map, checkIfExists: true).collect()
     } else {
         sample_map_file = Channel.fromPath("${projectDir}/NO_SAMPLE_MAP.txt", checkIfExists: false).collect()
     }
@@ -237,13 +263,18 @@ workflow gp_wf {
     // ---------------------
     // Parse BAM files from glob pattern
     // Extract sample name by removing _RG_dedup suffix if present
+    // Like --reads, several locations may be given, separated by semicolons.
+    // Indexes are checked up front in validateParams(); this repeats the lookup
+    // only to pick whichever of the two naming conventions is actually present.
+    def bam_patterns = params.bam_input.tokenize(';').collect { it.trim() }.findAll { it }
     bam_ch = Channel
-        .fromPath(params.bam_input)
+        .fromPath(bam_patterns, checkIfExists: true)
         .map { bam_file ->
             def sample_name = bam_file.baseName.replaceAll(/_RG_dedup$/, '')
-            def bai_file = file("${bam_file}.bai")
-            if (!bai_file.exists()) {
-                exit 1, "ERROR: Index file not found for ${bam_file}. Expected: ${bai_file}"
+            def bai_file = [ file("${bam_file}.bai"),
+                             file("${bam_file.parent}/${bam_file.baseName}.bai") ].find { it.exists() }
+            if (!bai_file) {
+                error "No BAM index found for ${bam_file}.\nExpected ${bam_file}.bai or ${bam_file.parent}/${bam_file.baseName}.bai — create one with: samtools index ${bam_file}"
             }
             tuple(sample_name, bam_file, bai_file)
         }
@@ -254,11 +285,11 @@ workflow gp_wf {
     // When using BAM input, BWA indices aren't needed but GATKHC module expects them
     // Use the same BWA index logic as for read processing
     if (params.bwa_index) {
-        bwa_amb = Channel.fromPath("${params.bwa_index}.amb").collect()
-        bwa_ann = Channel.fromPath("${params.bwa_index}.ann").collect()
-        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64").collect()
-        bwa_pac = Channel.fromPath("${params.bwa_index}.pac").collect()
-        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123").collect()
+        bwa_amb = Channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
+        bwa_ann = Channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
+        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
+        bwa_pac = Channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
+        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
     } else {
         // Build BWA index from reference even for BAM input (needed by GATKHC module)
         (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
@@ -389,7 +420,24 @@ workflow gp_wf {
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // Use clean VCF to produce a MAF, thinned VCF for e.g. PCA/clustering analyses
-    PopGenVCF(concat_clean_vcf)
+    popgen_vcf = PopGenVCF(concat_clean_vcf)
+
+    // ---------------------
+    // Optional PLINK analyses on the pop. gen. VCF
+    // ---------------------
+    plink_done = Channel.empty()
+    if (params.plink_pca) {
+        PlinkPCA(popgen_vcf)
+        plink_done = plink_done.mix(PlinkPCA.out[0])
+    }
+    if (params.plink_relationships) {
+        PlinkRelationships(popgen_vcf)
+        plink_done = plink_done.mix(PlinkRelationships.out[0])
+    }
+    if (params.plink_ld_prune) {
+        PlinkLDPrune(popgen_vcf)
+        plink_done = plink_done.mix(PlinkLDPrune.out[0])
+    }
 
     // ---------------------
     // Concat all variants (incl. low qual)
@@ -409,7 +457,8 @@ workflow gp_wf {
         RSummarizingFASTP(fastp_json_ch, fastp_summary_script)
         RSummarizingBWA(bam_reports_ch, bwa_summary_script)
         // Pass TSV summary files to the plotting process
-        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out, qual_plot_script,
+        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out,
+            ignored_report_ch, qual_plot_script,
             Channel.value(workflow.manifest.version),
             Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
@@ -418,21 +467,25 @@ workflow gp_wf {
             .mix(RSummarizingFASTP.out)
             .mix(RSummarizingBWA.out)
             .mix(RQualPlotting.out.report)
+            .mix(plink_done)
             .collect()
     } else {
-        // For BAM input, no FASTP/BWA TSV files available
-        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]), qual_plot_script,
+        // For BAM input, no FASTP/BWA TSV files available. Nothing can be
+        // dropped by download or trimming either, so no ignored-sample report.
+        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]),
+            Channel.value([]), qual_plot_script,
             Channel.value(workflow.manifest.version),
             Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         all_done = concat_clean_vcf.mix(concat_vcf)
             .mix(RQualPlotting.out.report)
+            .mix(plink_done)
             .collect()
     }
 
     // ---------------------
     // Generate pipeline execution statistics
     // ---------------------
-    PipelineStatistics(all_done, workflow.launchDir.resolve(params.outdir).resolve("pipeline_trace.txt"))
+    PipelineStatistics(all_done, workflow.launchDir.resolve(params.outdir).resolve("10_reports").resolve("pipeline_trace.txt"))
 
 }

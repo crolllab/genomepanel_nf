@@ -2,9 +2,102 @@
 
 All output files are written to the directory specified by `--outdir` (default: `./nf_output`).
 
+Output folders are **numbered in pipeline order**. A folder is only created when the step that
+fills it actually runs, so gaps in the numbering are normal — a `--bam_input` run has no
+`1_sra_downloads/`, one without any `--plink_*` flag has no `9_plink/`.
+
+```
+<outdir>/
+├── 1_sra_downloads/   Accession URLs + dropped-sample report     read input
+├── 2_reference/       Length-filtered reference genome            --min_contig_length
+├── 3_fastq_stats/     Per-sample fastp JSON + summary table       read input
+├── 4_bwa_mapping/     Per-sample flagstat JSON + summary table    read input
+├── 5_bam_files/       Per-sample duplicate-marked BAM files       --keep_bam
+├── 6_gvcf_files/      Per-sample GVCF files                       --keep_gvcf
+├── 7_variants/        Final VCFs and variant quality metrics      always
+├── 8_popgen_vcf/      Thinned, MAF-filtered population VCF        always
+├── 9_plink/           PCA, relatedness and LD pruning results     any --plink_*
+└── 10_reports/        HTML QC report and run statistics           always
+```
+
 ---
 
-## VCF files
+## `1_sra_downloads/`
+
+The three accession files are only generated when `--SRA_index` is used.
+`ignored_samples.txt` is written for any read-based run, including `--reads` only.
+
+| File | Description |
+|------|-------------|
+| `NCBI_download_urls.tsv` | Resolved SRR accessions, layout (PE/SE), and download URLs |
+| `NCBI_SRR_PE_accessions.txt` | List of all paired-end SRR run IDs |
+| `NCBI_SRR_SE_accessions.txt` | List of all single-end SRR run IDs |
+| `ignored_samples.txt` | Samples dropped before variant calling, split by the stage that dropped them. Always written, even when nothing was dropped. |
+
+!!! warning "Check `ignored_samples.txt` before treating a run as complete"
+    Read downloading and trimming are configured to give up on a sample rather
+    than abort the whole run. When that happens the sample is **missing from the
+    final VCF**, but the pipeline still finishes successfully — nothing in the
+    Nextflow summary flags it.
+
+    This file names every such sample, and the same list appears in the
+    **Sample completeness** section at the top of
+    `10_reports/pipeline_report.html`. If it reports `Total dropped: 0`, the panel
+    is complete.
+
+---
+
+## `2_reference/`
+
+Only generated when `--min_contig_length` is set.
+
+| File | Description |
+|------|-------------|
+| `<reference>.red.fasta` | The reference genome with all contigs shorter than the threshold removed. This filtered FASTA is what the rest of the run maps and calls against. |
+| `<reference>.filter_stats.txt` | Number and total length of contigs kept and discarded. |
+
+---
+
+## `3_fastq_stats/`
+
+Read-trimming QC, one JSON per sample plus a combined table. Not generated for `--bam_input` runs.
+
+| File | Description |
+|------|-------------|
+| `<sample>_PE_fastp.json` / `<sample>_SE_fastp.json` | Raw per-sample fastp report. |
+| `fastp_summary.tsv` | Per-sample fastp statistics (reads before/after trimming, Q20/Q30 rates, GC content, etc.). Wide format — one column per sample. |
+
+---
+
+## `4_bwa_mapping/`
+
+Alignment QC, one JSON per sample plus a combined table. Not generated for `--bam_input` runs.
+
+| File | Description |
+|------|-------------|
+| `<sample>_flagstat.json` | Raw per-sample `samtools flagstat` output. |
+| `bwa_summary.tsv` | Per-sample BWA-mem2 alignment statistics (total reads, mapped reads, mapping rate, etc.). Wide format — one column per sample. |
+
+---
+
+## `5_bam_files/`
+
+Saved when `--keep_bam true` is set. Contains per-sample, coordinate-sorted, duplicate-marked BAM files and their `.bai` index files.
+
+```
+<sample>_RG_dedup.bam
+<sample>_RG_dedup.bam.bai
+```
+
+---
+
+## `6_gvcf_files/`
+
+Saved when `--keep_gvcf true` is set. Contains per-sample GVCF files emitted by GATK HaplotypeCaller before joint genotyping. When the reference is processed in segments (`--reference_segments` > 0), the per-segment GVCFs are concatenated into one file per sample.
+
+---
+
+## `7_variants/`
 
 ### `final_variants.vcf.gz` / `.tbi`
 
@@ -27,7 +120,18 @@ Filtration criteria applied:
 
 High-quality VCF containing only variants with **`FILTER = PASS`** — a subset of `final_variants.vcf.gz`.
 
-### `final_variants.thin1000_maf0.05_maxm0.9.recode.vcf.gz`
+### Variant quality metrics
+
+| File | Description |
+|------|-------------|
+| `final_variants.metrics.csv.gz` | Compressed CSV of per-variant quality metrics (`CHROM`, `POS`, `QUAL`, `AN`, `MQ`, `DP`, `QD`), subsampled to ~1000 sites. These are the data behind the variant-quality plots in the HTML report. |
+| `final_variants.variant_stats.tsv` | Counts of SNPs and indels, both total and `PASS`-only. |
+
+---
+
+## `8_popgen_vcf/`
+
+### `final_variants.clean.vcf_thin1000_maf0.05_maxm0.9.recode.vcf.gz`
 
 Population-genetics VCF produced by vcftools with three filters applied simultaneously:
 
@@ -35,30 +139,58 @@ Population-genetics VCF produced by vcftools with three filters applied simultan
 - **MAF ≥ 0.05**: minor allele frequency filter
 - **Max missing ≤ 0.1**: at least 90% genotyping rate per site
 
+This is the input for every analysis in `9_plink/`.
+
 ---
 
-## SRA download logs
+## `9_plink/`
 
-These files are only generated when `--SRA_index` is used.
+Only generated when the corresponding flag is set. All files are derived from the
+population-genetics VCF above. Each analysis also writes a PLINK `.log` file recording the exact
+command and the number of samples and variants used.
+
+### `--plink_pca`
 
 | File | Description |
 |------|-------------|
-| `NCBI_download_urls.tsv` | Resolved SRR accessions, layout (PE/SE), and download URLs |
-| `NCBI_SRR_PE_accessions.txt` | List of all paired-end SRR run IDs |
-| `NCBI_SRR_SE_accessions.txt` | List of all single-end SRR run IDs |
+| `popgen_pca.eigenvec` | Per-sample principal component coordinates. One row per sample; columns `IID`, `PC1`, `PC2`, … |
+| `popgen_pca.eigenval` | Eigenvalue of each principal component, in order. Use to compute the variance explained per PC. |
 
----
+### `--plink_relationships`
 
-## QC summary tables
+Two square, tab-separated matrices describing pairwise relatedness, both computed over the same
+samples and variants. Rows and columns follow the order of the accompanying `.id` file.
 
 | File | Description |
 |------|-------------|
-| `fastp_summary.tsv` | Per-sample fastp statistics (reads before/after trimming, Q20/Q30 rates, GC content, etc.). Wide format — one column per sample. |
-| `bwa_summary.tsv` | Per-sample BWA-mem2 alignment statistics (total reads, mapped reads, mapping rate, etc.). Wide format — one column per sample. |
+| `popgen_relationships.rel` | Genomic relationship matrix (GRM) from `--make-rel`: an allele-sharing correlation matrix. Diagonal ≈ 1 (self-relatedness), a parent–child pair ≈ 0.5, unrelated ≈ 0. Negative values are normal and mean a pair is less similar than the sample average. |
+| `popgen_relationships.rel.id` | Sample IDs, in the row and column order of `.rel`. |
+| `popgen_relationships.king` | KING kinship coefficients from `--make-king`, an identity-by-descent estimate. Diagonal is 0.5 (self-kinship), a parent–child or full-sibling pair ≈ 0.25, second-degree ≈ 0.125, unrelated ≈ 0. More robust than the GRM when population structure is present. |
+| `popgen_relationships.king.id` | Sample IDs, in the row and column order of `.king`. |
+
+Use the KING matrix to identify and filter relatives or duplicate samples, and the GRM where a
+downstream method expects one (mixed models, heritability, kinship-aware association testing). See
+[Configuration](configuration.md#choosing-between-the-two-relationship-matrices) for the full
+comparison.
+
+!!! warning "KING requires heterozygous genotypes"
+    The KING estimator divides by the heterozygous site count of the less heterozygous sample in
+    each pair, so any pair where one sample has no heterozygous calls is reported as `-inf`. This
+    covers haploid (`--ploidy 1`) data as well as fully homozygous diploid panels — inbred lines,
+    selfing species, clonal isolates — and raising `--ploidy` does not change it. Use the `.rel`
+    matrix in those cases.
+
+### `--plink_ld_prune`
+
+| File | Description |
+|------|-------------|
+| `popgen_ld_pruned.prune.in` | IDs (`chrom:pos`) of variants retained after pruning — an approximately LD-independent subset. |
+| `popgen_ld_pruned.prune.out` | IDs of variants removed because they exceeded the r² threshold. |
+| `popgen_ld_pruned.vcf.gz` | The population-genetics VCF restricted to the retained variants. Subset from the input VCF, so genotypes, ploidy and all `FORMAT` fields are preserved unchanged. |
 
 ---
 
-## HTML quality-control report
+## `10_reports/`
 
 ### `pipeline_report.html`
 
@@ -70,54 +202,10 @@ A self-contained HTML report with three sections:
 
 The report uses inline PDF-embedded plots (font-independent) and requires no external dependencies to view.
 
----
-
-## Pipeline statistics
+### Pipeline statistics
 
 | File | Format | Description |
 |------|--------|-------------|
-| `pipeline_execution_stats.txt` | Human-readable | Per-process-type summary: task count, average/min/max wall-clock time. |
+| `pipeline_execution_stats.txt` | Human-readable | Per-process-type summary: task count, average/min/max wall-clock time, peak memory. |
 | `pipeline_execution_stats.tsv` | TSV | Machine-readable version of the above. Useful for benchmarking and resource optimisation. |
-
----
-
-## Per-sample intermediate files (optional)
-
-### `bam_files/`
-
-Saved when `--keep_bam true` is set. Contains per-sample, coordinate-sorted, duplicate-marked BAM files and their `.bai` index files.
-
-```
-<sample>_RG_dedup.bam
-<sample>_RG_dedup.bam.bai
-```
-
-### `gvcf_files/`
-
-Saved when `--keep_gvcf true` is set. Contains per-sample GVCF files emitted by GATK HaplotypeCaller before joint genotyping.
-
----
-
-## Variant quality plots
-
-### `qual_plots/`
-
-Per-metric quality plots for the unfiltered VCF, saved as individual PDF files and a compressed CSV of the underlying data:
-
-| File | Description |
-|------|-------------|
-| `final_variants.metrics.csv.gz` | Compressed CSV of all per-variant quality metrics |
-| `final_variants.plots.AN.pdf` | Density plot of samples genotyped per site (`AN`) |
-| `final_variants.plots.DP.pdf` | Density plot of total read depth (`DP`) |
-| `final_variants.plots.MQ.pdf` | Density plot of mapping quality (`MQ`) |
-| `final_variants.plots.QD.pdf` | Density plot of quality by depth (`QD`) |
-| `final_variants.plots.QUAL.pdf` | Density plot of variant quality score (`QUAL`) |
-
----
-
-## Per-sample statistics directories
-
-| Directory | Contents |
-|-----------|----------|
-| `fastp_stats/` | Per-sample fastp JSON and HTML reports |
-| `bwa_stats/` | Per-sample BWA-mem2 alignment summary files |
+| `pipeline_trace.txt` | TSV | The raw Nextflow execution trace — one row per task, written live during the run. The statistics above are derived from it. |
