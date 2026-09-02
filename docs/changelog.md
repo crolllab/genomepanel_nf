@@ -13,6 +13,7 @@
 - **All parameters and input files are validated before any task is submitted.** The new `validate_params` module reports every problem in a single block instead of failing partway through a run, and the startup banner gained a `Resolved inputs` section listing the read pairs, BAM files and accessions actually found. All input channels use `checkIfExists`, and both BAM index naming conventions (`sample.bam.bai` and `sample.bai`) are accepted.
 - **Outputs are reorganised into numbered directories** following the order of the pipeline: `1_sra_downloads/`, `2_reference/`, `3_fastq_stats/`, `4_bwa_mapping/`, `5_bam_files/`, `6_gvcf_files/`, `7_variants/`, `8_popgen_vcf/`, `9_plink/` and `10_reports/`.
 - **`--workdir` removed.** It was never used; set the work directory with Nextflow's own `-work-dir`.
+- **Nextflow 26 language compatibility.** The pipeline parses cleanly under the strict language parser that became the default in Nextflow 26.04. Constructs it no longer accepts — `switch`, C-style `for`, `while`, `++`/`--` and assignments inside expressions — have been rewritten, and every deprecation warning (implicit closure parameters, `Channel` in place of `channel`, unused closure parameters) is resolved. `nextflow lint` reports no errors and no warnings.
 
 ### Improvements
 

@@ -46,7 +46,7 @@ process ReportIgnoredSamples {
     lines << "# its retries. Re-run to try again, or fetch the reads manually and pass"
     lines << "# them with --reads."
     if (dropped_dl) {
-        dropped_dl.each { lines << it }
+        dropped_dl.each { d -> lines << d }
     } else {
         lines << "# (none)"
     }
@@ -56,7 +56,7 @@ process ReportIgnoredSamples {
     lines << "# Reads were available but trimSequencesPE/SE exhausted its retries."
     lines << "# Usually a truncated or corrupt FASTQ, or an out-of-memory kill."
     if (dropped_trim) {
-        dropped_trim.each { lines << it }
+        dropped_trim.each { t -> lines << t }
     } else {
         lines << "# (none)"
     }

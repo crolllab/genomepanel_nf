@@ -56,11 +56,11 @@ workflow gp_wf {
     // ---------------------
     if (params.min_contig_length && params.min_contig_length != false) {
         // Filter reference by contig length
-        filterReference(Channel.fromPath(params.reference, checkIfExists: true), params.min_contig_length)
+        filterReference(channel.fromPath(params.reference, checkIfExists: true), params.min_contig_length)
         reference_to_use = filterReference.out.filtered_fasta.collect()
     } else {
         // Use original reference
-        reference_to_use = Channel.fromPath(params.reference, checkIfExists: true).collect()
+        reference_to_use = channel.fromPath(params.reference, checkIfExists: true).collect()
     }
 
     // ---------------------
@@ -82,7 +82,7 @@ workflow gp_wf {
 
     // Input SRA index file
     // Step 0: Make a channel from the SRA index file
-    sra_file_ch = Channel.fromPath(params.SRA_index, checkIfExists: true)
+    sra_file_ch = channel.fromPath(params.SRA_index, checkIfExists: true)
     
     // First run SRAresolve to get SRR IDs and URLs
     SRAresolve(sra_file_ch)
@@ -93,23 +93,23 @@ workflow gp_wf {
     
     // Split into PE and SE channels with URL information
     pe_with_urls = url_data
-        .filter { it.Layout == 'PE' }
-        .map { tuple(it.SRR_ID, it.URL_1 ?: "", it.URL_2 ?: "", it.Source ?: "NCBI") }
+        .filter { row -> row.Layout == 'PE' }
+        .map { row -> tuple(row.SRR_ID, row.URL_1 ?: "", row.URL_2 ?: "", row.Source ?: "NCBI") }
     
     se_with_urls = url_data
-        .filter { it.Layout == 'SE' }
-        .map { tuple(it.SRR_ID, it.URL_1 ?: "", it.Source ?: "NCBI") }
+        .filter { row -> row.Layout == 'SE' }
+        .map { row -> tuple(row.SRR_ID, row.URL_1 ?: "", row.Source ?: "NCBI") }
 
     // Every accession SRAresolve managed to resolve. Kept so that accessions
     // lost to the download step's 'ignore' strategy can be named at the end.
-    sra_expected_ids = pe_with_urls.map { it[0] }.mix(se_with_urls.map { it[0] })
+    sra_expected_ids = pe_with_urls.map { t -> t[0] }.mix(se_with_urls.map { t -> t[0] })
 
     // Now run downloads with URL information for hybrid approach
     SRAdownloadPE(pe_with_urls)
     SRAdownloadSE(se_with_urls)
 
     } else {
-        sra_expected_ids = Channel.empty()
+        sra_expected_ids = channel.empty()
     }
 
     // ---------------------
@@ -117,9 +117,9 @@ workflow gp_wf {
     // ---------------------
     if (params.reads) {
         // Support semicolon-separated list of glob patterns (e.g. 'path1/**/{1,2}.fastq.gz;path2/**/{1,2}.fastq.gz')
-        def reads_patterns = params.reads.tokenize(';').collect { it.trim() }
+        def reads_patterns = params.reads.tokenize(';').collect { pat -> pat.trim() }
         // Create channel from read pairs - let Nextflow handle the pairing
-        read_pairs_local_ch = Channel.fromFilePairs(
+        read_pairs_local_ch = channel.fromFilePairs(
             reads_patterns,
             flat: false, // keeps paired R1/R2 in a tuple
             size: 2,  // expect exactly 2 files per pair
@@ -128,14 +128,14 @@ workflow gp_wf {
         
         // Reformat to extract proper sample IDs
         // Find common prefix between paired files to use as sample ID
-        local_pe_formatted = read_pairs_local_ch.map { sample_id, reads_list ->
+        local_pe_formatted = read_pairs_local_ch.map { _sample_id, reads_list ->
             // Get basenames without extensions
             def name1 = reads_list[0].name.replaceAll(/\.(fastq|fq)(\.gz)?$/, '')
             def name2 = reads_list[1].name.replaceAll(/\.(fastq|fq)(\.gz)?$/, '')
             
             // Find longest common prefix (this is the true sample ID)
             def minLen = Math.min(name1.length(), name2.length())
-            def commonPrefix = (0..<minLen).takeWhile { name1[it] == name2[it] }.collect { name1[it] }.join('')
+            def commonPrefix = (0..<minLen).takeWhile { i -> name1[i] == name2[i] }.collect { i -> name1[i] }.join('')
             
             // Remove trailing separators (_, ., -)
             commonPrefix = commonPrefix.replaceAll(/[._-]+$/, '')
@@ -143,7 +143,7 @@ workflow gp_wf {
             return [commonPrefix, reads_list[0], reads_list[1], 'local']
         }
     } else {
-        local_pe_formatted = Channel.empty()
+        local_pe_formatted = channel.empty()
     }
 
 
@@ -155,8 +155,8 @@ workflow gp_wf {
         sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, 'SRA'] }
         sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, 'SRA'] }
     } else {
-        sra_pe_formatted = Channel.empty()
-        sra_se_formatted = Channel.empty()
+        sra_pe_formatted = channel.empty()
+        sra_se_formatted = channel.empty()
     }
 
     combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
@@ -195,14 +195,14 @@ workflow gp_wf {
     // the difference to 1_sra_downloads/ignored_samples.txt. Sample renaming
     // via --SRR_sample_map happens later (at addRG), so IDs are directly
     // comparable here.
-    entered_trimming_ids = combined_pe_ch.map { it[0] }.mix(sra_se_formatted.map { it[0] })
-    downloaded_ids       = sra_pe_formatted.map { it[0] }.mix(sra_se_formatted.map { it[0] })
+    entered_trimming_ids = combined_pe_ch.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
+    downloaded_ids       = sra_pe_formatted.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
 
     ReportIgnoredSamples(
         sra_expected_ids.collect().ifEmpty([]),
         downloaded_ids.collect().ifEmpty([]),
         entered_trimming_ids.collect().ifEmpty([]),
-        trimmed_ch.map { it[0] }.collect().ifEmpty([])
+        trimmed_ch.map { t -> t[0] }.collect().ifEmpty([])
     )
     ignored_report_ch = ReportIgnoredSamples.out.report
 
@@ -214,11 +214,11 @@ workflow gp_wf {
     if (params.bwa_index) {
         // Use provided BWA index files
         // Collect into value channels that can be reused for each sample
-        bwa_amb = Channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
-        bwa_ann = Channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
-        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
-        bwa_pac = Channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
-        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
+        bwa_amb = channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
+        bwa_ann = channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
+        bwa_bwt = channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
+        bwa_pac = channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
+        bwa_0123 = channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
     } else {
         // Build BWA index from reference - returns 5 separate outputs
         (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
@@ -246,9 +246,9 @@ workflow gp_wf {
     // If a sample map file is provided, use it; otherwise use an empty placeholder file
     // The placeholder file must exist so Channel.fromPath can stage it properly
     if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
-        sample_map_file = Channel.fromPath(params.SRR_sample_map, checkIfExists: true).collect()
+        sample_map_file = channel.fromPath(params.SRR_sample_map, checkIfExists: true).collect()
     } else {
-        sample_map_file = Channel.fromPath("${projectDir}/NO_SAMPLE_MAP.txt", checkIfExists: false).collect()
+        sample_map_file = channel.fromPath("${projectDir}/NO_SAMPLE_MAP.txt", checkIfExists: false).collect()
     }
 
     // Updated workflow
@@ -266,13 +266,13 @@ workflow gp_wf {
     // Like --reads, several locations may be given, separated by semicolons.
     // Indexes are checked up front in validateParams(); this repeats the lookup
     // only to pick whichever of the two naming conventions is actually present.
-    def bam_patterns = params.bam_input.tokenize(';').collect { it.trim() }.findAll { it }
-    bam_ch = Channel
+    def bam_patterns = params.bam_input.tokenize(';').collect { pat -> pat.trim() }.findAll { pat -> pat }
+    bam_ch = channel
         .fromPath(bam_patterns, checkIfExists: true)
         .map { bam_file ->
             def sample_name = bam_file.baseName.replaceAll(/_RG_dedup$/, '')
             def bai_file = [ file("${bam_file}.bai"),
-                             file("${bam_file.parent}/${bam_file.baseName}.bai") ].find { it.exists() }
+                             file("${bam_file.parent}/${bam_file.baseName}.bai") ].find { f -> f.exists() }
             if (!bai_file) {
                 error "No BAM index found for ${bam_file}.\nExpected ${bam_file}.bai or ${bam_file.parent}/${bam_file.baseName}.bai — create one with: samtools index ${bam_file}"
             }
@@ -280,16 +280,16 @@ workflow gp_wf {
         }
     
     dedup_with_index = loadBAMs(bam_ch).bam
-    bams_to_cleanup = Channel.empty()   // user-provided BAMs are never deleted by the pipeline
+    bams_to_cleanup = channel.empty()   // user-provided BAMs are never deleted by the pipeline
     
     // When using BAM input, BWA indices aren't needed but GATKHC module expects them
     // Use the same BWA index logic as for read processing
     if (params.bwa_index) {
-        bwa_amb = Channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
-        bwa_ann = Channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
-        bwa_bwt = Channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
-        bwa_pac = Channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
-        bwa_0123 = Channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
+        bwa_amb = channel.fromPath("${params.bwa_index}.amb", checkIfExists: true).collect()
+        bwa_ann = channel.fromPath("${params.bwa_index}.ann", checkIfExists: true).collect()
+        bwa_bwt = channel.fromPath("${params.bwa_index}.bwt.2bit.64", checkIfExists: true).collect()
+        bwa_pac = channel.fromPath("${params.bwa_index}.pac", checkIfExists: true).collect()
+        bwa_0123 = channel.fromPath("${params.bwa_index}.0123", checkIfExists: true).collect()
     } else {
         // Build BWA index from reference even for BAM input (needed by GATKHC module)
         (bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123) = bwaIndex(reference_to_use)
@@ -337,7 +337,7 @@ workflow gp_wf {
     
     // dedup_interval_ch structure: [sample_id, bam, bai, chr, interval_name, interval_key]
     // GATKHC needs: [sample_id, bam, bai, interval_name, chr]
-    dedup_for_gatk = dedup_interval_ch.map { sample_id, bam, bai, chr, interval_name, interval_key ->
+    dedup_for_gatk = dedup_interval_ch.map { sample_id, bam, bai, chr, interval_name, _interval_key ->
         [sample_id, bam, bai, interval_name, chr]
     }
     
@@ -362,7 +362,7 @@ workflow gp_wf {
     // ---------------------
     if (params.keep_gvcf && segment_size > 0) {
         gvcf_by_sample = gvcf
-            .map { sample_id, chr, files -> [sample_id, files] }
+            .map { sample_id, _chr, files -> [sample_id, files] }
             .groupTuple(by: 0)
             .map { sample_id, file_lists -> [sample_id, file_lists.flatten()] }
         MergeGVCFs(gvcf_by_sample)
@@ -377,12 +377,12 @@ workflow gp_wf {
     // We need to group by [chr, interval] to keep segments separate
     // First, add back interval information for grouping
     gvcf_with_interval = gvcf.combine(intervals_ch)
-        .filter { sample_id, gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+        .filter { _sample_id, gvcf_chr, gvcf_files, int_chr, _int_name, int_key ->
             // Match GVCF files with their corresponding interval
             // Check if any file contains the interval key
-            gvcf_chr == int_chr && gvcf_files.any { it.name.contains(int_key.replaceAll('[:\\-]', '_')) }
+            gvcf_chr == int_chr && gvcf_files.any { f -> f.name.contains(int_key.replaceAll('[:\\-]', '_')) }
         }
-        .map { sample_id, gvcf_chr, gvcf_files, int_chr, int_name, int_key ->
+        .map { _sample_id, _gvcf_chr, gvcf_files, int_chr, int_name, _int_key ->
             // Return [interval_name, chr, files] for processing
             [int_name, int_chr, gvcf_files]
         }
@@ -416,7 +416,7 @@ workflow gp_wf {
     // Concatenate all segments to create final VCFs
     // ---------------------
     // Extract just the file paths from the tuples (drop chr and interval) before collecting
-    clean_vcf_ch = clean_vcf.map{ chr, interval, files -> files }.collect()
+    clean_vcf_ch = clean_vcf.map{ _chr, _interval, files -> files }.collect()
     concat_clean_vcf = ConcatCleanVCFs(clean_vcf_ch)
 
     // Use clean VCF to produce a MAF, thinned VCF for e.g. PCA/clustering analyses
@@ -425,7 +425,7 @@ workflow gp_wf {
     // ---------------------
     // Optional PLINK analyses on the pop. gen. VCF
     // ---------------------
-    plink_done = Channel.empty()
+    plink_done = channel.empty()
     if (params.plink_pca) {
         PlinkPCA(popgen_vcf)
         plink_done = plink_done.mix(PlinkPCA.out[0])
@@ -443,15 +443,15 @@ workflow gp_wf {
     // Concat all variants (incl. low qual)
     // ---------------------
     // Extract just the file paths from the tuples before collecting
-    fvcf_ch = fvcf.map{ chr, interval, files -> files }.collect()
+    fvcf_ch = fvcf.map{ _chr, _interval, files -> files }.collect()
     concat_vcf = ConcatVCFs(fvcf_ch)
 
     // ---------------------
     // R QC report + optional FASTP/BWA summaries
     // ---------------------
-    fastp_summary_script = Channel.value(file("${projectDir}/modules/r_process_summary_fastp.R"))
-    bwa_summary_script   = Channel.value(file("${projectDir}/modules/r_process_summary_bwa.R"))
-    qual_plot_script     = Channel.value(file("${projectDir}/modules/r_plotting.R"))
+    fastp_summary_script = channel.value(file("${projectDir}/modules/r_process_summary_fastp.R"))
+    bwa_summary_script   = channel.value(file("${projectDir}/modules/r_process_summary_bwa.R"))
+    qual_plot_script     = channel.value(file("${projectDir}/modules/r_plotting.R"))
 
     if (!params.bam_input) {
         RSummarizingFASTP(fastp_json_ch, fastp_summary_script)
@@ -459,8 +459,8 @@ workflow gp_wf {
         // Pass TSV summary files to the plotting process
         RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out,
             ignored_report_ch, qual_plot_script,
-            Channel.value(workflow.manifest.version),
-            Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
+            channel.value(workflow.manifest.version),
+            channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         // Mix all final outputs including R summaries and the HTML report
         all_done = concat_clean_vcf.mix(concat_vcf)
@@ -472,10 +472,10 @@ workflow gp_wf {
     } else {
         // For BAM input, no FASTP/BWA TSV files available. Nothing can be
         // dropped by download or trimming either, so no ignored-sample report.
-        RQualPlotting(concat_vcf, Channel.value([]), Channel.value([]),
-            Channel.value([]), qual_plot_script,
-            Channel.value(workflow.manifest.version),
-            Channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
+        RQualPlotting(concat_vcf, channel.value([]), channel.value([]),
+            channel.value([]), qual_plot_script,
+            channel.value(workflow.manifest.version),
+            channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         all_done = concat_clean_vcf.mix(concat_vcf)
             .mix(RQualPlotting.out.report)

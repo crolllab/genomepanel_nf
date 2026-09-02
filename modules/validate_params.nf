@@ -91,27 +91,25 @@ def patternSeparator() { return ';' }
 
 // A representative quoted pattern for each glob-valued parameter, used in messages.
 def exampleGlob(String name) {
-    switch (name?.replaceAll(/^--/, '')) {
-        case 'reads':     return "'path/to/reads/*_{1,2}.fastq.gz'"
-        case 'bam_input': return "'path/to/bams/*.bam'"
-        default:          return "'path/to/files/*'"
-    }
+    def examples = ['reads'    : "'path/to/reads/*_{1,2}.fastq.gz'",
+                    'bam_input': "'path/to/bams/*.bam'"]
+    return examples.get(name?.replaceAll(/^--/, ''), "'path/to/files/*'")
 }
 
 def splitPatterns(value) {
-    return value.toString().tokenize(patternSeparator()).collect { it.trim() }.findAll { it }
+    return value.toString().tokenize(patternSeparator()).collect { pat -> pat.trim() }.findAll { pat -> pat }
 }
 
 // True if the string contains a comma that is not inside {...} alternation.
 def hasCommaOutsideBraces(String s) {
-    int depth = 0
-    for (int i = 0; i < s.length(); i++) {
-        def c = s.charAt(i) as char
-        if (c == '{' as char) depth++
-        else if (c == '}' as char) depth--
-        else if (c == ',' as char && depth <= 0) return true
+    def depth = 0
+    def found = false
+    s.each { c ->
+        if (c == '{') depth += 1
+        else if (c == '}') depth -= 1
+        else if (c == ',' && depth <= 0) found = true
     }
-    return false
+    return found
 }
 
 // When a pattern matches nothing, work out whether the user reached for the wrong
@@ -131,7 +129,7 @@ def separatorHint(String name, String value) {
                 "  ${example}"]
 
     def words = value.trim().split(/\s+/)
-    if (words.size() > 1 && words.findAll { it.contains('/') || it.contains('*') }.size() > 1)
+    if (words.size() > 1 && words.findAll { w -> w.contains('/') || w.contains('*') }.size() > 1)
         return ["This looks like two or more patterns separated by spaces. Join them with a",
                 "semicolon, inside one set of quotes:",
                 "  ${example}"]
@@ -149,7 +147,7 @@ def globMatches(String pattern) {
             return resolved
         return resolved.exists() ? [resolved] : []
     }
-    catch (Exception e) {
+    catch (Exception _e) {
         return []
     }
 }
@@ -161,7 +159,7 @@ def hasGlobChars(String s) {
 // Absolute path for display, so "no such file" messages show where we looked.
 def displayPath(String p) {
     try { return file(p.trim()).toAbsolutePath().toString() }
-    catch (Exception e) { return p }
+    catch (Exception _e) { return p }
 }
 
 def humanBytes(long n) {
@@ -195,14 +193,14 @@ def checkInteger(String name, value, Map opts, List problems) {
 
     if (value == null || value.toString().trim().isEmpty()) {
         if (required)
-            addProblem(problems, "--${name} is required but was not given", [purpose, example].findAll { it })
+            addProblem(problems, "--${name} is required but was not given", [purpose, example].findAll { d -> d })
         return null
     }
 
     if (value instanceof Boolean) {
         addProblem(problems, "--${name} was given without a value",
                    ["A number must follow the flag. Check for a missing value or a dropped line continuation (\\).",
-                    example].findAll { it })
+                    example].findAll { d -> d })
         return null
     }
 
@@ -210,14 +208,14 @@ def checkInteger(String name, value, Map opts, List problems) {
     if (!(text ==~ /^-?\d+$/)) {
         addProblem(problems, "--${name} must be a whole number, but was '${text}'",
                    ["Give a plain number of base pairs -- suffixes such as kb, Mb or Gb are not understood.",
-                    example].findAll { it })
+                    example].findAll { d -> d })
         return null
     }
 
     def parsed = text as Integer
     if (parsed < min) {
         addProblem(problems, "--${name} must be ${min} or greater, but was ${parsed}",
-                   [purpose, example].findAll { it })
+                   [purpose, example].findAll { d -> d })
         return null
     }
     return parsed
@@ -262,6 +260,14 @@ def fastaProblems(reference) {
     return problems
 }
 
+// Nearest ancestor of `p` that exists, or null. Recursive because the Nextflow
+// language parser no longer supports `while` loops.
+def nearestExisting(p) {
+    if (p == null) return null
+    if (p.exists()) return p
+    return nearestExisting(p.getParent())
+}
+
 // The output directory is only touched by publishDir, late in the run. Check it
 // up front so a read-only path fails now rather than after the variant calling.
 def outdirProblem(String outdir) {
@@ -270,9 +276,7 @@ def outdirProblem(String outdir) {
         if (target.exists() && !target.isDirectory())
             return "--outdir points at ${displayPath(outdir)}, which exists but is not a directory"
 
-        def probe = target
-        while (probe != null && !probe.exists())
-            probe = probe.getParent()
+        def probe = nearestExisting(target)
         if (probe == null)
             return "--outdir ${displayPath(outdir)} cannot be resolved to a writable location"
         if (!java.nio.file.Files.isWritable(probe))
@@ -290,7 +294,7 @@ def outdirProblem(String outdir) {
 // ---------------------
 
 // Returns the resolved reference Path, or null if it could not be used.
-def checkReference(List problems, List warnings, Map summary) {
+def checkReference(List problems, List _warnings, Map summary) {
     if (!params.reference) {
         addProblem(problems, "--reference is required but was not given",
                    ["The pipeline needs a reference genome in uncompressed FASTA format.",
@@ -310,7 +314,7 @@ def checkReference(List problems, List warnings, Map summary) {
     }
     if (matches.size() > 1) {
         addProblem(problems, "--reference matched ${matches.size()} files, but exactly one is required",
-                   ["Matched: ${matches.take(5).collect { it.name }.join(', ')}${matches.size() > 5 ? ', ...' : ''}",
+                   ["Matched: ${matches.take(5).collect { m -> m.name }.join(', ')}${matches.size() > 5 ? ', ...' : ''}",
                     "Point --reference at a single FASTA file rather than a glob pattern."])
         return null
     }
@@ -330,7 +334,7 @@ def checkReference(List problems, List warnings, Map summary) {
 // container into a startup message. The scan stops at the first contig that clears
 // the threshold, so the common (passing) case costs almost nothing and only the
 // failing case reads the whole file -- which is exactly when the answer is wanted.
-def checkMinContigLength(reference, List problems, List warnings, Map summary) {
+def checkMinContigLength(reference, List problems, List _warnings, Map _summary) {
     if (reference == null) return
     def raw = params.min_contig_length
     if (raw == null || raw == false || raw.toString().trim().toLowerCase() == 'false') return
@@ -342,31 +346,32 @@ def checkMinContigLength(reference, List problems, List warnings, Map summary) {
     def kept    = 0
     def contigs = 0
 
+    def SHORT_CIRCUIT = '__genomepanel_nf_contig_found__'
     try {
-        reference.withReader { r ->
-            String line
-            while ((line = r.readLine()) != null) {
-                if (line.startsWith('>')) {
-                    if (contigs > 0) {
-                        if (current > longest) longest = current
-                        if (current >= threshold) kept++
-                    }
-                    contigs++
-                    current = 0
-                    if (kept > 0) return    // at least one contig survives; stop reading
+        reference.eachLine { line ->
+            if (line.startsWith('>')) {
+                if (contigs > 0) {
+                    if (current > longest) longest = current
+                    if (current >= threshold) kept += 1
                 }
-                else {
-                    current += line.trim().length()
-                }
+                contigs += 1
+                current = 0
+                if (kept > 0) throw new RuntimeException(SHORT_CIRCUIT)
             }
-            if (contigs > 0) {
-                if (current > longest) longest = current
-                if (current >= threshold) kept++
+            else {
+                current += line.trim().length()
             }
+        }
+        // Only reached when the file ended without any contig clearing the threshold.
+        if (contigs > 0) {
+            if (current > longest) longest = current
+            if (current >= threshold) kept += 1
         }
     }
     catch (Exception e) {
-        return   // unreadable reference is reported by checkReference
+        // Our own stop signal means a contig passed; anything else is a read failure,
+        // which checkReference already reports.
+        if (e.message != SHORT_CIRCUIT) return
     }
 
     if (kept == 0) {
@@ -396,7 +401,7 @@ def checkReads(List problems, List warnings, Map summary) {
     }
 
     if (allMatches.isEmpty()) {
-        def detail = ["Looked for: ${patterns.collect { displayPath(it) }.join('\n                 ')}",
+        def detail = ["Looked for: ${patterns.collect { pat -> displayPath(pat) }.join('\n                 ')}",
                       "",
                       "The pipeline would otherwise index the reference and finish without calling",
                       "any variants, so this is treated as a fatal error.",
@@ -413,7 +418,7 @@ def checkReads(List problems, List warnings, Map summary) {
             detail << "  * the read-number token does not match the files, e.g. the pattern says"
             detail << "    {1,2} but the files are named _R1/_R2"
             detail << "  * a relative path resolved against the launch directory, not the script"
-            if (!patterns.any { hasGlobChars(it) })
+            if (!patterns.any { pat -> hasGlobChars(pat) })
                 detail << "  * the pattern contains no wildcard at all, so it can only match one exact file"
         }
         addProblem(problems, "--reads matched no files", detail)
@@ -426,15 +431,15 @@ def checkReads(List problems, List warnings, Map summary) {
     }
 
     // Group by sample key to report pairs and, more usefully, leftovers.
-    def grouped  = allMatches.unique { it.toAbsolutePath().toString() }.groupBy { readPairKey(it.name) }
-    def pairs    = grouped.findAll { k, v -> v.size() == 2 }
-    def unpaired = grouped.findAll { k, v -> v.size() == 1 }
-    def crowded  = grouped.findAll { k, v -> v.size() > 2 }
+    def grouped  = allMatches.unique { f -> f.toAbsolutePath().toString() }.groupBy { f -> readPairKey(f.name) }
+    def pairs    = grouped.findAll { _k, v -> v.size() == 2 }
+    def unpaired = grouped.findAll { _k, v -> v.size() == 1 }
+    def crowded  = grouped.findAll { _k, v -> v.size() > 2 }
 
     if (pairs.isEmpty()) {
-        def detail = ["Files found: ${allMatches.take(6).collect { it.name }.join(', ')}${allMatches.size() > 6 ? ', ...' : ''}",
+        def detail = ["Files found: ${allMatches.take(6).collect { f -> f.name }.join(', ')}${allMatches.size() > 6 ? ', ...' : ''}",
                       ""]
-        if (allMatches.size() == 1 && !patterns.any { hasGlobChars(it) }) {
+        if (allMatches.size() == 1 && !patterns.any { pat -> hasGlobChars(pat) }) {
             detail << "--reads was given one plain file path with no wildcard in it. If you meant to"
             detail << "pass a pattern, quote it so the shell hands it to Nextflow intact:"
             detail << "  --reads 'path/to/reads/*_{1,2}.fastq.gz'"
@@ -450,7 +455,7 @@ def checkReads(List problems, List warnings, Map summary) {
 
     if (unpaired) {
         warnings << ("--reads: ${unpaired.size()} file(s) have no mate and will be silently ignored: " +
-                     unpaired.values().flatten().take(6).collect { it.name }.join(', ') +
+                     unpaired.values().flatten().take(6).collect { f -> f.name }.join(', ') +
                      (unpaired.size() > 6 ? ', ...' : ''))
     }
     if (crowded) {
@@ -459,10 +464,10 @@ def checkReads(List problems, List warnings, Map summary) {
                      crowded.keySet().take(6).join(', '))
     }
 
-    def emptyFiles = allMatches.findAll { it.size() == 0 }
+    def emptyFiles = allMatches.findAll { f -> f.size() == 0 }
     if (emptyFiles)
         warnings << ("--reads: ${emptyFiles.size()} matched file(s) are empty (0 bytes): " +
-                     emptyFiles.take(4).collect { it.name }.join(', '))
+                     emptyFiles.take(4).collect { f -> f.name }.join(', '))
 
     summary['Local FASTQ'] = "${allMatches.size()} files -> ${pairs.size()} read pair${pairs.size() == 1 ? '' : 's'}" +
                              (patterns.size() > 1 ? " from ${patterns.size()} patterns" : "")
@@ -489,7 +494,7 @@ def checkSraIndex(List problems, List warnings, Map summary) {
     def accessionFile = matches[0]
     def accessions
     try {
-        accessions = accessionFile.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }
+        accessions = accessionFile.readLines().collect { l -> l.trim() }.findAll { l -> l && !l.startsWith('#') }
     }
     catch (Exception e) {
         addProblem(problems, "--SRA_index file ${accessionFile.name} could not be read: ${e.message}")
@@ -502,7 +507,7 @@ def checkSraIndex(List problems, List warnings, Map summary) {
         return
     }
 
-    def malformed = accessions.findAll { !(it ==~ /^[A-Za-z]{2,6}[0-9]{3,}$/) }
+    def malformed = accessions.findAll { a -> !(a ==~ /^[A-Za-z]{2,6}[0-9]{3,}$/) }
     if (malformed)
         warnings << ("--SRA_index: ${malformed.size()} line(s) do not look like SRA/ENA accessions and " +
                      "will probably resolve to nothing: " + malformed.take(4).join(', '))
@@ -515,7 +520,7 @@ def checkSraIndex(List problems, List warnings, Map summary) {
     summary['SRA accessions'] = "${accessions.size()} from ${accessionFile.name}"
 }
 
-def checkSampleMap(List problems, List warnings, Map summary) {
+def checkSampleMap(List problems, List _warnings, Map summary) {
     if (!params.SRR_sample_map) return
     if (params.SRR_sample_map instanceof Boolean) return
 
@@ -531,7 +536,7 @@ def checkSampleMap(List problems, List warnings, Map summary) {
     def mapFile = matches[0]
     def lines
     try {
-        lines = mapFile.readLines().collect { it.trim() }.findAll { it }
+        lines = mapFile.readLines().collect { l -> l.trim() }.findAll { l -> l }
     }
     catch (Exception e) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} could not be read: ${e.message}")
@@ -546,7 +551,7 @@ def checkSampleMap(List problems, List warnings, Map summary) {
 
     // A tab-separated file is looked up with a comma-anchored grep in addRG, so
     // every lookup misses and every sample silently keeps its run ID.
-    if (lines.every { !it.contains(',') } && lines.any { it.contains('\t') }) {
+    if (lines.every { l -> !l.contains(',') } && lines.any { l -> l.contains('\t') }) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} is tab-separated, but must be comma-separated",
                    ["Sample names are looked up by comma, so a TSV would match nothing and every",
                     "sample would silently keep its original run ID.",
@@ -554,7 +559,7 @@ def checkSampleMap(List problems, List warnings, Map summary) {
         return
     }
 
-    def malformed = lines.findAll { it.tokenize(',').findAll { f -> f.trim() }.size() < 2 }
+    def malformed = lines.findAll { l -> l.tokenize(',').findAll { f -> f.trim() }.size() < 2 }
     if (malformed) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} has ${malformed.size()} malformed line(s)",
                    ["Each line needs two comma-separated fields: Run_ID,Sample_Name",
@@ -562,7 +567,7 @@ def checkSampleMap(List problems, List warnings, Map summary) {
         return
     }
 
-    def sampleNames = lines.collect { it.tokenize(',')[1].trim() }.unique()
+    def sampleNames = lines.collect { l -> l.tokenize(',')[1].trim() }.unique()
     summary['Sample map'] = "${lines.size()} run IDs -> ${sampleNames.size()} sample names"
 }
 
@@ -584,10 +589,10 @@ def checkBamInput(List problems, List warnings, Map summary) {
         if (found.isEmpty()) emptyPatterns << pattern
         matches.addAll(found)
     }
-    matches = matches.unique { it.toAbsolutePath().toString() }
+    matches = matches.unique { f -> f.toAbsolutePath().toString() }
 
     if (matches.isEmpty()) {
-        def detail = ["Looked for: ${patterns.collect { displayPath(it) }.join('\n                 ')}",
+        def detail = ["Looked for: ${patterns.collect { pat -> displayPath(pat) }.join('\n                 ')}",
                       "",
                       "The pipeline would otherwise index the reference and finish without calling",
                       "any variants, so this is treated as a fatal error.",
@@ -611,27 +616,27 @@ def checkBamInput(List problems, List warnings, Map summary) {
         addProblem(problems, "${missingIndex.size()} of ${matches.size()} BAM file(s) have no index",
                    (["Every BAM needs a .bai alongside it (either <name>.bam.bai or <name>.bai)."] +
                     ["Index with:  samtools index <file.bam>", "Missing for:"] +
-                    missingIndex.take(8).collect { "  ${it.name}" } +
+                    missingIndex.take(8).collect { f -> "  ${f.name}" } +
                     (missingIndex.size() > 8 ? ["  ... and ${missingIndex.size() - 8} more"] : [])))
         return
     }
 
-    def emptyFiles = matches.findAll { it.size() == 0 }
+    def emptyFiles = matches.findAll { f -> f.size() == 0 }
     if (emptyFiles)
         warnings << ("--bam_input: ${emptyFiles.size()} matched file(s) are empty (0 bytes): " +
-                     emptyFiles.take(4).collect { it.name }.join(', '))
+                     emptyFiles.take(4).collect { f -> f.name }.join(', '))
 
     summary['BAM files'] = "${matches.size()} files (all indexed)" +
                            (patterns.size() > 1 ? " from ${patterns.size()} patterns" : "")
 }
 
-def checkBwaIndex(List problems, List warnings, Map summary) {
+def checkBwaIndex(List problems, List _warnings, Map summary) {
     if (!params.bwa_index) return
     if (params.bwa_index instanceof Boolean) return
 
     def prefix     = params.bwa_index.toString().trim()
     def extensions = ['.amb', '.ann', '.bwt.2bit.64', '.pac', '.0123']
-    def missing    = extensions.findAll { !file("${prefix}${it}").exists() }
+    def missing    = extensions.findAll { ext -> !file("${prefix}${ext}").exists() }
 
     if (missing) {
         def detail = ["Prefix used: ${displayPath(prefix)}",
@@ -666,15 +671,12 @@ def checkStrayArguments(List problems, strayArgs) {
     try {
         def tokens = workflow.commandLine.tokenize(' ')
         def firstStray = tokens.indexOf(strays[0].toString())
-        if (firstStray > 0) {
-            for (int i = firstStray - 1; i >= 0; i--) {
-                if (tokens[i].startsWith('--')) { culprit = tokens[i]; break }
-            }
-        }
+        if (firstStray > 0)
+            culprit = tokens.take(firstStray).reverse().find { tok -> tok.startsWith('--') }
     }
-    catch (Exception e) { /* best effort only */ }
+    catch (Exception _e) { /* best effort only */ }
 
-    def existing = strays.findAll { file(it.toString()).exists() }
+    def existing = strays.findAll { s -> file(s.toString()).exists() }
     def detail = []
 
     if (culprit && existing.size() == strays.size()) {
@@ -692,7 +694,7 @@ def checkStrayArguments(List problems, strayArgs) {
 
     detail << ""
     detail << "Ignored:"
-    strays.take(5).each { detail << "  ${it}" }
+    strays.take(5).each { s -> detail << "  ${s}" }
     if (strays.size() > 5) detail << "  ... and ${strays.size() - 5} more"
 
     addProblem(problems,
@@ -718,7 +720,7 @@ def validateParams(strayArgs = null) {
     def aliases = nextflowOptionAliases()
     def unknown = (params.keySet() as Set) - knownParams()
 
-    def misusedOptions = unknown.findAll { aliases.containsKey(it) }
+    def misusedOptions = unknown.findAll { u -> aliases.containsKey(u) }
     misusedOptions.each { name ->
         addProblem(problems, "--${name} is not a pipeline parameter; you probably meant '${aliases[name]}'",
                    ["Nextflow's own options take a single dash. Passed with two dashes they become",
@@ -729,7 +731,7 @@ def validateParams(strayArgs = null) {
     if (realUnknown) {
         addProblem(problems, "Unknown parameter(s): ${realUnknown.sort().join(', ')}",
                    ["Valid parameters are:"] +
-                   knownParams().sort().collect { "  --${it}" } +
+                   knownParams().sort().collect { k -> "  --${k}" } +
                    ["", "Run with --help for a description of each."])
     }
 

@@ -45,7 +45,7 @@ workflow {
        error formatProblems(check.problems)
    }
 
-   check.warnings.each { log.warn it }
+   check.warnings.each { w -> log.warn w }
 
    log.info """
    =============================================
