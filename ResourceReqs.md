@@ -40,7 +40,7 @@ base value raised rather than its retry count.
 
 | Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
 |---------|------|------|--------|----------|---------------|------------|
-| `GATKHC` | 7d | 1 | 4 GB × attempt | 150 | `retry` | 6 |
+| `GATKHC` | 7d | 1 | 4 GB × attempt | 500 | `retry` | 6 |
 | `GenomicsDBImport` | 7d | 2 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`ignore`** | 6 |
 | `GenotypeGVCFs` | 7d | 1 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`ignore`** | 6 |
 | `MergeGVCFs` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
