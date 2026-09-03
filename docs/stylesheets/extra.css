@@ -1,4 +1,27 @@
 /* ------------------------------------------------------------------ */
+/* Global type scale                                                   */
+/* Material sizes everything in rem, so shifting the root font size    */
+/* scales body copy, nav, tables, admonitions and code together.       */
+/* This moves Material's own ladder (125 / 137.5 / 150%) up one step,  */
+/* i.e. body copy goes from 16px to 17.6px.                            */
+/* ------------------------------------------------------------------ */
+html {
+  font-size: 137.5%;
+}
+
+@media screen and (min-width: 100em) {
+  html {
+    font-size: 150%;
+  }
+}
+
+@media screen and (min-width: 125em) {
+  html {
+    font-size: 162.5%;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Mermaid diagrams: fill width, prevent shrinking                     */
 /* ------------------------------------------------------------------ */
 .mermaid svg {

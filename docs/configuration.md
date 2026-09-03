@@ -138,9 +138,22 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `--reference` | `path` | — | **Required.** Absolute path to the reference genome in FASTA format, uncompressed. Accepts `.fasta`, `.fa`, `.fna`, and `.fas` extensions. Exactly one file — not a pattern. |
-| `--reference_segments` | `integer` | `0` | Size in bp of genome segments used for parallel variant calling. `0` disables segmentation. Smaller values increase parallelism at the cost of overhead. |
+| `--reference_segments` | `integer` | `0` | Size in bp of genome segments used for parallel variant calling. `0` calls one task per contig. Smaller values increase parallelism at the cost of per-task overhead. See the note below. |
 | `--min_contig_length` | `integer` | `false` | Filter reference contigs shorter than this value (bp). Useful for excluding small scaffolds. `false` disables filtering. |
 | `--bwa_index` | `path` | — | Path to a pre-built BWA-mem2 index, given as **the FASTA path the index was built from** — normally the exact same value as `--reference`. Skips BWA indexing. See the warning below. |
+
+!!! tip "When to set `--reference_segments`"
+    With the default `0`, variant calling is scattered one task per contig, so task
+    duration follows contig length. A genome with a few large chromosomes and many small
+    scaffolds produces a very uneven mix: most tasks finish in seconds while a handful run
+    for hours, and the stage cannot finish before its longest task. Adding cores or raising
+    `maxForks` does not shorten that tail.
+
+    Segmenting (for example `--reference_segments 1000000` for 1 Mb windows) splits the
+    large contigs into comparable pieces and is usually the larger wall-clock win on such
+    assemblies. It costs one scheduling and container startup per extra task, and adds a
+    `MergeGVCFs` step when `--keep_gvcf` is set. Chromosome-scale assemblies with contigs
+    of similar size gain little from it.
 
 !!! warning "`--bwa_index` takes the FASTA path, not an index file"
     `bwa-mem2 index ref.fasta` writes its five files by appending suffixes to the
@@ -271,11 +284,18 @@ These settings are found in `nextflow.config` and can be edited directly.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `executor.queueSize` | 300 | Maximum number of tasks submitted to SLURM at once. |
-| `executor.submitRateLimit` | `'240/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
+| `executor.queueSize` | 500 | Maximum tasks in flight (submitted but not yet complete) across all processes. |
+| `executor.submitRateLimit` | `'500/1min'` | Maximum task submission rate (prevents overwhelming the scheduler). |
 | SRA download `maxForks` | 10 | Maximum concurrent SRA downloads (PE and SE each). Reduce if NCBI rate-limits your connection. |
 | fastp `maxForks` | 20 | Maximum concurrent trimming tasks (PE and SE each; I/O intensive). |
-| GATK HC `maxForks` | 150 | Maximum concurrent HaplotypeCaller tasks. Very I/O intensive. Adjust depending on storage performance. |
+| GATK HC `maxForks` | 500 | Maximum HaplotypeCaller tasks in flight. Capped in turn by `executor.queueSize`, so raise both together. |
+
+These limits count tasks that are **submitted but not yet complete**, not tasks that
+are running, and they are deliberately set above the concurrency a cluster typically
+grants so that the surplus waits in the SLURM queue and backfills a freed core without
+a round trip through Nextflow. See
+[Concurrency and rate limits](resources.md#concurrency-and-rate-limits) for how to size
+them for your cluster.
 
 !!! note "SLURM partition walltime requirements"
     Several pipeline processes request up to **7 days** of walltime (e.g. BWA mapping, GATK HaplotypeCaller, GenomicsDB import). When using `-profile slurm`, all jobs are submitted to the partition specified with `--slurm_queue`. This partition must allow a maximum walltime sufficient for the longest-running jobs.
