@@ -4,7 +4,7 @@
 
 ### Storage requirements
 
-The pipeline aggressively deletes intermediate files after each step to minimise disk usage (`cleanup = true` in `nextflow.config`). Despite this, large runs can temporarily require **many TB** of scratch space. Always point `-work-dir` to a fast, high-capacity scratch filesystem:
+Each process deletes the intermediate files it consumed as soon as it produces its own output (e.g. `addRG` deletes the sorted BAM once the read-group-tagged BAM exists), so disk usage does not simply accumulate over the run. Despite this, large runs can temporarily require **many TB** of scratch space. Always point `-work-dir` to a fast, high-capacity scratch filesystem:
 
 ```bash
 nextflow run main.nf ... -work-dir '/path/to/scratch/genomepanel_work'
@@ -12,6 +12,15 @@ nextflow run main.nf ... -work-dir '/path/to/scratch/genomepanel_work'
 
 !!! warning
     Because intermediate files are removed on task completion, `-resume` may not skip many steps once variant calling is underway. It is most useful for resuming after the reference indexing stage.
+
+At the very end of a run, `main.nf`'s `workflow.onComplete` handler deletes the whole
+work directory **only if every task succeeded, with nothing failed and nothing
+ignored** — `nextflow.config` deliberately does not set `cleanup = true`. A run with any
+failed or ignored task (visible in the startup log as `WorkflowStats[... failedCount=…
+ignoredCount=…]`) leaves the work directory in place instead, with a warning, so the
+failing task's `.command.err` is still there to read and `-resume` remains possible.
+Deleting a work directory that was intentionally kept is then your call to make, once
+you've looked at why it failed.
 
 Keep the Nextflow process alive in a `tmux` or `screen` session — even when using `--profile slurm`, the Nextflow process must remain running until all jobs complete.
 

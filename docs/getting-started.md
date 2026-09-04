@@ -167,7 +167,7 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --SRA_index './SRA_accessions.txt'
 ```
 
-To resume a previous run (if the `work-dir` is still intact), simply add `-resume` to the command. Nextflow will skip completed steps and only execute missing ones.
+To resume a previous run (if the `work-dir` is still intact), simply add `-resume` to the command. Nextflow will skip completed steps and only execute missing ones. The work directory is only deleted automatically when a run finishes with nothing failed and nothing ignored (see [HPC usage & utilities](resources.md#storage-requirements)), so `-resume` stays available after a run that hit a problem.
 
 The pipeline validates every parameter before submitting any work. If something is wrong —
 a missing file, a glob that matches nothing, a ploidy that was never set — it stops

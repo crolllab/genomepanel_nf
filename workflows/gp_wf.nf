@@ -16,7 +16,11 @@ include { bwaMap } from '../modules/bwa_mapping'
 include { samtoolsSort } from '../modules/samtools_sort'
 include { addRG } from '../modules/picard_add_read_groups'
 include { dupRemoval } from '../modules/picard_duplicates_removal'
+include { dupRemoval as dupRemovalMergedBamInput } from '../modules/picard_duplicates_removal'
+include { mergeRunBAMs } from '../modules/merge_run_bams'
+include { mergeRunBAMs as mergeRunBAMsBamInput } from '../modules/merge_run_bams'
 include { loadBAMs } from '../modules/load_bams'
+include { probeBAMSample } from '../modules/probe_bam_sample'
 include { GATKHC } from '../modules/gatk4_hc'
 include { cleanupBAMs } from '../modules/cleanup_bams'
 include { GenomicsDBImport } from '../modules/genomicsdb_import'
@@ -243,45 +247,116 @@ workflow gp_wf {
     // ---------------------
     // SRR to Sample mapping (optional)
     // ---------------------
-    // If a sample map file is provided, use it; otherwise use an empty placeholder file
-    // The placeholder file must exist so Channel.fromPath can stage it properly
+    // Read the map once, here in Groovy, rather than with a shell grep inside
+    // addRG. That is what lets Nextflow see the RESOLVED sample name and group
+    // runs by it below -- several runs mapped to the same Sample_Name are
+    // merged into one BAM before duplicate marking, so HaplotypeCaller and
+    // GenomicsDBImport ever see one gVCF per sample, never several sharing an
+    // SM tag (the cause of the 2026-09-04 lepus run's GenomicsDBImport
+    // failures: 85 intervals each rejecting a sample name repeated up to 9
+    // times, because each run had produced -- and kept -- its own gVCF).
+    //
+    // A leading UTF-8 BOM (common in CSVs saved from Excel) is stripped from
+    // the first line only, so it cannot silently break just that one lookup
+    // and fall back to the raw run ID.
+    //
+    // The map's optional third column names the sequencing library explicitly
+    // (Run_ID,Sample_Name,Library_ID). Without it, each run gets its own
+    // library id: assuming every run of a sample is the same library, with no
+    // evidence either way, is not safe, since duplicate marking scopes to the
+    // library.
+    def sample_of  = [:]
+    def library_of = [:]
     if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
-        sample_map_file = channel.fromPath(params.SRR_sample_map, checkIfExists: true).collect()
-    } else {
-        sample_map_file = channel.fromPath("${projectDir}/NO_SAMPLE_MAP.txt", checkIfExists: false).collect()
+        file(params.SRR_sample_map).readLines().eachWithIndex { raw, idx ->
+            def line = (idx == 0 && raw.startsWith('\uFEFF') ? raw.substring(1) : raw).trim()
+            if (!line || line.startsWith('#')) return
+            def fields = line.tokenize(',')*.trim()
+            if (fields.size() < 2) return
+            sample_of[fields[0]] = fields[1]
+            if (fields.size() >= 3 && fields[2]) library_of[fields[0]] = fields[2]
+        }
     }
 
-    // Updated workflow
-    addRG(bam_sorted, sample_map_file)
-    dedup_bams = dupRemoval(addRG.out.bam)
+    bam_with_sample = bam_sorted.map { run_id, bam, bai ->
+        def sample_name = sample_of.getOrDefault(run_id, run_id)
+        def library_id  = library_of.getOrDefault(run_id, "${sample_name}_${run_id}_LB")
+        tuple(run_id, sample_name, library_id, bam, bai)
+    }
+
+    // ---------------------
+    // Read-group tagging, then merge every run of one sample before marking
+    // duplicates (GATK best practice: duplicates from the same physical DNA
+    // fragment can only be recognised once all of a sample's reads are in one
+    // BAM). Samples with a single run skip the merge process entirely.
+    // ---------------------
+    addRG(bam_with_sample)
+    runs_by_sample = addRG.out.bam
+        .map { sample_name, _run_id, bam -> tuple(sample_name, bam) }
+        .groupTuple(by: 0)
+        .branch { sample_id, bams ->
+            single: bams.size() == 1
+            multi:  true
+        }
+    single_run_bam = runs_by_sample.single.map { sample_id, bams -> tuple(sample_id, bams[0]) }
+    merged_run_bam = mergeRunBAMs(runs_by_sample.multi).bam
+
+    dedup_bams = dupRemoval(single_run_bam.mix(merged_run_bam))
     dedup_with_index = dedup_bams.bam
     bams_to_cleanup = dedup_with_index   // pipeline-generated BAMs; deleted after all GATKHC tasks complete
-    
+
     } else {
     // ---------------------
     // Load pre-existing BAM files
     // ---------------------
-    // Parse BAM files from glob pattern
-    // Extract sample name by removing _RG_dedup suffix if present
-    // Like --reads, several locations may be given, separated by semicolons.
-    // Indexes are checked up front in validateParams(); this repeats the lookup
-    // only to pick whichever of the two naming conventions is actually present.
+    // Parse BAM files from glob pattern. Like --reads, several locations may
+    // be given, separated by semicolons. Indexes are checked up front in
+    // validateParams(); this repeats the lookup only to pick whichever of the
+    // two naming conventions is actually present.
+    //
+    // orig_id (for tagging/logging only) still comes from the filename; the
+    // sample identity that everything downstream keys on comes from the
+    // BAM's own @RG SM tag (probeBAMSample), never the filename. Two files
+    // named after different runs can legitimately share one SM -- e.g.
+    // re-supplying this pipeline's own --keep_bam output, where
+    // *_RG_dedup.bam is named by run but tagged by sample. Grouping by
+    // filename there would silently treat them as distinct samples and feed
+    // GenomicsDBImport duplicate SM entries at the interval level, exactly
+    // the failure --SRR_sample_map runs can hit (see the note above).
     def bam_patterns = params.bam_input.tokenize(';').collect { pat -> pat.trim() }.findAll { pat -> pat }
     bam_ch = channel
         .fromPath(bam_patterns, checkIfExists: true)
         .map { bam_file ->
-            def sample_name = bam_file.baseName.replaceAll(/_RG_dedup$/, '')
+            def orig_id = bam_file.baseName.replaceAll(/_RG_dedup$/, '')
             def bai_file = [ file("${bam_file}.bai"),
                              file("${bam_file.parent}/${bam_file.baseName}.bai") ].find { f -> f.exists() }
             if (!bai_file) {
                 error "No BAM index found for ${bam_file}.\nExpected ${bam_file}.bai or ${bam_file.parent}/${bam_file.baseName}.bai — create one with: samtools index ${bam_file}"
             }
-            tuple(sample_name, bam_file, bai_file)
+            tuple(orig_id, bam_file, bai_file)
         }
-    
-    dedup_with_index = loadBAMs(bam_ch).bam
+
+    probed = probeBAMSample(bam_ch).bam
+
+    // Group by the header's SM tag. A sample backed by a single BAM is passed
+    // through untouched -- this pipeline already trusts --bam_input files to
+    // be pre-processed and deduplicated, so nothing is re-run needlessly. A
+    // sample spread across several BAMs is merged and put back through
+    // dupRemoval, because duplicates shared between those BAMs were never
+    // visible while each was deduplicated on its own.
+    runs_by_sm = probed
+        .map { _orig_id, sm, bam, bai -> tuple(sm, bam, bai) }
+        .groupTuple(by: 0)
+        .branch { sm, bams, bais ->
+            single: bams.size() == 1
+            multi:  true
+        }
+    single_bam_input = loadBAMs(runs_by_sm.single.map { sm, bams, bais -> tuple(sm, bams[0], bais[0]) }).bam
+    merged_bam_input  = dupRemovalMergedBamInput(mergeRunBAMsBamInput(runs_by_sm.multi.map { sm, bams, _bais -> tuple(sm, bams) }).bam).bam
+
+    dedup_with_index = single_bam_input.mix(merged_bam_input)
     bams_to_cleanup = channel.empty()   // user-provided BAMs are never deleted by the pipeline
-    
+
     // When using BAM input, BWA indices aren't needed but GATKHC module expects them
     // Use the same BWA index logic as for read processing
     if (params.bwa_index) {

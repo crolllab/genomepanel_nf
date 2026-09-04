@@ -19,6 +19,7 @@ base value raised rather than its retry count.
 | `SRAdownloadSE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 4 | 6 |
 | `ReportIgnoredSamples` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `loadBAMs` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
+| `probeBAMSample` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `filterReference` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
 | `bwaIndex` | 1d | 1 | 16 GB × attempt | — | `retry` | 6 |
 | `fastaIndex` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
@@ -33,16 +34,25 @@ base value raised rather than its retry count.
 | `bwaMap` | 7d | — | 8 GB × attempt | — | `retry` | 6 |
 | `samtoolsSort` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
 | `addRG` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `mergeRunBAMs` | 1d | 2 | 4 GB × attempt | — | `retry` | 6 |
+| `mergeRunBAMsBamInput` | 1d | 2 | 4 GB × attempt | — | `retry` | 6 |
 | `dupRemoval` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `dupRemovalMergedBamInput` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
 | `cleanupBAMs` | 1h | 1 | 256 MB | — | — | — |
+
+`mergeRunBAMsBamInput` and `dupRemovalMergedBamInput` are the same processes as
+`mergeRunBAMs` and `dupRemoval`, included under an alias so the `--bam_input`
+path (several caller-supplied BAMs sharing one `@RG SM` tag) can run them a
+second time, independently of the read-processing path's own merge/dedup step.
+See gp_wf.nf.
 
 ### Variant calling
 
 | Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
 |---------|------|------|--------|----------|---------------|------------|
 | `GATKHC` | 7d | 1 | 4 GB × attempt | 500 | `retry` | 6 |
-| `GenomicsDBImport` | 7d | 2 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`ignore`** | 6 |
-| `GenotypeGVCFs` | 7d | 1 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`ignore`** | 6 |
+| `GenomicsDBImport` | 7d | 2 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+| `GenotypeGVCFs` | 7d | 1 | 16 GB × attempt | 150 | `retry` on OOM (137/143/247), else **`finish`** | 6 |
 | `MergeGVCFs` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
 
 ### VCF post-processing
@@ -98,9 +108,13 @@ Dropped samples are named in `<outdir>/1_sra_downloads/ignored_samples.txt` and 
 the **Sample completeness** section of the HTML report, both written by
 `ReportIgnoredSamples`. Check one of them before treating a run as complete.
 
-`GenomicsDBImport` and `GenotypeGVCFs` invert the logic: they retry **only** on
-out-of-memory exit statuses (137, 143, 247) and ignore anything else, on the
-grounds that a non-OOM failure there will not be fixed by repeating it.
+`GenomicsDBImport` and `GenotypeGVCFs` retry **only** on out-of-memory exit
+statuses (137, 143, 247); anything else is a GATK user error that a retry will
+not fix (most commonly two gVCFs claiming the same sample name), and now
+`finish` — not `ignore` — lets already-running tasks complete but stops the
+workflow and reports failure, rather than dropping the interval from the
+final VCF while reporting success (the 2026-09-04 lepus incident: 85 tasks
+failed this way and were ignored 85 times).
 
 ### The SRA download retry loop
 

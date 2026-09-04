@@ -112,24 +112,45 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
 |-----------|------|---------|-------------|
 | `--SRA_index` | `path` | — | Path to a plain-text file listing NCBI/ENA single or paired-end Illumina read accessions (one per line). Accepts `SRR`, `SRX`, `SRP`, `PRJNA`, `ERR`, etc. |
 | `--NCBI_API_key` | `string` | — | **Highly recommended with `--SRA_index`.** Passed to E-utilities as `NCBI_API_KEY`, raising the metadata lookup rate limit from 3 to 10 requests/second. Get your personal [NCBI API key](https://account.ncbi.nlm.nih.gov/). |
-| `--SRR_sample_map` | `path` | `false` | CSV file mapping SRR IDs to sample names (`SRR_ID,Sample_Name`, no header). Allows merging multiple runs per sample and renaming samples. Must be comma-separated — a tab-separated file is rejected at startup, because sample names are looked up by comma and every lookup would silently miss. See [Getting started](getting-started.md) for format. |
+| `--SRR_sample_map` | `path` | `false` | CSV file mapping run IDs to sample names, optionally with a library ID (`Run_ID,Sample_Name[,Library_ID]`, no header). Must be comma-separated — a tab-separated file is rejected at startup, because sample names are looked up by comma and every lookup would silently miss. A leading UTF-8 byte-order mark (common in CSVs saved from Excel) is stripped automatically, so it cannot silently break the first line's lookup. See [Getting started](getting-started.md) for format. |
+
+!!! info "Several runs, one sample"
+    When more than one run maps to the same `Sample_Name`, the pipeline merges their
+    BAMs and marks duplicates across the combined reads — GATK's best practice, since
+    duplicate fragments from the same sample can only be recognised once every read is
+    in one BAM. Each merged sample still produces exactly **one** BAM and **one** gVCF,
+    which is what lets `GenomicsDBImport` accept it: a sample name that shows up on more
+    than one gVCF at the same interval is a fatal `GenomicsDBImport` error, not something
+    it merges for you.
+
+    `Library_ID` is optional. Without it, each run is treated as its own library —
+    assuming several runs share a library, with no other evidence, is not a safe
+    default, since duplicate marking is scoped to the library.
 
 ### Pre-processed BAM files
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--bam_input` | `glob` | — | Glob pattern for pre-existing BAM files. Skips all read-processing steps (trimming, mapping, deduplication) and starts directly with variant calling. Cannot be combined with `--reads` or `--SRA_index`. Single-quote the pattern; separate several locations with `;`. See [File paths and glob patterns](#file-paths-and-glob-patterns). |
+| `--bam_input` | `glob` | — | Glob pattern for pre-existing BAM files. Skips trimming and mapping and starts directly with variant calling. Cannot be combined with `--reads` or `--SRA_index`. Single-quote the pattern; separate several locations with `;`. See [File paths and glob patterns](#file-paths-and-glob-patterns). |
 
 !!! warning "BAM file requirements"
     BAM files provided via `--bam_input` must be:
 
     - Coordinate-sorted
-    - Containing `@RG` read group information in the header
+    - Containing `@RG` read group information in the header, including an `SM` (sample) tag
     - Accompanied by a `.bai` index file in the same directory (either `sample.bam.bai` or `sample.bai`)
 
     The **index is checked at startup** and every BAM missing one is listed in a single error.
     Coordinate sorting and the presence of `@RG` headers are *not* validated — ensure your
     files comply before running.
+
+!!! info "Sample identity comes from the BAM header, not the filename"
+    Several `--bam_input` files sharing one `@RG SM` tag are treated as one sample: merged
+    and put back through duplicate marking, the same as several runs mapped to one
+    `Sample_Name` under `--reads`/`--SRA_index` (see above) — including the pipeline's own
+    `--keep_bam` output, where a file is *named* by run but *tagged* by sample. A sample
+    backed by a single BAM is passed through unchanged, since `--bam_input` already expects
+    pre-processed, deduplicated BAMs and there is nothing to redo.
 
 ---
 
