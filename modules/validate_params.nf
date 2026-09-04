@@ -534,14 +534,21 @@ def checkSampleMap(List problems, List _warnings, Map summary) {
     }
 
     def mapFile = matches[0]
-    def lines
+    def rawLines
     try {
-        lines = mapFile.readLines().collect { l -> l.trim() }.findAll { l -> l }
+        rawLines = mapFile.readLines()
     }
     catch (Exception e) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} could not be read: ${e.message}")
         return
     }
+
+    // A leading UTF-8 BOM (common in CSVs saved from Excel) sits in front of
+    // the first Run_ID otherwise, so that one lookup alone fails to match and
+    // silently falls back to using the run ID as the sample name. Strip it
+    // before anything else touches the first line.
+    if (rawLines && rawLines[0].startsWith('\uFEFF')) rawLines[0] = rawLines[0].substring(1)
+    def lines = rawLines.collect { l -> l.trim() }.findAll { l -> l }
 
     if (lines.isEmpty()) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} is empty",
@@ -562,13 +569,22 @@ def checkSampleMap(List problems, List _warnings, Map summary) {
     def malformed = lines.findAll { l -> l.tokenize(',').findAll { f -> f.trim() }.size() < 2 }
     if (malformed) {
         addProblem(problems, "--SRR_sample_map file ${mapFile.name} has ${malformed.size()} malformed line(s)",
-                   ["Each line needs two comma-separated fields: Run_ID,Sample_Name",
+                   ["Each line needs two (or three) comma-separated fields:",
+                    "Run_ID,Sample_Name[,Library_ID]",
                     "First offending line: '${malformed[0]}'"])
         return
     }
 
-    def sampleNames = lines.collect { l -> l.tokenize(',')[1].trim() }.unique()
-    summary['Sample map'] = "${lines.size()} run IDs -> ${sampleNames.size()} sample names"
+    // Several runs may legitimately map to the same Sample_Name -- the
+    // pipeline merges them into one BAM before duplicate marking (see
+    // addRG / mergeRunBAMs in gp_wf.nf) rather than calling variants
+    // separately per run. Surface that up front: it used to be invisible
+    // until GenomicsDBImport rejected the repeated sample name late in the
+    // run (the 2026-09-04 lepus incident).
+    def bySample = lines.groupBy { l -> l.tokenize(',')[1].trim() }
+    def merged   = bySample.findAll { _name, runLines -> runLines.size() > 1 }
+    summary['Sample map'] = "${lines.size()} run IDs -> ${bySample.size()} sample names" +
+                            (merged ? " (${merged.size()} span multiple runs and will be merged)" : "")
 }
 
 def checkBamInput(List problems, List warnings, Map summary) {
@@ -783,8 +799,9 @@ def validateParams(strayArgs = null) {
     }
     if (params.bam_input && (params.reads || params.SRA_index)) {
         addProblem(problems, "--bam_input cannot be combined with --reads or --SRA_index",
-                   ["--bam_input skips trimming, mapping and deduplication entirely, so it is either",
-                    "BAM input or read input, not both."])
+                   ["--bam_input skips trimming and mapping entirely, so it is either BAM input or",
+                    "read input, not both. (Duplicate marking still runs again for any sample split",
+                    "across several --bam_input files -- see --bam_input above.)"])
     }
 
     // --- files and globs ------------------------------------------------------
@@ -867,6 +884,9 @@ def helpMessage() {
      --SRA_index <file>        Plain-text file of SRA/ENA accessions, one per line.
      --bam_input <glob>        Pre-processed, coordinate-sorted, indexed BAM files
                                carrying @RG headers. Skips trimming and mapping.
+                               Sample identity comes from each BAM's @RG SM tag,
+                               not its filename: several files sharing one SM are
+                               merged and re-deduplicated into a single sample.
                                --bam_input 'bams/*.bam'
 
    Quoting and multiple locations
@@ -900,8 +920,15 @@ def helpMessage() {
      --NCBI_API_key <key>      NCBI API key; raises the E-utilities rate limit
                                from 3 to 10 requests/second. Recommended with
                                --SRA_index.
-     --SRR_sample_map <csv>    CSV of 'Run_ID,Sample_Name', no header. Merges
-                               several runs into one sample and renames samples.
+     --SRR_sample_map <csv>    CSV of 'Run_ID,Sample_Name[,Library_ID]', no header.
+                               Renames samples, and merges several runs mapped to
+                               the same Sample_Name into one BAM (with duplicate
+                               marking run on the combined reads) before variant
+                               calling, so GenomicsDBImport never sees one sample
+                               name claimed by more than one gVCF. Library_ID is
+                               optional; without it, each run gets its own,
+                               since assuming several runs share a library is
+                               not safe with no other evidence.
 
    Population genetics (run on the thinned, MAF-filtered VCF)
      --plink_pca               Principal component analysis.                 [false]

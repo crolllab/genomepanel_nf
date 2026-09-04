@@ -25,6 +25,34 @@ params.plink_ld_prune = false  // LD pruning of the pop. gen. VCF (plink2)
 include { gp_wf } from './workflows/gp_wf'
 include { validateParams; formatProblems; helpMessage } from './modules/validate_params'
 
+// ---------------------
+// Work directory cleanup
+// ---------------------
+def cleanUpWorkDirIfClean() {
+    def stats = workflow.stats
+    def clean = workflow.success && stats.ignoredCount == 0 && stats.failedCount == 0
+
+    if (clean) {
+        def wd = workflow.workDir.toFile()
+        if (wd.exists()) {
+            log.info "Run completed cleanly (0 failed, 0 ignored tasks) -- deleting work directory: ${wd}"
+            wd.deleteDir()
+        }
+    }
+    else {
+        log.warn """
+        Work directory left in place (not cleaned up): ${workflow.workDir}
+            success       : ${workflow.success}
+            failed tasks  : ${stats.failedCount}
+            ignored tasks : ${stats.ignoredCount}
+        A failed or ignored task means at least one sample or segment did not
+        produce what it should have -- inspect its work directory (named in
+        .nextflow.log) for .command.err before deleting anything, and
+        consider -resume once the cause is fixed.
+        """.stripIndent()
+    }
+}
+
 
 workflow {
 
@@ -46,6 +74,8 @@ workflow {
    }
 
    check.warnings.each { w -> log.warn w }
+
+   workflow.onComplete { cleanUpWorkDirIfClean() }
 
    log.info """
    =============================================

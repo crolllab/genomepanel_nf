@@ -1,6 +1,10 @@
 process GenotypeGVCFs {
     tag "GATK4 Genotype GVCFs"
-    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
+    // Same reasoning as GenomicsDBImport (see that module): a non-OOM exit
+    // here is a GATK user error that will recur identically on every retry,
+    // not something to retry and then silently drop an entire interval from
+    // the final VCF.
+    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'finish' }
     maxRetries 6
 
 

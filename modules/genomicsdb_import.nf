@@ -1,6 +1,17 @@
 process GenomicsDBImport {
     tag "GATK4 GenomicsDB Import"
-    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'ignore' }
+    // 137/143/247 are OOM-kill signatures (SIGKILL, SIGTERM, and the SLURM
+    // cgroup OOM exit code) -- worth a retry at a higher memory ceiling.
+    // Everything else is a GATK user error (most commonly: two gVCFs claiming
+    // the same sample name -- see modules/picard_add_read_groups.nf and
+    // gp_wf.nf for why that can no longer happen for a single run) and will
+    // fail identically on every retry and on every other interval. 'ignore'
+    // used to swallow that silently: on 2026-09-04, all 85 GenomicsDBImport
+    // tasks in the lepus run failed this way in under 10 seconds each, the
+    // failure was ignored 85 times, and the workflow reported success with an
+    // empty VCF. 'finish' lets already-running tasks complete but stops the
+    // workflow and reports failure instead.
+    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'finish' }
     maxRetries 6
 
     input:

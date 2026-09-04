@@ -1,48 +1,41 @@
 process addRG {
-    tag "PICARD adding ReadGroup"
+    tag "PICARD adding ReadGroup: ${run_id} -> ${sample_name}"
     errorStrategy 'retry'
     maxRetries 6
-       
+
     input:
-    tuple val(sample_id), path(sorted_bam), path(sorted_bai)
-    path sample_map
-    
+    tuple val(run_id), val(sample_name), val(library_id), path(sorted_bam), path(sorted_bai)
+
     output:
-    tuple val(sample_id), path("${sample_id}_RG.bam"), emit: bam
-    
+    tuple val(sample_name), val(run_id), path("${run_id}_RG.bam"), emit: bam
+
     script:
-    // Determine the sample name (SM tag) - either from map file or use original sample_id
-    // The sample_map file format: SRR_ID,Sample_Name (CSV, no header)
-    // Note: sample_id is kept for file naming; RG_SAMPLE is used for the SM tag in BAM
-    // GATK CombineGVCFs will merge GVCFs with the same SM tag into a single sample
+    // sample_name and library_id are resolved once, in Groovy, by gp_wf.nf
+    // (see the sample_of/library_of maps built from --SRR_sample_map). That is
+    // what lets Nextflow group runs by their RESOLVED sample name afterwards,
+    // to merge every run of one sample before duplicate marking -- a shell-side
+    // lookup here (the previous design) makes the resolved name invisible to
+    // Nextflow, so two runs of the same sample stay two separate BAMs, two
+    // separate gVCFs, and a GenomicsDBImport rejection later on ("duplicate
+    // sample" — the 2026-09-04 lepus incident).
+    //
+    // RGLB defaults to a per-run library id (sample_name + run_id) rather than
+    // a single library shared by every run of a sample: with no other evidence,
+    // assuming every run is the same library is not safe (duplicate marking
+    // scopes to the library), and MarkDuplicates degrades gracefully if runs
+    // really do share a library. Give the map file a third column
+    // (Run_ID,Sample_Name,Library_ID) to state the true library instead.
     """
-    # Check if sample map file exists, is not a placeholder, and is not empty
-    if [ -f "${sample_map}" ] && [ -s "${sample_map}" ] && [ "${sample_map}" != "NO_SAMPLE_MAP.txt" ]; then
-        # Look up sample name from map file (format: SRR_ID,Sample_Name)
-        # Use head -1 to handle potential duplicate entries (first match wins)
-        MAPPED_SAMPLE=\$(grep "^${sample_id}," "${sample_map}" | head -1 | cut -d',' -f2 | tr -d '\\r\\n' || true)
-        if [ -n "\$MAPPED_SAMPLE" ]; then
-            RG_SAMPLE="\$MAPPED_SAMPLE"
-            echo "Mapped ${sample_id} to sample name: \$RG_SAMPLE"
-        else
-            RG_SAMPLE="${sample_id}"
-            echo "No mapping found for ${sample_id}, using original ID"
-        fi
-    else
-        RG_SAMPLE="${sample_id}"
-        echo "No sample map provided, using original ID: ${sample_id}"
-    fi
-    
     picard -Xmx${task.memory.toGiga()-2}g AddOrReplaceReadGroups \
         -INPUT $sorted_bam \
-        -OUTPUT ${sample_id}_RG.bam \
-        -RGID ${sample_id} \
-        -RGLB \${RG_SAMPLE}_LB \
+        -OUTPUT ${run_id}_RG.bam \
+        -RGID ${run_id} \
+        -RGLB ${library_id} \
         -RGPL ILLUMINA \
         -RGPU unit1 \
-        -RGSM \${RG_SAMPLE} \
+        -RGSM ${sample_name} \
         --VALIDATION_STRINGENCY SILENT
-    
+
     # Delete the sorted BAM and BAI files (resolve symlinks to actual files)
     bam_target="\$(readlink -f "$sorted_bam")"
     bai_target="\$(readlink -f "$sorted_bai")"
