@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **A retried task no longer finds its input already deleted.** Each read-processing step (`trimSequencesPE/SE`, `bwaMap`, `samtoolsSort`, `addRG`, `mergeRunBAMs`, `dupRemoval`) used to delete its input at the end of its own script. When the script succeeded but the task was still reported as failed — as happened on 2026-09-18, when storage stalls made Nextflow's job wrapper exit 141 after `addRG` had finished — every retry failed with `Cannot read non-existent file` and the run aborted. Intermediates are now deleted by the workflow, only after Nextflow has accepted the task's output, and only inside the work directory.
+- **`--bam_input` no longer deletes the caller's BAMs.** When several input BAMs shared one `@RG SM` tag, `mergeRunBAMs` deleted the original files after merging them.
+- **`samtoolsSort` fails on a truncated SAM instead of writing a truncated BAM.** A failing `samtools view` in the `view | sort` pipe previously went unnoticed.
+
+### Changes
+
+- **Mapping and BAM processing drop a failing sample instead of aborting the run.** `bwaMap`, `samtoolsSort`, `addRG`, `mergeRunBAMs` and `dupRemoval` now fall back to `ignore` once their retries are exhausted, like downloading and trimming already did. `ignored_samples.txt` and the HTML report gained *Failed during mapping* and *Failed during duplicate marking* sections. `cleanupBAMs` now ignores its own failures.
+
 ## v1.1.0 — 2026-09-01
 
 ### New features

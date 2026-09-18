@@ -15,8 +15,8 @@ base value raised rather than its retry count.
 | Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
 |---------|------|------|--------|----------|---------------|------------|
 | `SRAresolve` | 7d | 1 | 1 GB | — | `retry` | 6 |
-| `SRAdownloadPE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 4 | 6 |
-| `SRAdownloadSE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 4 | 6 |
+| `SRAdownloadPE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 5 | 6 |
+| `SRAdownloadSE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 5 | 6 |
 | `ReportIgnoredSamples` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `loadBAMs` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `probeBAMSample` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
@@ -29,14 +29,14 @@ base value raised rather than its retry count.
 
 | Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
 |---------|------|------|--------|----------|---------------|------------|
-| `trimSequencesPE` | 1d | — | 2 GB × attempt | 20 | `retry` → **`ignore`** after attempt 3 | 6 |
-| `trimSequencesSE` | 1d | — | 2 GB × attempt | 20 | `retry` → **`ignore`** after attempt 3 | 6 |
-| `bwaMap` | 7d | — | 8 GB × attempt | — | `retry` | 6 |
-| `samtoolsSort` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
-| `addRG` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
-| `mergeRunBAMs` | 1d | 2 | 4 GB × attempt | — | `retry` | 6 |
-| `mergeRunBAMsBamInput` | 1d | 2 | 4 GB × attempt | — | `retry` | 6 |
-| `dupRemoval` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `trimSequencesPE` | 1d | — | 2 GB × attempt | 20 | `retry` → **`ignore`** after attempt 4 | 6 |
+| `trimSequencesSE` | 1d | — | 2 GB × attempt | 20 | `retry` → **`ignore`** after attempt 4 | 6 |
+| `bwaMap` | 7d | — | 8 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
+| `samtoolsSort` | 1d | 1 | 2 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
+| `addRG` | 1d | 1 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
+| `mergeRunBAMs` | 1d | 2 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 4 | 3 |
+| `mergeRunBAMsBamInput` | 1d | 2 | 4 GB × attempt | — | `retry` | 3 |
+| `dupRemoval` | 1d | 1 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
 | `dupRemovalMergedBamInput` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
 | `cleanupBAMs` | 1h | 1 | 256 MB | — | — | — |
 
@@ -95,16 +95,37 @@ inherit the profile default: **4** under `-profile local`, **8** under
 
 ### Processes that give up instead of failing the run
 
-Four processes fall back to `ignore` once their retries are exhausted. The task
-fails, the run continues, and the sample is **absent from the final VCF** while
-the pipeline still reports success:
+Every per-sample step on the read path falls back to `ignore` once its retries
+are exhausted. The task fails, the run continues, and the sample is **absent
+from the final VCF** while the pipeline still reports success:
 
 | Process | Gives up after |
 |---------|----------------|
-| `SRAdownloadPE`, `SRAdownloadSE` | attempt 4 |
-| `trimSequencesPE`, `trimSequencesSE` | attempt 3 |
+| `SRAdownloadPE`, `SRAdownloadSE` | attempt 5 |
+| `trimSequencesPE`, `trimSequencesSE` | attempt 4 |
+| `bwaMap`, `samtoolsSort`, `addRG`, `dupRemoval` | attempt 7 |
+| `mergeRunBAMs` | attempt 4 |
 
-Dropped samples are named in `<outdir>/1_sra_downloads/ignored_samples.txt` and in
+A run dropped at `bwaMap`, `samtoolsSort` or `addRG` only removes the whole
+sample if it was that sample's only run; with `--SRR_sample_map`, the sample's
+other runs are still merged and called.
+
+The `--bam_input` counterparts (`mergeRunBAMsBamInput`,
+`dupRemovalMergedBamInput`) deliberately do **not** fall back to `ignore` (set in
+`nextflow.config`): those BAMs are the caller's own, a failure means the input
+needs fixing, and no ignored-sample report covers that path.
+
+Steps that work on a genome segment or on the whole panel (`GATKHC`,
+`GenomicsDBImport`, `GenotypeGVCFs`, `FilterVCFs`, `CleanVCFs`, the concat and
+reference steps) never `ignore`. Dropping one there does not remove a sample
+cleanly — it leaves a sample uncalled in one segment, or removes a segment for
+every sample -- and nothing downstream would notice.
+
+`cleanupBAMs` is the one exception: it only deletes BAMs once every variant
+call has been made, so it uses plain `ignore`. A failed delete leaves the file
+behind rather than aborting the run.
+
+Dropped samples and runs are named in `<outdir>/1_sra_downloads/ignored_samples.txt`, split by the stage that dropped them, and in
 the **Sample completeness** section of the HTML report, both written by
 `ReportIgnoredSamples`. Check one of them before treating a run as complete.
 

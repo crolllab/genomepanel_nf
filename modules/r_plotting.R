@@ -144,25 +144,31 @@ footer { margin-top: 60px; font-size: 0.85em; color: #aaa;
 # =====================================================
 # SECTION 0: Samples dropped during the run
 # =====================================================
-# Downloading and trimming fall back to an 'ignore' error strategy once their
-# retries are exhausted, so a failed sample disappears from the run without
-# failing it. ReportIgnoredSamples writes the names it detected; surface them
+# Every per-sample step from download to duplicate marking falls back to an
+# 'ignore' error strategy once its retries are exhausted, so a failed sample
+# disappears from the run without failing it. ReportIgnoredSamples writes the names it detected; surface them
 # here so a green run does not hide a shrunken panel.
 if (file.exists("ignored_samples.txt")) {
   ig_lines   <- readLines("ignored_samples.txt", warn = FALSE)
   ig_section <- NA_character_
   ig_dl      <- character(0)
   ig_trim    <- character(0)
+  ig_map     <- character(0)
+  ig_dup     <- character(0)
 
   for (ln in ig_lines) {
     if (grepl("^## Failed to download", ln))          { ig_section <- "dl";   next }
     if (grepl("^## Failed during read trimming", ln)) { ig_section <- "trim"; next }
+    if (grepl("^## Failed during mapping", ln))        { ig_section <- "map";  next }
+    if (grepl("^## Failed during duplicate marking", ln)) { ig_section <- "dup"; next }
     if (grepl("^\\s*#", ln) || !nzchar(trimws(ln)))    next
     if (identical(ig_section, "dl"))   ig_dl   <- c(ig_dl,   trimws(ln))
     if (identical(ig_section, "trim")) ig_trim <- c(ig_trim, trimws(ln))
+    if (identical(ig_section, "map"))  ig_map  <- c(ig_map,  trimws(ln))
+    if (identical(ig_section, "dup"))  ig_dup  <- c(ig_dup,  trimws(ln))
   }
 
-  n_drop <- length(ig_dl) + length(ig_trim)
+  n_drop <- length(ig_dl) + length(ig_trim) + length(ig_map) + length(ig_dup)
 
   sample_list <- function(ids) {
     esc <- gsub("&", "&amp;", ids, fixed = TRUE)
@@ -202,6 +208,25 @@ if (file.exists("ignored_samples.txt")) {
         truncated or corrupt FASTQ, or an out-of-memory kill.</p>\n',
         length(ig_trim)), file = con)
       cat(sample_list(ig_trim), file = con)
+      cat('</div>\n', file = con)
+    }
+
+    if (length(ig_map) > 0) {
+      cat('<div class="alert">\n', file = con)
+      cat(sprintf('<p><strong>Failed during mapping (%d)</strong> &mdash; run
+        IDs whose mapping, sorting or read-group tagging exhausted its retries. A
+        sample with other runs is still called, from fewer reads.</p>\n',
+        length(ig_map)), file = con)
+      cat(sample_list(ig_map), file = con)
+      cat('</div>\n', file = con)
+    }
+
+    if (length(ig_dup) > 0) {
+      cat('<div class="alert">\n', file = con)
+      cat(sprintf('<p><strong>Failed during duplicate marking (%d)</strong>
+        &mdash; samples whose run merging or duplicate marking exhausted its
+        retries.</p>\n', length(ig_dup)), file = con)
+      cat(sample_list(ig_dup), file = con)
       cat('</div>\n', file = con)
     }
   }

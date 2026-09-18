@@ -1,13 +1,15 @@
 process addRG {
     tag "PICARD adding ReadGroup: ${run_id} -> ${sample_name}"
-    errorStrategy 'retry'
+    errorStrategy { task.attempt <= 6 ? 'retry' : 'ignore' }
     maxRetries 6
 
     input:
-    tuple val(run_id), val(sample_name), val(library_id), path(sorted_bam), path(sorted_bai)
+    // consumed: the sorted BAM and index, deleted by the workflow once this
+    // task's output is accepted (see modules/delete_intermediates.nf)
+    tuple val(run_id), val(sample_name), val(library_id), path(sorted_bam), path(sorted_bai), val(consumed)
 
     output:
-    tuple val(sample_name), val(run_id), path("${run_id}_RG.bam"), emit: bam
+    tuple val(sample_name), val(run_id), path("${run_id}_RG.bam"), val(consumed), emit: bam
 
     script:
     // sample_name and library_id are resolved once, in Groovy, by gp_wf.nf
@@ -35,11 +37,5 @@ process addRG {
         -RGPU unit1 \
         -RGSM ${sample_name} \
         --VALIDATION_STRINGENCY SILENT
-
-    # Delete the sorted BAM and BAI files (resolve symlinks to actual files)
-    bam_target="\$(readlink -f "$sorted_bam")"
-    bai_target="\$(readlink -f "$sorted_bai")"
-    [ -n "\$bam_target" ] && [ -f "\$bam_target" ] && rm "\$bam_target" || true
-    [ -n "\$bai_target" ] && [ -f "\$bai_target" ] && rm "\$bai_target" || true
     """
 }

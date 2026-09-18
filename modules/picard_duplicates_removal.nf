@@ -1,6 +1,6 @@
 process dupRemoval {
     tag "PICARD marking duplicates"
-    errorStrategy 'retry'
+    errorStrategy { task.attempt <= 6 ? 'retry' : 'ignore' }
     maxRetries 6
 
     publishDir "${params.outdir}/5_bam_files",
@@ -9,12 +9,15 @@ process dupRemoval {
         enabled: params.keep_bam
 
     input:
-    tuple val(sample_id), path(rg_bam)
+    // consumed: the read-group (or merged) BAM, deleted by the workflow once
+    // this task's output is accepted (see modules/delete_intermediates.nf)
+    tuple val(sample_id), path(rg_bam), val(consumed)
 
     output:
     tuple val(sample_id),
           path("${sample_id}_RG_dedup.bam"),
           path("${sample_id}_RG_dedup.bam.bai"),
+          val(consumed),
           emit: bam
 
     script:
@@ -29,9 +32,5 @@ process dupRemoval {
     picard -Xmx${task.memory.toGiga()-2}g BuildBamIndex \
         -INPUT ${sample_id}_RG_dedup.bam \
         -OUTPUT ${sample_id}_RG_dedup.bam.bai
-
-    # Delete the RG BAM file (resolve symlink to actual file)
-    rg_target="\$(readlink -f "$rg_bam")"
-    [ -n "\$rg_target" ] && [ -f "\$rg_target" ] && rm "\$rg_target" || true
     """
 }
