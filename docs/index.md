@@ -129,6 +129,13 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.1.1 *(September 2026)*
+
+- Runs mapped to the same sample (`--SRR_sample_map`, or `--bam_input` files sharing an `@RG SM` tag) are merged before duplicate marking, giving one gVCF per sample; samples move on as soon as their own runs are done, without waiting for the rest of the panel.
+- A task retried after a spurious failure no longer finds its input deleted; intermediates are removed only after a step succeeds, and user-supplied BAMs are never deleted.
+- Mapping and BAM processing now drop a failing sample instead of aborting the run; dropped samples are listed in `ignored_samples.txt` and the HTML report. GATK errors in GenomicsDBImport/GenotypeGVCFs now stop the run instead of being silently ignored.
+- Higher HaplotypeCaller concurrency on SLURM; the work directory is only deleted after a run with no failed or ignored tasks.
+
 ### v1.1.0 *(September 2026)*
 
 - Optional PLINK 2 analyses on the pop-gen VCF: `--plink_pca`, `--plink_relationships` (GRM and KING matrices) and `--plink_ld_prune`, published to `9_plink/`.

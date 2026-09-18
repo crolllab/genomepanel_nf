@@ -1,16 +1,23 @@
 # Changelog
 
-## Unreleased
+## v1.1.1 — 2026-09-18
 
 ### Fixes
 
 - **A retried task no longer finds its input already deleted.** Each read-processing step (`trimSequencesPE/SE`, `bwaMap`, `samtoolsSort`, `addRG`, `mergeRunBAMs`, `dupRemoval`) used to delete its input at the end of its own script. When the script succeeded but the task was still reported as failed — as happened on 2026-09-18, when storage stalls made Nextflow's job wrapper exit 141 after `addRG` had finished — every retry failed with `Cannot read non-existent file` and the run aborted. Intermediates are now deleted by the workflow, only after Nextflow has accepted the task's output, and only inside the work directory.
 - **`--bam_input` no longer deletes the caller's BAMs.** When several input BAMs shared one `@RG SM` tag, `mergeRunBAMs` deleted the original files after merging them.
+- **Samples no longer wait for the whole panel before duplicate marking.** Grouping runs by sample (to merge runs of one sample) held every sample until the last one in the run had finished `addRG`, so duplicate marking and HaplotypeCaller could not start until all mapping was done. Each sample's expected run count is now known from the resolved inputs, and a sample is released as soon as its last run is read-group tagged. A sample whose run was dropped along the way is still released, with the runs that made it, once `addRG` has finished for everyone.
 - **`samtoolsSort` fails on a truncated SAM instead of writing a truncated BAM.** A failing `samtools view` in the `view | sort` pipe previously went unnoticed.
 
 ### Changes
 
+- **Runs of the same sample are merged before duplicate marking.** Several runs mapped to one sample with `--SRR_sample_map`, or several `--bam_input` files sharing one `@RG SM` tag, used to produce one gVCF each, which `GenomicsDBImport` rejects as a duplicate sample. They are now merged (new `mergeRunBAMs`) and duplicate-marked together, giving one gVCF per sample. With `--bam_input`, the sample name now comes from the BAM's `@RG SM` tag (new `probeBAMSample`), not the filename. `--SRR_sample_map` accepts an optional third `Library_ID` column and ignores a leading UTF-8 BOM.
+- **GATK errors in `GenomicsDBImport` and `GenotypeGVCFs` stop the run.** They used to be ignored, which could report success with intervals missing from the final VCF. Out-of-memory exits are still retried.
+- **The work directory is only deleted after a clean run.** `cleanup = true` is replaced by a check that deletes it only when no task failed or was ignored; otherwise it is kept for inspection and `-resume`.
+- **Higher HaplotypeCaller concurrency on SLURM.** `GATKHC` `maxForks` 150 → 500, `executor.queueSize` 300 → 500 and `submitRateLimit` 240 → 500 per minute, so the queue keeps a pending backlog.
 - **Mapping and BAM processing drop a failing sample instead of aborting the run.** `bwaMap`, `samtoolsSort`, `addRG`, `mergeRunBAMs` and `dupRemoval` now fall back to `ignore` once their retries are exhausted, like downloading and trimming already did. `ignored_samples.txt` and the HTML report gained *Failed during mapping* and *Failed during duplicate marking* sections. `cleanupBAMs` now ignores its own failures.
+
+---
 
 ## v1.1.0 — 2026-09-01
 
