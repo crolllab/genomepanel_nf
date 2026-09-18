@@ -4,7 +4,7 @@
 
 ### Storage requirements
 
-Each process deletes the intermediate files it consumed as soon as it produces its own output (e.g. `addRG` deletes the sorted BAM once the read-group-tagged BAM exists), so disk usage does not simply accumulate over the run. Despite this, large runs can temporarily require **many TB** of scratch space. Always point `-work-dir` to a fast, high-capacity scratch filesystem:
+The intermediate files a step consumed are deleted as soon as that step succeeds (e.g. the sorted BAM goes once `addRG` has produced the read-group-tagged BAM), so disk usage does not simply accumulate over the run. The deletion is done by the workflow, not by the task, and only once Nextflow has recorded the task as successful: a task that fails or is retried always finds its inputs intact. Only files inside the work directory are ever deleted — never your own `--reads` or `--bam_input` files. Despite this, large runs can temporarily require **many TB** of scratch space. Always point `-work-dir` to a fast, high-capacity scratch filesystem:
 
 ```bash
 nextflow run main.nf ... -work-dir '/path/to/scratch/genomepanel_work'

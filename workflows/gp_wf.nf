@@ -39,6 +39,7 @@ include { RSummarizingFASTP } from '../modules/r_process_summary_fastp'
 include { ReportIgnoredSamples } from '../modules/report_ignored'
 include { MergeGVCFs } from '../modules/merge_gvcfs'
 include { PipelineStatistics } from '../modules/pipeline_statistics'
+include { deleteIntermediates } from '../modules/delete_intermediates'
 
 // ---------------------
 // Main workflow
@@ -144,7 +145,9 @@ workflow gp_wf {
             // Remove trailing separators (_, ., -)
             commonPrefix = commonPrefix.replaceAll(/[._-]+$/, '')
             
-            return [commonPrefix, reads_list[0], reads_list[1], 'local']
+            // Last element: files to delete once trimming succeeds -- none,
+            // user-provided reads are never deleted.
+            return [commonPrefix, reads_list[0], reads_list[1], []]
         }
     } else {
         local_pe_formatted = channel.empty()
@@ -155,9 +158,10 @@ workflow gp_wf {
     if (params.SRA_index) {
         // Simple channel formatting - downloads that succeed will have outputs
         // Downloads that still fail after retries will not emit anything
-        // Add source tag to distinguish from local files
-        sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, 'SRA'] }
-        sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, 'SRA'] }
+        // Last element: the downloaded FASTQs, deleted once trimming succeeds
+        // (see modules/delete_intermediates.nf).
+        sra_pe_formatted = SRAdownloadPE.out.map { sample_id, r1, r2 -> [sample_id, r1, r2, [r1.toString(), r2.toString()]] }
+        sra_se_formatted = SRAdownloadSE.out.map { sample_id, r1 -> [sample_id, r1, [r1.toString()]] }
     } else {
         sra_pe_formatted = channel.empty()
         sra_se_formatted = channel.empty()
@@ -173,9 +177,20 @@ workflow gp_wf {
     trimSequencesSE(sra_se_formatted)
 
 
-    // Access trimmed outputs
-    pe_trimmed = trimSequencesPE.out.reads
-    se_trimmed = trimSequencesSE.out.reads
+    // Access trimmed outputs. Intermediate files are deleted here, from the
+    // workflow, rather than by the task that read them: a task's output is
+    // only emitted once Nextflow has accepted the task as successful, so a
+    // failed or retried attempt always finds its inputs intact (see
+    // modules/delete_intermediates.nf). The same pattern follows every step
+    // down to duplicate marking.
+    pe_trimmed = trimSequencesPE.out.reads.map { sample_id, reads, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, reads)
+    }
+    se_trimmed = trimSequencesSE.out.reads.map { sample_id, reads, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, reads)
+    }
     pe_reports = trimSequencesPE.out.report
     se_reports = trimSequencesSE.out.report
 
@@ -189,27 +204,6 @@ workflow gp_wf {
 
     // Merge SE + PE trimmed reads into one channel
     trimmed_ch = pe_trimmed.mix(se_trimmed)
-
-    // ---------------------
-    // Track silently dropped samples
-    // ---------------------
-    // Downloading and trimming both switch to 'ignore' once their retries run
-    // out, so a failed sample vanishes from the channel instead of stopping the
-    // run. Compare the IDs entering each stage with those leaving it, and write
-    // the difference to 1_sra_downloads/ignored_samples.txt. Sample renaming
-    // via --SRR_sample_map happens later (at addRG), so IDs are directly
-    // comparable here.
-    entered_trimming_ids = combined_pe_ch.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
-    downloaded_ids       = sra_pe_formatted.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
-
-    ReportIgnoredSamples(
-        sra_expected_ids.collect().ifEmpty([]),
-        downloaded_ids.collect().ifEmpty([]),
-        entered_trimming_ids.collect().ifEmpty([]),
-        trimmed_ch.map { t -> t[0] }.collect().ifEmpty([])
-    )
-    ignored_report_ch = ReportIgnoredSamples.out.report
-
 
     // ---------------------
     // BWA index (only needed for read input)
@@ -231,15 +225,26 @@ workflow gp_wf {
     // ---------------------
     // Mapping
     // ---------------------
-    bwaMap(reference_to_use, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123, trimmed_ch)
+    // Trimmed reads: one path for single-end, a list of two for paired-end.
+    bwaMap(reference_to_use, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_0123,
+        trimmed_ch.map { sample_id, reads ->
+            tuple(sample_id, reads, (reads instanceof List ? reads : [reads]).collect { r -> r.toString() })
+        })
+    mapped_sam = bwaMap.out.sam.map { sample_id, sam, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, sam, [sam.toString()])
+    }
 
 
     // ---------------------
     // Post-processing BAM
     // ---------------------
 
-    samtoolsSort(bwaMap.out)
-    bam_sorted = samtoolsSort.out.bam
+    samtoolsSort(mapped_sam)
+    bam_sorted = samtoolsSort.out.bam.map { sample_id, bam, bai, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, bam, bai)
+    }
 
     bam_reports = samtoolsSort.out.report
     bam_reports_ch = bam_reports.collect()
@@ -281,7 +286,7 @@ workflow gp_wf {
     bam_with_sample = bam_sorted.map { run_id, bam, bai ->
         def sample_name = sample_of.getOrDefault(run_id, run_id)
         def library_id  = library_of.getOrDefault(run_id, "${sample_name}_${run_id}_LB")
-        tuple(run_id, sample_name, library_id, bam, bai)
+        tuple(run_id, sample_name, library_id, bam, bai, [bam.toString(), bai.toString()])
     }
 
     // ---------------------
@@ -291,19 +296,53 @@ workflow gp_wf {
     // BAM). Samples with a single run skip the merge process entirely.
     // ---------------------
     addRG(bam_with_sample)
-    runs_by_sample = addRG.out.bam
+    rg_bams = addRG.out.bam.map { sample_name, run_id, bam, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_name, run_id, bam)
+    }
+    runs_by_sample = rg_bams
         .map { sample_name, _run_id, bam -> tuple(sample_name, bam) }
         .groupTuple(by: 0)
-        .branch { sample_id, bams ->
+        .branch { _sample_id, bams ->
             single: bams.size() == 1
             multi:  true
         }
-    single_run_bam = runs_by_sample.single.map { sample_id, bams -> tuple(sample_id, bams[0]) }
-    merged_run_bam = mergeRunBAMs(runs_by_sample.multi).bam
+    single_run_bam = runs_by_sample.single.map { sample_id, bams -> tuple(sample_id, bams[0], [bams[0].toString()]) }
+    mergeRunBAMs(runs_by_sample.multi.map { sample_id, bams -> tuple(sample_id, bams, bams.collect { b -> b.toString() }) })
+    merged_run_bam = mergeRunBAMs.out.bam.map { sample_id, bam, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, bam, [bam.toString()])
+    }
 
-    dedup_bams = dupRemoval(single_run_bam.mix(merged_run_bam))
-    dedup_with_index = dedup_bams.bam
+    dupRemoval(single_run_bam.mix(merged_run_bam))
+    dedup_with_index = dupRemoval.out.bam.map { sample_id, bam, bai, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sample_id, bam, bai)
+    }
     bams_to_cleanup = dedup_with_index   // pipeline-generated BAMs; deleted after all GATKHC tasks complete
+
+    // ---------------------
+    // Track silently dropped samples
+    // ---------------------
+    // Every per-sample step from download to duplicate marking switches to
+    // 'ignore' once its retries run out, so a failed sample vanishes from the
+    // channel instead of stopping the run. Compare the IDs entering each stage
+    // with those leaving it, and write the difference to
+    // 1_sra_downloads/ignored_samples.txt. Up to addRG the IDs are run IDs;
+    // run merging and duplicate marking work on resolved sample names.
+    entered_trimming_ids = combined_pe_ch.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
+    downloaded_ids       = sra_pe_formatted.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
+
+    ReportIgnoredSamples(
+        sra_expected_ids.collect().ifEmpty([]),
+        downloaded_ids.collect().ifEmpty([]),
+        entered_trimming_ids.collect().ifEmpty([]),
+        trimmed_ch.map { t -> t[0] }.collect().ifEmpty([]),
+        rg_bams.map { t -> t[1] }.collect().ifEmpty([]),
+        rg_bams.map { t -> t[0] }.unique().collect().ifEmpty([]),
+        dedup_with_index.map { t -> t[0] }.collect().ifEmpty([])
+    )
+    ignored_report_ch = ReportIgnoredSamples.out.report
 
     } else {
     // ---------------------
@@ -347,12 +386,19 @@ workflow gp_wf {
     runs_by_sm = probed
         .map { _orig_id, sm, bam, bai -> tuple(sm, bam, bai) }
         .groupTuple(by: 0)
-        .branch { sm, bams, bais ->
+        .branch { _sm, bams, _bais ->
             single: bams.size() == 1
             multi:  true
         }
     single_bam_input = loadBAMs(runs_by_sm.single.map { sm, bams, bais -> tuple(sm, bams[0], bais[0]) }).bam
-    merged_bam_input  = dupRemovalMergedBamInput(mergeRunBAMsBamInput(runs_by_sm.multi.map { sm, bams, _bais -> tuple(sm, bams) }).bam).bam
+    // The caller's BAMs are never deleted (empty consumed list); the merged BAM
+    // is the pipeline's own and goes once duplicate marking has succeeded.
+    mergeRunBAMsBamInput(runs_by_sm.multi.map { sm, bams, _bais -> tuple(sm, bams, []) })
+    dupRemovalMergedBamInput(mergeRunBAMsBamInput.out.bam.map { sm, bam, _consumed -> tuple(sm, bam, [bam.toString()]) })
+    merged_bam_input = dupRemovalMergedBamInput.out.bam.map { sm, bam, bai, consumed ->
+        deleteIntermediates(consumed)
+        tuple(sm, bam, bai)
+    }
 
     dedup_with_index = single_bam_input.mix(merged_bam_input)
     bams_to_cleanup = channel.empty()   // user-provided BAMs are never deleted by the pipeline

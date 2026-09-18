@@ -1,6 +1,8 @@
 process bwaMap {
     tag "BWA-mem mapping"
-    errorStrategy 'retry'
+    // Per-sample step: once retries run out the run is dropped (and named in
+    // ignored_samples.txt) instead of aborting every other sample.
+    errorStrategy { task.attempt <= 6 ? 'retry' : 'ignore' }
     maxRetries 6
         
     input:
@@ -10,26 +12,17 @@ process bwaMap {
     file "${reference}.bwt.2bit.64"
     file "${reference}.pac"
     file "${reference}.0123"
-    tuple val(sample_id), path(trimmed_reads)
+    // consumed: the trimmed reads, deleted by the workflow once this task's
+    // output is accepted (see modules/delete_intermediates.nf)
+    tuple val(sample_id), path(trimmed_reads), val(consumed)
     
     output:
-    tuple val(sample_id), path("${sample_id}.sam"), emit: sam
+    tuple val(sample_id), path("${sample_id}.sam"), val(consumed), emit: sam
     
     script:
     // Build bwa-mem input dynamically
     def reads_cmd = trimmed_reads.size() == 2 ? "${trimmed_reads[0]} ${trimmed_reads[1]}" : "${trimmed_reads[0]}"
     """
-    set -e  # Exit immediately on error - prevents cleanup if command fails
-    
     bwa-mem2 mem -t $task.cpus $reference $reads_cmd > ${sample_id}.sam
-    
-    # Only reached if bwa-mem2 succeeded - cleanup input files
-    # Delete the trimmed reads files (resolve symlinks to actual files)
-    for read_file in ${trimmed_reads.join(' ')}; do
-        target="\$(readlink -f "\$read_file")"
-        if [ -n "\$target" ] && [ -f "\$target" ]; then
-            rm "\$target" || true
-        fi
-    done
     """
 }

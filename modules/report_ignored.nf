@@ -1,8 +1,10 @@
 // Report samples that were silently dropped during the run.
 //
-// SRAdownloadPE/SE and trimSequencesPE/SE fall back to an 'ignore' error
-// strategy once their retries are exhausted: the task fails, Nextflow carries
-// on, and the sample simply never appears in any downstream channel. Without
+// Every per-sample step from download to duplicate marking (SRAdownloadPE/SE,
+// trimSequencesPE/SE, bwaMap, samtoolsSort, addRG, mergeRunBAMs, dupRemoval)
+// falls back to an 'ignore' error strategy once its retries are exhausted: the
+// task fails, Nextflow carries on, and the sample simply never appears in any
+// downstream channel. Without
 // this report a run finishes green while samples are quietly missing from the
 // final VCF, which is easy to overlook on a panel of a few hundred.
 //
@@ -21,6 +23,9 @@ process ReportIgnoredSamples {
     val downloaded_accessions
     val entered_trimming
     val finished_trimming
+    val finished_read_groups      // run IDs that made it through addRG
+    val expected_samples          // sample names those runs resolve to
+    val finished_dedup            // sample names that made it through dupRemoval
 
     output:
     path "ignored_samples.txt", emit: report
@@ -28,7 +33,12 @@ process ReportIgnoredSamples {
     script:
     def dropped_dl   = ((resolved_accessions as List) - (downloaded_accessions as List)).unique().sort()
     def dropped_trim = ((entered_trimming    as List) - (finished_trimming    as List)).unique().sort()
-    def total        = dropped_dl.size() + dropped_trim.size()
+    // Runs that were trimmed but never came out of bwaMap -> samtoolsSort -> addRG
+    def dropped_map  = ((finished_trimming   as List) - (finished_read_groups as List)).unique().sort()
+    // Samples with at least one read-grouped run that never came out of
+    // mergeRunBAMs -> dupRemoval
+    def dropped_dup  = ((expected_samples    as List) - (finished_dedup       as List)).unique().sort()
+    def total        = dropped_dl.size() + dropped_trim.size() + dropped_map.size() + dropped_dup.size()
 
     def lines = []
     lines << "# genomepanel_nf - samples dropped before variant calling"
@@ -57,6 +67,26 @@ process ReportIgnoredSamples {
     lines << "# Usually a truncated or corrupt FASTQ, or an out-of-memory kill."
     if (dropped_trim) {
         dropped_trim.each { t -> lines << t }
+    } else {
+        lines << "# (none)"
+    }
+    lines << ""
+
+    lines << "## Failed during mapping (${dropped_map.size()})"
+    lines << "# Run IDs. bwaMap, samtoolsSort or addRG exhausted its retries. If the"
+    lines << "# sample has other runs (--SRR_sample_map), it is still called, from fewer"
+    lines << "# reads; otherwise it is absent from the final VCF."
+    if (dropped_map) {
+        dropped_map.each { m -> lines << m }
+    } else {
+        lines << "# (none)"
+    }
+    lines << ""
+
+    lines << "## Failed during duplicate marking (${dropped_dup.size()})"
+    lines << "# Sample names. mergeRunBAMs or dupRemoval exhausted its retries."
+    if (dropped_dup) {
+        dropped_dup.each { d -> lines << d }
     } else {
         lines << "# (none)"
     }

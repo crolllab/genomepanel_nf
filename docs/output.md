@@ -35,8 +35,8 @@ The three accession files are only generated when `--SRA_index` is used.
 | `ignored_samples.txt` | Samples dropped before variant calling, split by the stage that dropped them. Always written, even when nothing was dropped. |
 
 !!! warning "Check `ignored_samples.txt` before treating a run as complete"
-    Read downloading and trimming are configured to give up on a sample rather
-    than abort the whole run. When that happens the sample is **missing from the
+    Every per-sample step from download to duplicate marking is configured to
+    give up on a sample rather than abort the whole run. When that happens the sample is **missing from the
     final VCF**, but the pipeline still finishes successfully — nothing in the
     Nextflow summary flags it.
 

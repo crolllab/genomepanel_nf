@@ -1,23 +1,19 @@
 process mergeRunBAMs {
     tag "Merging runs into sample: ${sample_id}"
-    errorStrategy 'retry'
-    maxRetries 6
+    errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
+    maxRetries 3
 
     input:
-    tuple val(sample_id), path(bams)
+    // consumed: the per-run BAMs, deleted by the workflow once this task's
+    // output is accepted (see modules/delete_intermediates.nf). Empty for
+    // --bam_input, whose BAMs belong to the user.
+    tuple val(sample_id), path(bams), val(consumed)
 
     output:
-    tuple val(sample_id), path("${sample_id}_merged.bam"), emit: bam
+    tuple val(sample_id), path("${sample_id}_merged.bam"), val(consumed), emit: bam
 
     script:
     """
     samtools merge -@ ${task.cpus} -f ${sample_id}_merged.bam ${bams}
-
-    # Delete the per-run BAMs now that they are merged (resolve symlinks to the
-    # actual files staged by upstream processes).
-    for f in ${bams}; do
-        target="\$(readlink -f "\$f")"
-        [ -n "\$target" ] && [ -f "\$target" ] && rm -f "\$target" || true
-    done
     """
 }
