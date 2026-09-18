@@ -300,9 +300,26 @@ workflow gp_wf {
         deleteIntermediates(consumed)
         tuple(sample_name, run_id, bam)
     }
+    // How many runs each sample should end up with. This is known as soon as
+    // the inputs are resolved (SRAresolve + the local read pairs), long before
+    // any mapping, and it lets groupTuple release each sample the moment its
+    // last run is read-group tagged. Without a size, groupTuple holds every
+    // sample until the whole addRG channel has closed, so duplicate marking and
+    // HaplotypeCaller could not start until the last sample in the panel had
+    // been mapped. A run dropped on the way ('ignore' at download, trimming or
+    // mapping) leaves its sample's group short; remainder: true still releases
+    // it, with the runs that made it, once addRG has finished for everyone.
+    runs_per_sample = sra_expected_ids
+        .mix(local_pe_formatted.map { t -> t[0] })
+        .map { run_id -> sample_of.getOrDefault(run_id, run_id) }
+        .collect()
+        .map { samples -> samples.countBy { s -> s } }
+
     runs_by_sample = rg_bams
-        .map { sample_name, _run_id, bam -> tuple(sample_name, bam) }
-        .groupTuple(by: 0)
+        .combine(runs_per_sample)
+        .map { sample_name, _run_id, bam, expected -> tuple(groupKey(sample_name, expected[sample_name] ?: 1), bam) }
+        .groupTuple(by: 0, remainder: true)
+        .map { key, bams -> tuple(key.toString(), bams) }
         .branch { _sample_id, bams ->
             single: bams.size() == 1
             multi:  true
