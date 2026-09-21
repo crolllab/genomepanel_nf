@@ -20,9 +20,18 @@ process ConcatVCFs {
     # This handles adjacent 1 Mb segments that might have variants at boundaries
     bcftools concat -a -D -f vcf_list.txt -Oz > final_variants.vcf.gz
     tabix -p vcf final_variants.vcf.gz
-    TOTAL=\$(bcftools view -H final_variants.vcf.gz | wc -l)
+    # With --call_invar_sites the VCF is mostly invariant records (ALT "."),
+    # whose QUAL/AN/MQ/QD are "." and would both swamp the metrics sample and
+    # break the report's numeric plots, so sample variant sites only.
+    if [ "${params.call_invar_sites}" = "true" ]; then
+        SITE_FILTER=(-e 'ALT="."')
+    else
+        SITE_FILTER=()
+    fi
+    TOTAL=\$(bcftools view -H "\${SITE_FILTER[@]}" final_variants.vcf.gz | wc -l)
     FRAC=\$(awk -v t="\$TOTAL" 'BEGIN{ printf "%.6f", (t <= 1000 ? 1.0 : 1000/t) }')
-    bcftools query -f '%CHROM,%POS,%QUAL,%AN,%MQ,%DP,%QD\n' final_variants.vcf.gz \
+    bcftools view "\${SITE_FILTER[@]}" -Ou final_variants.vcf.gz \
+        | bcftools query -f '%CHROM,%POS,%QUAL,%AN,%MQ,%DP,%QD\n' \
         | awk -v frac="\$FRAC" 'BEGIN{srand(42)} (frac >= 1.0 || rand() < frac)' \
         | gzip > final_variants.metrics.csv.gz
 
