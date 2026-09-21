@@ -1,6 +1,9 @@
 process RQualPlotting {
     tag "Generating QC report"
-    errorStrategy 'retry'
+    // Retry only on memory/kill exits (memory scales with the attempt). An R
+    // error recurs identically on every retry, so fail at once instead of
+    // resubmitting six times with ever larger memory requests.
+    errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'finish' }
     maxRetries 6
     publishDir "${params.outdir}/10_reports", mode: 'copy'
 

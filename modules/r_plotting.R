@@ -433,7 +433,16 @@ if (file.exists("final_variants.metrics.csv.gz")) {
 
 if (!is.null(df) && nrow(df) > 0 && ncol(df) >= 7) {
   names(df) <- c("CHROM", "POS", "QUAL", "AN", "MQ", "DP", "QD")
-  df[["QD"]] <- suppressWarnings(as.numeric(df[["QD"]]))
+  # bcftools writes "." for missing values, which makes read.csv return a
+  # character column and scale_x_log10() fail. Coerce every metric, then keep
+  # rows with a usable QUAL (invariant sites have none).
+  for (m in c("QUAL", "AN", "MQ", "DP", "QD")) {
+    df[[m]] <- suppressWarnings(as.numeric(df[[m]]))
+  }
+  df <- df[is.finite(df[["QUAL"]]) & df[["QUAL"]] > 0, , drop = FALSE]
+}
+
+if (!is.null(df) && nrow(df) > 0 && ncol(df) >= 7) {
 
   p3a <- ggplot(df, aes(x = QUAL)) +
     geom_density(fill = COL_SKYBLUE, alpha = 0.4, colour = COL_BLUE) +
