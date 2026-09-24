@@ -27,10 +27,12 @@ flowchart TD
     A1([Local FASTQ\n--reads]):::io
     A2([SRA / ENA\n--SRA_index]):::io
     A3([BAM files\n--bam_input]):::io
+    A4([PacBio HiFi\n--hifi_reads / --hifi_SRA_index\nexperimental]):::io
     REF([Reference genome\n--reference]):::io
 
     T[fastp\ntrimming & QC]:::step
     M[bwa-mem2\nread mapping]:::step
+    MH[pbmm2\nHiFi read mapping]:::step
     D[Picard\nread groups & deduplication]:::step
     HC[GATK HaplotypeCaller\nper-sample GVCF]:::step
     JG[GATK joint genotyping\nCombineGVCFs + GenotypeGVCFs]:::step
@@ -51,6 +53,9 @@ flowchart TD
     REF --> M
     REF --> HC
     M --> D
+    A4 --> MH
+    REF --> MH
+    MH --> D
     D --> HC
     A3 --> HC
     HC --> JG
@@ -65,11 +70,12 @@ flowchart TD
     QC --> O4
 ```
 
-The pipeline accepts three input modes that converge at the variant calling step:
+The pipeline accepts four input modes that converge at the variant calling step:
 
 1. **Local FASTQ files** (`--reads`): raw paired-end Illumina reads are trimmed with fastp, mapped with bwa-mem2, sorted with samtools, assigned read groups and deduplicated with Picard.
 2. **SRA/ENA accessions** (`--SRA_index`): accessions are resolved to run IDs and download URLs; paired-end and single-end runs are handled automatically before joining the same read-processing path.
 3. **Pre-processed BAM files** (`--bam_input`): coordinate-sorted, read-group annotated BAMs skip directly to variant calling.
+4. **PacBio HiFi reads** (`--hifi_reads`, `--hifi_SRA_index`; *experimental*): local FASTQ or SRA/ENA accessions are mapped with pbmm2 without trimming. They can be combined with Illumina input, and a HiFi run given the same sample name as Illumina runs is merged with them and called as one sample.
 
 After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. All QC metrics are collected into a single `pipeline_report.html`.
 
@@ -115,6 +121,7 @@ Please cite the underlying tools if you use them through this pipeline.
 |------|---------|------|-----------|
 | [fastp](https://github.com/OpenGene/fastp) | 1.3.1 | Adapter trimming, read QC | Chen et al. 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty560](https://doi.org/10.1093/bioinformatics/bty560) |
 | [bwa-mem2](https://github.com/bwa-mem2/bwa-mem2) | 2.3 | Read mapping | Vasimuddin et al. 2019, *IPDPS* [doi:10.1109/IPDPS.2019.00041](https://doi.org/10.1109/IPDPS.2019.00041) |
+| [pbmm2](https://github.com/PacificBiosciences/pbmm2) / [minimap2](https://github.com/lh3/minimap2) | 26.2.0 / 2.26 | PacBio HiFi read mapping (experimental) | Li 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty191](https://doi.org/10.1093/bioinformatics/bty191) |
 | [SAMtools](https://www.htslib.org/) | 1.23.1 | BAM manipulation & sorting | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [Picard](https://broadinstitute.github.io/picard/) | 3.4.0 | Read group assignment, duplicate removal | Broad Institute 2019 |
 | [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration | Van der Auwera & O'Connor 2020 |

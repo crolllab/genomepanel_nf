@@ -33,6 +33,7 @@ The three accession files are only generated when `--SRA_index` is used.
 | `NCBI_SRR_PE_accessions.txt` | List of all paired-end SRR run IDs |
 | `NCBI_SRR_SE_accessions.txt` | List of all single-end SRR run IDs |
 | `ignored_samples.txt` | Samples dropped before variant calling, split by the stage that dropped them. Always written, even when nothing was dropped. |
+| `hifi/` | The same three accession files for `--hifi_SRA_index` (PacBio HiFi, experimental). |
 
 !!! warning "Check `ignored_samples.txt` before treating a run as complete"
     Every per-sample step from download to duplicate marking is configured to
@@ -76,6 +77,7 @@ Alignment QC, one JSON per sample plus a combined table. Not generated for `--ba
 | File | Description |
 |------|-------------|
 | `<sample>_flagstat.json` | Raw per-sample `samtools flagstat` output. |
+| `<run>_HiFi_flagstat.json` | The same for a PacBio HiFi run mapped with pbmm2 (experimental); it appears in `bwa_summary.tsv` as the column `<run>_HiFi`. |
 | `bwa_summary.tsv` | Per-sample BWA-mem2 alignment statistics (total reads, mapped reads, mapping rate, etc.). Wide format — one column per sample. |
 
 ---

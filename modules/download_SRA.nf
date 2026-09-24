@@ -34,9 +34,11 @@ EOF
 
     # Timeouts (seconds) for the two long sra-tools steps. A ~8 GB .sra needs
     # well over ten minutes both to fetch and to convert, more again when the
-    # work directory sits on network storage, so keep these generous.
-    prefetch_timeout=3600
-    fasterq_timeout=3600
+    # work directory sits on network storage, so keep these generous. Raised
+    # per process with ext.prefetch_timeout / ext.fasterq_timeout in
+    # nextflow.config (SRAdownloadHiFi does, for multi-GB PacBio runs).
+    prefetch_timeout=${task.ext.prefetch_timeout ?: 3600}
+    fasterq_timeout=${task.ext.fasterq_timeout ?: 3600}
 
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then
@@ -232,9 +234,11 @@ EOF
 
     # Timeouts (seconds) for the two long sra-tools steps. A ~8 GB .sra needs
     # well over ten minutes both to fetch and to convert, more again when the
-    # work directory sits on network storage, so keep these generous.
-    prefetch_timeout=3600
-    fasterq_timeout=3600
+    # work directory sits on network storage, so keep these generous. Raised
+    # per process with ext.prefetch_timeout / ext.fasterq_timeout in
+    # nextflow.config (SRAdownloadHiFi does, for multi-GB PacBio runs).
+    prefetch_timeout=${task.ext.prefetch_timeout ?: 3600}
+    fasterq_timeout=${task.ext.fasterq_timeout ?: 3600}
 
     while [ \$attempt -le \$max_attempts ] && [ "\$success" = "false" ]; do
         if [ \$attempt -gt 1 ]; then

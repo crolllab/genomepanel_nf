@@ -31,8 +31,8 @@ not stop the run.
 
 ## File paths and glob patterns
 
-`--reads` and `--bam_input` take **glob patterns**; `--reference` and `--SRA_index` take a
-single file. The rules below apply to all of them.
+`--reads`, `--hifi_reads` and `--bam_input` take **glob patterns**; `--reference`, `--SRA_index`
+and `--hifi_SRA_index` take a single file. The rules below apply to all of them.
 
 ### Quoting
 
@@ -78,7 +78,7 @@ you can confirm every location was picked up.
     so it cannot also separate patterns. `path1,path2`, `path1|path2` and `path1 path2` are
     each rejected at startup with a message pointing at the semicolon form.
 
-`--reference` and `--SRA_index` accept exactly one file each; a pattern matching several
+`--reference`, `--SRA_index` and `--hifi_SRA_index` accept exactly one file each; a pattern matching several
 files is rejected.
 
 ---
@@ -98,7 +98,7 @@ files is rejected.
 
 ## Read input options
 
-Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `--bam_input` if you have pre-processed BAM files (can't be combined with `--reads` or `--SRA_index`). See below for details.
+Provide either or both of `--reads` and `--SRA_index`, optionally together with PacBio HiFi reads (`--hifi_reads`, `--hifi_SRA_index`; experimental). Alternatively, provide `--bam_input` if you have pre-processed BAM files (can't be combined with any read input). See below for details.
 
 ### Local FASTQ files
 
@@ -127,11 +127,62 @@ Provide either or both of `--reads` and `--SRA_index`. Alternatively, provide `-
     assuming several runs share a library, with no other evidence, is not a safe
     default, since duplicate marking is scoped to the library.
 
+### PacBio HiFi reads (experimental)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--hifi_reads` | `glob` | — | Glob pattern pointing to PacBio HiFi FASTQ files (`.fastq`, `.fq`, optionally gzipped), **one file per run**. The run ID is the file name without its FASTQ extension and must be unique. It must not match any `--reads` run or any accession listed for download, since the same run would otherwise be merged into its sample twice. Single-quote the pattern; separate several locations with `;`. |
+| `--hifi_SRA_index` | `path` | — | Plain-text file listing PacBio HiFi SRA/ENA accessions, one per line — in the same format as `--SRA_index`, but a separate file. An accession may not be listed in both. Paired-end runs resolved from it are skipped with a warning, since they cannot be PacBio data. |
+
+HiFi runs can be given on their own or together with Illumina input. They are not trimmed
+(HiFi reads are consensus-called and adapter-free) and are mapped with
+[pbmm2](https://github.com/PacificBiosciences/pbmm2), PacBio's minimap2 wrapper, using
+`--preset CCS` against a reference index built once per run. pbmm2 writes the read group
+itself:
+
+```
+@RG  ID:<run_id>  SM:<sample_name>  LB:<sample_name>_<run_id>_HIFI_LB  PL:PACBIO
+```
+
+From there a HiFi BAM follows the same path as an Illumina one: runs of the same sample
+are merged, duplicates are marked, and the sample is called with GATK HaplotypeCaller and
+joint-genotyped with the rest of the panel.
+
+!!! info "Combining HiFi and Illumina reads of one sample"
+    Give the HiFi run and the Illumina runs the same `Sample_Name` in `--SRR_sample_map`:
+
+    ```
+    SRR2584863,REL7179B
+    hifi_REL7179B,REL7179B
+    ```
+
+    Their BAMs are merged into one and called as a single sample, since GATK groups reads by
+    the `SM` tag. Each run keeps its own read group `ID` and library `LB`. Duplicate
+    marking is scoped to the library, so HiFi reads are never compared with Illumina reads.
+    If you set `Library_ID` in the map yourself, never give a HiFi run the same library
+    as an Illumina run.
+
+!!! warning "Experimental"
+    - **Treat indel calls in samples with HiFi data with caution.** HiFi's main remaining
+      error is a wrong homopolymer length, and HaplotypeCaller's indel error model (its
+      default `--pcr-indel-model CONSERVATIVE`, which the pipeline does not change) was
+      built for short reads. Indel calling has not been benchmarked on HiFi data in this
+      pipeline; a long-read caller such as DeepVariant is generally more accurate for
+      HiFi indels. SNP calls are less affected. The same caution is printed at startup
+      whenever HiFi input is given.
+    - Only HiFi (CCS) reads are supported. Older PacBio subread or CLR data in the SRA
+      downloads without error but maps poorly under the CCS preset. Check that each
+      accession is a HiFi run.
+    - Unaligned PacBio BAM (`hifi_reads.bam`) is not accepted by `--hifi_reads`. Convert
+      it first with `samtools fastq hifi_reads.bam | gzip > run.fastq.gz`.
+    - HiFi runs appear in `4_bwa_mapping/` as `<run>_HiFi` columns, but not in the fastp
+      tables, since they are not trimmed.
+
 ### Pre-processed BAM files
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--bam_input` | `glob` | — | Glob pattern for pre-existing BAM files. Skips trimming and mapping and starts directly with variant calling. Cannot be combined with `--reads` or `--SRA_index`. Single-quote the pattern; separate several locations with `;`. See [File paths and glob patterns](#file-paths-and-glob-patterns). |
+| `--bam_input` | `glob` | — | Glob pattern for pre-existing BAM files. Skips trimming and mapping and starts directly with variant calling. Cannot be combined with `--reads`, `--SRA_index`, `--hifi_reads` or `--hifi_SRA_index`. Single-quote the pattern; separate several locations with `;`. See [File paths and glob patterns](#file-paths-and-glob-patterns). |
 
 !!! warning "BAM file requirements"
     BAM files provided via `--bam_input` must be:

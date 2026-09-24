@@ -5,3 +5,5 @@ work
 *_output*
 site/
 example/output/
+# Example PacBio HiFi reads fetched by hand (see example/README.md)
+example/hifi/

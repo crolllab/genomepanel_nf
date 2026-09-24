@@ -1,7 +1,8 @@
 // Report samples that were silently dropped during the run.
 //
 // Every per-sample step from download to duplicate marking (SRAdownloadPE/SE,
-// trimSequencesPE/SE, bwaMap, samtoolsSort, addRG, mergeRunBAMs, dupRemoval)
+// trimSequencesPE/SE, bwaMap, samtoolsSort, addRG, mergeRunBAMs, dupRemoval,
+// and for PacBio HiFi runs SRAdownloadHiFi, pbmm2Map, hifiFlagstat)
 // falls back to an 'ignore' error strategy once its retries are exhausted: the
 // task fails, Nextflow carries on, and the sample simply never appears in any
 // downstream channel. Without
@@ -22,8 +23,8 @@ process ReportIgnoredSamples {
     val resolved_accessions
     val downloaded_accessions
     val entered_trimming
-    val finished_trimming
-    val finished_read_groups      // run IDs that made it through addRG
+    val finished_trimming         // run IDs ready for mapping: trimmed Illumina runs, and HiFi runs (never trimmed)
+    val finished_read_groups      // run IDs that made it through addRG (Illumina) or hifiFlagstat (HiFi)
     val expected_samples          // sample names those runs resolve to
     val finished_dedup            // sample names that made it through dupRemoval
 
@@ -52,9 +53,9 @@ process ReportIgnoredSamples {
     lines << ""
 
     lines << "## Failed to download (${dropped_dl.size()})"
-    lines << "# Accession was resolved by SRAresolve, but SRAdownloadPE/SE exhausted"
+    lines << "# Accession was resolved by SRAresolve, but SRAdownloadPE/SE/HiFi exhausted"
     lines << "# its retries. Re-run to try again, or fetch the reads manually and pass"
-    lines << "# them with --reads."
+    lines << "# them with --reads (or --hifi_reads)."
     if (dropped_dl) {
         dropped_dl.each { d -> lines << d }
     } else {
@@ -73,7 +74,8 @@ process ReportIgnoredSamples {
     lines << ""
 
     lines << "## Failed during mapping (${dropped_map.size()})"
-    lines << "# Run IDs. bwaMap, samtoolsSort or addRG exhausted its retries. If the"
+    lines << "# Run IDs. bwaMap, samtoolsSort or addRG (pbmm2Map or hifiFlagstat for"
+    lines << "# PacBio HiFi runs) exhausted its retries. If the"
     lines << "# sample has other runs (--SRR_sample_map), it is still called, from fewer"
     lines << "# reads; otherwise it is absent from the final VCF."
     if (dropped_map) {
