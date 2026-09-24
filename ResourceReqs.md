@@ -17,6 +17,8 @@ base value raised rather than its retry count.
 | `SRAresolve` | 7d | 1 | 1 GB | — | `retry` | 6 |
 | `SRAdownloadPE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 5 | 6 |
 | `SRAdownloadSE` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 5 | 6 |
+| `SRAresolveHiFi` | 7d | 1 | 1 GB | — | `retry` | 6 |
+| `SRAdownloadHiFi` | 7d | 1 | 2 GB × attempt | 10 | `retry` → **`ignore`** after attempt 5 | 6 |
 | `ReportIgnoredSamples` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `loadBAMs` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
 | `probeBAMSample` | 1h | 1 | 1 GB × attempt | — | `retry` | 6 |
@@ -24,6 +26,14 @@ base value raised rather than its retry count.
 | `bwaIndex` | 1d | 1 | 16 GB × attempt | — | `retry` | 6 |
 | `fastaIndex` | 1d | 1 | 2 GB × attempt | — | `retry` | 6 |
 | `gatkIndex` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `pbmm2Index` | 1d | 4 | 16 GB × attempt | — | `retry` | 6 |
+
+`SRAresolveHiFi` and `SRAdownloadHiFi` are `SRAresolve` and `SRAdownloadSE`
+included under an alias for `--hifi_SRA_index` (PacBio HiFi, experimental).
+`SRAresolveHiFi` publishes to `1_sra_downloads/hifi/` so that it does not
+overwrite the Illumina accession lists. `SRAdownloadHiFi` raises both
+sra-tools timeouts to 14400 s through `ext.prefetch_timeout` /
+`ext.fasterq_timeout`.
 
 ### Read processing and mapping
 
@@ -34,6 +44,8 @@ base value raised rather than its retry count.
 | `bwaMap` | 7d | — | 8 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
 | `samtoolsSort` | 1d | 1 | 2 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
 | `addRG` | 1d | 1 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
+| `pbmm2Map` | 7d | — | 24 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
+| `hifiFlagstat` | 1d | 2 | 2 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
 | `mergeRunBAMs` | 1d | 2 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 4 | 3 |
 | `mergeRunBAMsBamInput` | 1d | 2 | 4 GB × attempt | — | `retry` | 3 |
 | `dupRemoval` | 1d | 1 | 4 GB × attempt | — | `retry` → **`ignore`** after attempt 7 | 6 |
@@ -88,10 +100,12 @@ See gp_wf.nf.
 
 ### CPUs marked "—"
 
-`trimSequencesPE`, `trimSequencesSE` and `bwaMap` set no `cpus` directive, so they
-inherit the profile default: **4** under `-profile local`, **8** under
-`-profile slurm`, **16** under `-profile local_highCPU`. `bwaMap` passes this to
-`bwa-mem2 mem -t`, so the mapping thread count follows the profile.
+`trimSequencesPE`, `trimSequencesSE`, `bwaMap` and `pbmm2Map` set no `cpus`
+directive, so they inherit the profile default: **4** under `-profile local`,
+**8** under `-profile slurm`, **16** under `-profile local_highCPU`. `bwaMap`
+passes this to `bwa-mem2 mem -t`, so the mapping thread count follows the
+profile. `pbmm2Map` splits it between alignment (`-j`) and sorting (`-J`, a
+quarter of the CPUs, at least one).
 
 ### Processes that give up instead of failing the run
 
@@ -101,9 +115,10 @@ from the final VCF** while the pipeline still reports success:
 
 | Process | Gives up after |
 |---------|----------------|
-| `SRAdownloadPE`, `SRAdownloadSE` | attempt 5 |
+| `SRAdownloadPE`, `SRAdownloadSE`, `SRAdownloadHiFi` | attempt 5 |
 | `trimSequencesPE`, `trimSequencesSE` | attempt 4 |
 | `bwaMap`, `samtoolsSort`, `addRG`, `dupRemoval` | attempt 7 |
+| `pbmm2Map`, `hifiFlagstat` | attempt 7 |
 | `mergeRunBAMs` | attempt 4 |
 
 A run dropped at `bwaMap`, `samtoolsSort` or `addRG` only removes the whole
@@ -143,8 +158,9 @@ failed this way and were ignored 85 times).
 Nextflow's `maxRetries`. Each Nextflow attempt runs up to 4 internal attempts
 with backoffs of 10, 30 and 60 minutes (plus jitter), trying ENA first and
 falling back to NCBI `prefetch` + `fasterq-dump`. Both sra-tools steps are
-wrapped in a 3600 s `timeout`; raise `prefetch_timeout` / `fasterq_timeout` in
-`modules/download_SRA.nf` for unusually large accessions. A completed `.sra` is
+wrapped in a 3600 s `timeout`; raise it for unusually large accessions with
+`ext.prefetch_timeout` / `ext.fasterq_timeout` in the process's `withName:`
+block, as `SRAdownloadHiFi` does. A completed `.sra` is
 kept between internal attempts so a failed extraction does not re-download it.
 
 One Nextflow attempt can therefore take a couple of hours, most of it sleeping.

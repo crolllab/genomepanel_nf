@@ -6,6 +6,14 @@ nextflow.enable.dsl=2
 include { SRAresolve } from '../modules/resolve_SRA'
 include { SRAdownloadPE } from '../modules/download_SRA'
 include { SRAdownloadSE } from '../modules/download_SRA'
+// PacBio HiFi runs (experimental) are resolved and downloaded by the same
+// processes as Illumina runs, under aliases so that their resources and
+// publish location can be set separately in nextflow.config.
+include { SRAresolve as SRAresolveHiFi } from '../modules/resolve_SRA'
+include { SRAdownloadSE as SRAdownloadHiFi } from '../modules/download_SRA'
+include { pbmm2Index } from '../modules/pbmm2_mapping'
+include { pbmm2Map } from '../modules/pbmm2_mapping'
+include { hifiFlagstat } from '../modules/pbmm2_mapping'
 include { trimSequencesPE } from '../modules/fastp_trimming'
 include { trimSequencesSE } from '../modules/fastp_trimming'
 include { filterReference } from '../modules/filter_reference'
@@ -79,7 +87,43 @@ workflow gp_wf {
     // ---------------------
     if (!params.bam_input) {
     // Process reads through full pipeline
-    
+
+    // ---------------------
+    // SRR to Sample mapping (optional)
+    // ---------------------
+    // Read the map once, here in Groovy, rather than with a shell grep inside
+    // addRG. That is what lets Nextflow see the RESOLVED sample name and group
+    // runs by it below -- several runs mapped to the same Sample_Name are
+    // merged into one BAM before duplicate marking, so HaplotypeCaller and
+    // GenomicsDBImport ever see one gVCF per sample, never several sharing an
+    // SM tag (the cause of the 2026-09-04 lepus run's GenomicsDBImport
+    // failures: 85 intervals each rejecting a sample name repeated up to 9
+    // times, because each run had produced -- and kept -- its own gVCF).
+    // Resolved up here because the HiFi runs need their sample name before
+    // mapping: pbmm2 writes the read group itself.
+    //
+    // A leading UTF-8 BOM (common in CSVs saved from Excel) is stripped from
+    // the first line only, so it cannot silently break just that one lookup
+    // and fall back to the raw run ID.
+    //
+    // The map's optional third column names the sequencing library explicitly
+    // (Run_ID,Sample_Name,Library_ID). Without it, each run gets its own
+    // library id: assuming every run of a sample is the same library, with no
+    // evidence either way, is not safe, since duplicate marking scopes to the
+    // library.
+    def sample_of  = [:]
+    def library_of = [:]
+    if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
+        file(params.SRR_sample_map).readLines().eachWithIndex { raw, idx ->
+            def line = (idx == 0 && raw.startsWith('﻿') ? raw.substring(1) : raw).trim()
+            if (!line || line.startsWith('#')) return
+            def fields = line.tokenize(',')*.trim()
+            if (fields.size() < 2) return
+            sample_of[fields[0]] = fields[1]
+            if (fields.size() >= 3 && fields[2]) library_of[fields[0]] = fields[2]
+        }
+    }
+
     // ---------------------
     // SRA metadata + downloads
     // ---------------------
@@ -170,6 +214,76 @@ workflow gp_wf {
     combined_pe_ch = sra_pe_formatted.mix(local_pe_formatted)
 
     // ---------------------
+    // PacBio HiFi reads (EXPERIMENTAL): SRA downloads and/or local FASTQ
+    // ---------------------
+    // Each HiFi run is one FASTQ. Tuples: [run_id, reads, consumed].
+    if (params.hifi_SRA_index) {
+        SRAresolveHiFi(channel.fromPath(params.hifi_SRA_index, checkIfExists: true))
+        hifi_rows = SRAresolveHiFi.out.url_file
+            .splitCsv(sep: '\t', header: true)
+            .branch { row ->
+                single: row.Layout == 'SE'
+                paired: true
+            }
+        // PacBio runs are registered as SINGLE; a PAIRED one cannot be HiFi.
+        hifi_rows.paired.subscribe { row ->
+            log.warn "--hifi_SRA_index: ${row.SRR_ID} is a paired-end run, so it cannot be PacBio HiFi data -- skipped. Put Illumina accessions in --SRA_index."
+        }
+        hifi_with_urls = hifi_rows.single.map { row -> tuple(row.SRR_ID, row.URL_1 ?: "", row.Source ?: "NCBI") }
+        hifi_sra_expected_ids = hifi_with_urls.map { t -> t[0] }
+
+        SRAdownloadHiFi(hifi_with_urls)
+        // The downloaded FASTQ is deleted once pbmm2Map succeeds.
+        hifi_sra_reads = SRAdownloadHiFi.out.map { run_id, reads -> tuple(run_id, reads, [reads.toString()]) }
+    } else {
+        hifi_sra_expected_ids = channel.empty()
+        hifi_sra_reads        = channel.empty()
+    }
+
+    if (params.hifi_reads) {
+        // One file per run; the run ID is the file name without its FASTQ
+        // extension. User-provided reads are never deleted.
+        def hifi_patterns = params.hifi_reads.tokenize(';').collect { pat -> pat.trim() }.findAll { pat -> pat }
+        hifi_local = channel
+            .fromPath(hifi_patterns, checkIfExists: true)
+            .map { fq -> tuple(fq.name.replaceAll(/(?i)\.(fastq|fq)(\.gz)?$/, ''), fq, []) }
+    } else {
+        hifi_local = channel.empty()
+    }
+
+    hifi_reads_ch = hifi_sra_reads.mix(hifi_local)
+
+    if (params.hifi_reads || params.hifi_SRA_index) {
+        pbmm2_mmi = pbmm2Index(reference_to_use)
+
+        // RG ID is the run ID, as for Illumina runs; SM is the resolved sample
+        // name, so a HiFi run and the Illumina runs of the same sample are
+        // merged into one BAM below. The default LB is per run and marked
+        // HIFI, so MarkDuplicates never compares HiFi and Illumina reads.
+        pbmm2Map(pbmm2_mmi, hifi_reads_ch.map { run_id, reads, consumed ->
+            def sample_name = sample_of.getOrDefault(run_id, run_id)
+            def library_id  = library_of.getOrDefault(run_id, "${sample_name}_${run_id}_HIFI_LB")
+            tuple(run_id, sample_name, library_id, reads, consumed)
+        })
+
+        hifiFlagstat(pbmm2Map.out.bam.map { run_id, _sample_name, bam, _consumed -> tuple(run_id, bam) })
+
+        // Release each HiFi BAM only once hifiFlagstat has read it: from here
+        // it can be merged and deleted. A run whose flagstat fails is dropped
+        // by the join and reported as failed during mapping.
+        hifi_rg_bams = pbmm2Map.out.bam
+            .join(hifiFlagstat.out.report)
+            .map { run_id, sample_name, bam, consumed, _json ->
+                deleteIntermediates(consumed)
+                tuple(sample_name, run_id, bam)
+            }
+        hifi_reports = hifiFlagstat.out.report.map { _run_id, json -> json }
+    } else {
+        hifi_rg_bams = channel.empty()
+        hifi_reports = channel.empty()
+    }
+
+    // ---------------------
     // Read trimming, reporting
     // ---------------------
     // Connect channels to trimming processes
@@ -246,42 +360,10 @@ workflow gp_wf {
         tuple(sample_id, bam, bai)
     }
 
-    bam_reports = samtoolsSort.out.report
+    // Illumina (samtoolsSort) and HiFi (hifiFlagstat) mapping statistics
+    // share one summary table.
+    bam_reports = samtoolsSort.out.report.mix(hifi_reports)
     bam_reports_ch = bam_reports.collect()
-
-    // ---------------------
-    // SRR to Sample mapping (optional)
-    // ---------------------
-    // Read the map once, here in Groovy, rather than with a shell grep inside
-    // addRG. That is what lets Nextflow see the RESOLVED sample name and group
-    // runs by it below -- several runs mapped to the same Sample_Name are
-    // merged into one BAM before duplicate marking, so HaplotypeCaller and
-    // GenomicsDBImport ever see one gVCF per sample, never several sharing an
-    // SM tag (the cause of the 2026-09-04 lepus run's GenomicsDBImport
-    // failures: 85 intervals each rejecting a sample name repeated up to 9
-    // times, because each run had produced -- and kept -- its own gVCF).
-    //
-    // A leading UTF-8 BOM (common in CSVs saved from Excel) is stripped from
-    // the first line only, so it cannot silently break just that one lookup
-    // and fall back to the raw run ID.
-    //
-    // The map's optional third column names the sequencing library explicitly
-    // (Run_ID,Sample_Name,Library_ID). Without it, each run gets its own
-    // library id: assuming every run of a sample is the same library, with no
-    // evidence either way, is not safe, since duplicate marking scopes to the
-    // library.
-    def sample_of  = [:]
-    def library_of = [:]
-    if (params.SRR_sample_map && params.SRR_sample_map instanceof String) {
-        file(params.SRR_sample_map).readLines().eachWithIndex { raw, idx ->
-            def line = (idx == 0 && raw.startsWith('\uFEFF') ? raw.substring(1) : raw).trim()
-            if (!line || line.startsWith('#')) return
-            def fields = line.tokenize(',')*.trim()
-            if (fields.size() < 2) return
-            sample_of[fields[0]] = fields[1]
-            if (fields.size() >= 3 && fields[2]) library_of[fields[0]] = fields[2]
-        }
-    }
 
     bam_with_sample = bam_sorted.map { run_id, bam, bai ->
         def sample_name = sample_of.getOrDefault(run_id, run_id)
@@ -296,10 +378,11 @@ workflow gp_wf {
     // BAM). Samples with a single run skip the merge process entirely.
     // ---------------------
     addRG(bam_with_sample)
+    // HiFi runs join here, already read-grouped by pbmm2.
     rg_bams = addRG.out.bam.map { sample_name, run_id, bam, consumed ->
         deleteIntermediates(consumed)
         tuple(sample_name, run_id, bam)
-    }
+    }.mix(hifi_rg_bams)
     // How many runs each sample should end up with. This is known as soon as
     // the inputs are resolved (SRAresolve + the local read pairs), long before
     // any mapping, and it lets groupTuple release each sample the moment its
@@ -311,6 +394,8 @@ workflow gp_wf {
     // it, with the runs that made it, once addRG has finished for everyone.
     runs_per_sample = sra_expected_ids
         .mix(local_pe_formatted.map { t -> t[0] })
+        .mix(hifi_sra_expected_ids)
+        .mix(hifi_local.map { t -> t[0] })
         .map { run_id -> sample_of.getOrDefault(run_id, run_id) }
         .collect()
         .map { samples -> samples.countBy { s -> s } }
@@ -347,14 +432,20 @@ workflow gp_wf {
     // with those leaving it, and write the difference to
     // 1_sra_downloads/ignored_samples.txt. Up to addRG the IDs are run IDs;
     // run merging and duplicate marking work on resolved sample names.
+    // HiFi runs are not trimmed: they count as ready for mapping as soon as
+    // their reads are in hand, so a pbmm2Map or hifiFlagstat failure is
+    // reported as failed during mapping.
     entered_trimming_ids = combined_pe_ch.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
-    downloaded_ids       = sra_pe_formatted.map { t -> t[0] }.mix(sra_se_formatted.map { t -> t[0] })
+    downloaded_ids       = sra_pe_formatted.map { t -> t[0] }
+        .mix(sra_se_formatted.map { t -> t[0] })
+        .mix(hifi_sra_reads.map { t -> t[0] })
+    ready_to_map_ids     = trimmed_ch.map { t -> t[0] }.mix(hifi_reads_ch.map { t -> t[0] })
 
     ReportIgnoredSamples(
-        sra_expected_ids.collect().ifEmpty([]),
+        sra_expected_ids.mix(hifi_sra_expected_ids).collect().ifEmpty([]),
         downloaded_ids.collect().ifEmpty([]),
         entered_trimming_ids.collect().ifEmpty([]),
-        trimmed_ch.map { t -> t[0] }.collect().ifEmpty([]),
+        ready_to_map_ids.collect().ifEmpty([]),
         rg_bams.map { t -> t[1] }.collect().ifEmpty([]),
         rg_bams.map { t -> t[0] }.unique().collect().ifEmpty([]),
         dedup_with_index.map { t -> t[0] }.collect().ifEmpty([])
@@ -592,17 +683,25 @@ workflow gp_wf {
     qual_plot_script     = channel.value(file("${projectDir}/modules/r_plotting.R"))
 
     if (!params.bam_input) {
-        RSummarizingFASTP(fastp_json_ch, fastp_summary_script)
+        // HiFi runs are not trimmed, so a HiFi-only run has no fastp reports.
+        // Collecting none emits nothing, which would leave RSummarizingFASTP
+        // -- and with it the report -- waiting forever; pass an empty summary,
+        // as for BAM input.
+        if (params.reads || params.SRA_index) {
+            fastp_tsv = RSummarizingFASTP(fastp_json_ch, fastp_summary_script)
+        } else {
+            fastp_tsv = channel.value([])
+        }
         RSummarizingBWA(bam_reports_ch, bwa_summary_script)
         // Pass TSV summary files to the plotting process
-        RQualPlotting(concat_vcf, RSummarizingFASTP.out, RSummarizingBWA.out,
+        RQualPlotting(concat_vcf, fastp_tsv, RSummarizingBWA.out,
             ignored_report_ch, qual_plot_script,
             channel.value(workflow.manifest.version),
             channel.value(workflow.start.format('yyyy-MM-dd HH:mm')))
 
         // Mix all final outputs including R summaries and the HTML report
         all_done = concat_clean_vcf.mix(concat_vcf)
-            .mix(RSummarizingFASTP.out)
+            .mix(fastp_tsv)
             .mix(RSummarizingBWA.out)
             .mix(RQualPlotting.out.report)
             .mix(plink_done)

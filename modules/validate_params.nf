@@ -30,6 +30,7 @@ def knownParams() {
         'outdir',
         'reference', 'reference_segments', 'min_contig_length', 'bwa_index',
         'reads', 'SRA_index', 'SRR_sample_map', 'NCBI_API_key', 'bam_input',
+        'hifi_reads', 'hifi_SRA_index',
         'ploidy', 'call_invar_sites', 'use_duplicate_reads', 'genomicsdb_batch_size',
         'keep_bam', 'keep_gvcf',
         'plink_pca', 'plink_relationships', 'plink_ld_prune',
@@ -63,6 +64,7 @@ def nextflowOptionAliases() {
 // tokenize([;])".
 def stringParams() {
     ['reference', 'reads', 'SRA_index', 'bam_input', 'bwa_index',
+     'hifi_reads', 'hifi_SRA_index',
      'SRR_sample_map', 'slurm_queue', 'outdir', 'NCBI_API_key']
 }
 
@@ -91,8 +93,9 @@ def patternSeparator() { return ';' }
 
 // A representative quoted pattern for each glob-valued parameter, used in messages.
 def exampleGlob(String name) {
-    def examples = ['reads'    : "'path/to/reads/*_{1,2}.fastq.gz'",
-                    'bam_input': "'path/to/bams/*.bam'"]
+    def examples = ['reads'     : "'path/to/reads/*_{1,2}.fastq.gz'",
+                    'hifi_reads': "'path/to/hifi/*.fastq.gz'",
+                    'bam_input' : "'path/to/bams/*.bam'"]
     return examples.get(name?.replaceAll(/^--/, ''), "'path/to/files/*'")
 }
 
@@ -471,23 +474,27 @@ def checkReads(List problems, List warnings, Map summary) {
 
     summary['Local FASTQ'] = "${allMatches.size()} files -> ${pairs.size()} read pair${pairs.size() == 1 ? '' : 's'}" +
                              (patterns.size() > 1 ? " from ${patterns.size()} patterns" : "")
+    return pairs.keySet() as List
 }
 
-def checkSraIndex(List problems, List warnings, Map summary) {
-    if (!params.SRA_index) return
-    if (params.SRA_index instanceof Boolean) return
+// Shared by --SRA_index and --hifi_SRA_index. Returns the accessions listed,
+// or null if the file could not be used.
+def checkAccessionFile(String name, String summaryKey, List problems, List warnings, Map summary) {
+    def value = params[name]
+    if (!value) return
+    if (value instanceof Boolean) return
 
-    def pattern = params.SRA_index.toString().trim()
+    def pattern = value.toString().trim()
     def matches = globMatches(pattern)
 
     if (matches.isEmpty()) {
-        addProblem(problems, "--SRA_index file not found: ${displayPath(pattern)}",
-                   ["--SRA_index takes a plain-text file listing one accession per line",
+        addProblem(problems, "--${name} file not found: ${displayPath(pattern)}",
+                   ["--${name} takes a plain-text file listing one accession per line",
                     "(SRR, ERR, DRR, SRX, SRP, PRJNA ...), not an accession itself."])
         return
     }
     if (matches.size() > 1) {
-        addProblem(problems, "--SRA_index matched ${matches.size()} files, but exactly one is required")
+        addProblem(problems, "--${name} matched ${matches.size()} files, but exactly one is required")
         return
     }
 
@@ -497,27 +504,99 @@ def checkSraIndex(List problems, List warnings, Map summary) {
         accessions = accessionFile.readLines().collect { l -> l.trim() }.findAll { l -> l && !l.startsWith('#') }
     }
     catch (Exception e) {
-        addProblem(problems, "--SRA_index file ${accessionFile.name} could not be read: ${e.message}")
+        addProblem(problems, "--${name} file ${accessionFile.name} could not be read: ${e.message}")
         return
     }
 
     if (accessions.isEmpty()) {
-        addProblem(problems, "--SRA_index file ${accessionFile.name} contains no accessions",
+        addProblem(problems, "--${name} file ${accessionFile.name} contains no accessions",
                    ["The file is empty or contains only blank lines. List one accession per line."])
         return
     }
 
     def malformed = accessions.findAll { a -> !(a ==~ /^[A-Za-z]{2,6}[0-9]{3,}$/) }
     if (malformed)
-        warnings << ("--SRA_index: ${malformed.size()} line(s) do not look like SRA/ENA accessions and " +
+        warnings << ("--${name}: ${malformed.size()} line(s) do not look like SRA/ENA accessions and " +
                      "will probably resolve to nothing: " + malformed.take(4).join(', '))
 
-    if (!params.NCBI_API_key)
-        warnings << ("--SRA_index without --NCBI_API_key: NCBI throttles anonymous E-utilities requests to " +
-                     "3/second, so metadata lookup for large accession lists is slow and prone to retries. " +
-                     "A free key (https://account.ncbi.nlm.nih.gov/) raises this to 10/second.")
+    summary[summaryKey] = "${accessions.size()} from ${accessionFile.name}"
+    return accessions
+}
 
-    summary['SRA accessions'] = "${accessions.size()} from ${accessionFile.name}"
+// PacBio HiFi FASTQ files (experimental), one file per run. The run ID -- and,
+// without --SRR_sample_map, the sample name -- is the file name minus its
+// FASTQ extension. Returns those run IDs, or null if the input is unusable.
+def hifiRunId(String filename) {
+    return filename.replaceAll(/(?i)\.(fastq|fq)(\.gz)?$/, '')
+}
+
+def checkHifiReads(List problems, List warnings, Map summary) {
+    if (!params.hifi_reads) return
+    if (params.hifi_reads instanceof Boolean) return
+
+    def raw = params.hifi_reads.toString()
+    def patterns = splitPatterns(raw)
+    if (patterns.isEmpty()) {
+        addProblem(problems, "--hifi_reads was given an empty pattern")
+        return
+    }
+
+    def matches = []
+    def emptyPatterns = []
+    patterns.each { pattern ->
+        def found = globMatches(pattern)
+        if (found.isEmpty()) emptyPatterns << pattern
+        matches.addAll(found)
+    }
+    matches = matches.unique { f -> f.toAbsolutePath().toString() }
+
+    if (matches.isEmpty()) {
+        def detail = ["Looked for: ${patterns.collect { pat -> displayPath(pat) }.join('\n                 ')}",
+                      ""]
+        def hint = separatorHint('hifi_reads', raw)
+        if (hint) detail.addAll(hint)
+        else      detail << "Remember to single-quote the pattern: --hifi_reads 'hifi/*.fastq.gz'"
+        addProblem(problems, "--hifi_reads matched no files", detail)
+        return
+    }
+
+    if (emptyPatterns)
+        warnings << ("--hifi_reads: ${emptyPatterns.size()} of ${patterns.size()} patterns matched no files: " +
+                     emptyPatterns.join(', '))
+
+    // pbmm2 reads unaligned PacBio BAM natively, but --rg (how the sample name
+    // is set) applies to FASTA/FASTQ input only, so only FASTQ is accepted.
+    def notFastq = matches.findAll { f -> !(f.name ==~ /(?i).*\.(fastq|fq)(\.gz)?$/) }
+    if (notFastq) {
+        def detail = ["--hifi_reads takes FASTQ files (.fastq, .fq, optionally .gz), one per run."]
+        if (notFastq.any { f -> f.name.toLowerCase().endsWith('.bam') })
+            detail << "For an unaligned PacBio hifi_reads.bam, convert it first:  samtools fastq in.bam | gzip > run.fastq.gz"
+        detail << "Not FASTQ:"
+        detail.addAll(notFastq.take(6).collect { f -> "  ${f.name}" })
+        addProblem(problems, "--hifi_reads matched ${notFastq.size()} file(s) that are not FASTQ", detail)
+        return
+    }
+
+    // The run ID becomes the read-group ID and the pbmm2 BAM's file name, so
+    // two files with the same name in different folders would collide.
+    def clashing = matches.groupBy { f -> hifiRunId(f.name) }.findAll { _id, files -> files.size() > 1 }
+    if (clashing) {
+        addProblem(problems, "--hifi_reads: ${clashing.size()} run ID(s) are shared by more than one file",
+                   (["Each HiFi file's run ID is its file name without the FASTQ extension, and must be",
+                     "unique. Rename the files; to combine them into one sample, give them the same",
+                     "Sample_Name in --SRR_sample_map instead."] +
+                    clashing.take(4).collect { id, files -> "  ${id}: ${files.collect { f -> f.toString() }.join(', ')}" }))
+        return
+    }
+
+    def emptyFiles = matches.findAll { f -> f.size() == 0 }
+    if (emptyFiles)
+        warnings << ("--hifi_reads: ${emptyFiles.size()} matched file(s) are empty (0 bytes): " +
+                     emptyFiles.take(4).collect { f -> f.name }.join(', '))
+
+    summary['HiFi FASTQ'] = "${matches.size()} run${matches.size() == 1 ? '' : 's'}" +
+                            (patterns.size() > 1 ? " from ${patterns.size()} patterns" : "")
+    return matches.collect { f -> hifiRunId(f.name) }
 }
 
 def checkSampleMap(List problems, List _warnings, Map summary) {
@@ -790,15 +869,19 @@ def validateParams(strayArgs = null) {
                      "Values around 1000000 (1 Mb) are typical.")
 
     // --- input selection ------------------------------------------------------
-    if (!params.reads && !params.SRA_index && !params.bam_input) {
+    def readInput = params.reads || params.SRA_index || params.hifi_reads || params.hifi_SRA_index
+    if (!readInput && !params.bam_input) {
         addProblem(problems, "No input data was provided",
                    ["Supply at least one of:",
                     "  --reads      'path/to/*_{1,2}.fastq.gz'   local paired-end FASTQ files",
                     "  --SRA_index  accessions.txt               SRA/ENA accessions, one per line",
-                    "  --bam_input  'path/to/*.bam'              pre-processed, indexed BAM files"])
+                    "  --bam_input  'path/to/*.bam'              pre-processed, indexed BAM files",
+                    "or, experimentally, PacBio HiFi reads:",
+                    "  --hifi_reads     'path/to/*.fastq.gz'     local HiFi FASTQ, one file per run",
+                    "  --hifi_SRA_index hifi_accessions.txt      HiFi SRA/ENA accessions, one per line"])
     }
-    if (params.bam_input && (params.reads || params.SRA_index)) {
-        addProblem(problems, "--bam_input cannot be combined with --reads or --SRA_index",
+    if (params.bam_input && readInput) {
+        addProblem(problems, "--bam_input cannot be combined with --reads, --SRA_index, --hifi_reads or --hifi_SRA_index",
                    ["--bam_input skips trimming and mapping entirely, so it is either BAM input or",
                     "read input, not both. (Duplicate marking still runs again for any sample split",
                     "across several --bam_input files -- see --bam_input above.)"])
@@ -807,9 +890,54 @@ def validateParams(strayArgs = null) {
     // --- files and globs ------------------------------------------------------
     def reference = checkReference(problems, warnings, summary)
     checkMinContigLength(reference, problems, warnings, summary)
-    checkReads(problems, warnings, summary)
-    checkSraIndex(problems, warnings, summary)
+    def illuminaRunIds = checkReads(problems, warnings, summary)
+    def illuminaAccessions = checkAccessionFile('SRA_index', 'SRA accessions', problems, warnings, summary)
+    def hifiRunIds = checkHifiReads(problems, warnings, summary)
+    def hifiAccessions = checkAccessionFile('hifi_SRA_index', 'HiFi SRA IDs', problems, warnings, summary)
     checkSampleMap(problems, warnings, summary)
+
+    if ((params.SRA_index || params.hifi_SRA_index) && !params.NCBI_API_key)
+        warnings << ("SRA accessions without --NCBI_API_key: NCBI throttles anonymous E-utilities requests to " +
+                     "3/second, so metadata lookup for large accession lists is slow and prone to retries. " +
+                     "A free key (https://account.ncbi.nlm.nih.gov/) raises this to 10/second.")
+
+    // A run ID is the read-group ID and names the run's BAM, so a HiFi run and
+    // an Illumina run must never share one. Only local files and accessions
+    // listed verbatim can be compared here; runs resolved from a project or
+    // experiment accession are only known once SRAresolve has run.
+    def sharedRuns = ((illuminaRunIds ?: []).intersect(hifiRunIds ?: []))
+    if (sharedRuns)
+        addProblem(problems, "${sharedRuns.size()} run ID(s) are given both as Illumina (--reads) and HiFi (--hifi_reads) input",
+                   ["Each run needs its own ID. Rename the HiFi files, and give both the same",
+                    "Sample_Name in --SRR_sample_map to call them as one sample.",
+                    "Shared: ${sharedRuns.take(6).join(', ')}"])
+    def sharedAccessions = ((illuminaAccessions ?: []).intersect(hifiAccessions ?: []))
+    if (sharedAccessions)
+        addProblem(problems, "${sharedAccessions.size()} accession(s) are listed in both --SRA_index and --hifi_SRA_index",
+                   ["A run is either Illumina or PacBio HiFi data; list each accession in one file only.",
+                    "Shared: ${sharedAccessions.take(6).join(', ')}"])
+    // A local HiFi file named after an accession that is also downloaded
+    // (e.g. a pre-fetched ERR123.fastq.gz plus ERR123 in an accession file)
+    // would be counted as two runs of one sample and its reads merged twice.
+    def downloadedTwice = ((hifiRunIds ?: []).intersect((illuminaAccessions ?: []) + (hifiAccessions ?: []))) +
+                          ((illuminaRunIds ?: []).intersect(hifiAccessions ?: []))
+    if (downloadedTwice)
+        addProblem(problems, "${downloadedTwice.size()} run(s) are given both as a local file and as an accession to download",
+                   ["The same run would be mapped twice and merged into its sample twice. Give each run",
+                    "once: either the local file (--reads / --hifi_reads) or the accession",
+                    "(--SRA_index / --hifi_SRA_index).",
+                    "Both: ${downloadedTwice.unique().take(6).join(', ')}"])
+
+    // Indels in particular: HiFi's dominant residual error is a wrong
+    // homopolymer length, and HaplotypeCaller's indel error model (its default
+    // --pcr-indel-model CONSERVATIVE, which the pipeline does not change) was
+    // built for short reads. That has not been benchmarked here.
+    if (params.hifi_reads || params.hifi_SRA_index)
+        warnings << ("PacBio HiFi input is experimental: reads are mapped with pbmm2 (--preset CCS), not " +
+                     "trimmed, and called with GATK HaplotypeCaller alongside any Illumina runs. Treat INDEL calls " +
+                     "in samples with HiFi data as less trustworthy than SNPs: HiFi's main error is a wrong " +
+                     "homopolymer length, and HaplotypeCaller's indel error model was built for short reads and " +
+                     "has not been benchmarked on HiFi data in this pipeline.")
     checkBamInput(problems, warnings, summary)
     checkBwaIndex(problems, warnings, summary)
 
@@ -831,10 +959,10 @@ def validateParams(strayArgs = null) {
                     "fail once there were results to publish."])
 
     // --- combinations that are valid but rarely intended -----------------------
-    if (params.SRR_sample_map && !params.SRA_index && !params.reads)
+    if (params.SRR_sample_map && params.bam_input && !readInput)
         warnings << "--SRR_sample_map has no effect with --bam_input: sample names are taken from the read groups already in the BAM headers."
 
-    if (params.NCBI_API_key && !params.SRA_index)
+    if (params.NCBI_API_key && !params.SRA_index && !params.hifi_SRA_index)
         warnings << "--NCBI_API_key has no effect without --SRA_index; it is only used for SRA metadata lookups."
 
     if (params.plink_relationships && params.ploidy?.toString() == '1')
@@ -889,6 +1017,19 @@ def helpMessage() {
                                merged and re-deduplicated into a single sample.
                                --bam_input 'bams/*.bam'
 
+   PacBio HiFi input (EXPERIMENTAL; combines with --reads and --SRA_index)
+     --hifi_reads <glob>       HiFi FASTQ files, one per run. Not trimmed;
+                               mapped with pbmm2 (--preset CCS). The run ID is
+                               the file name without its FASTQ extension.
+                               --hifi_reads 'hifi/*.fastq.gz'
+     --hifi_SRA_index <file>   Plain-text file of PacBio HiFi SRA/ENA accessions.
+     A HiFi run mapped to the same Sample_Name as Illumina runs in
+     --SRR_sample_map is merged with them and called as one sample; it keeps
+     its own read group and library, so duplicates are marked per platform.
+     Treat indel calls in samples with HiFi data with caution: HaplotypeCaller's
+     indel error model was built for short reads, and HiFi's main error is a
+     wrong homopolymer length. SNP calls are less affected.
+
    Quoting and multiple locations
      Always put a glob pattern in SINGLE quotes. Unquoted, the shell expands it
      before Nextflow sees it, the parameter keeps only the first file and the rest
@@ -902,7 +1043,8 @@ def helpMessage() {
        --reads 'runA/*_{1,2}.fastq.gz;runB/*_{1,2}.fastq.gz'
        --bam_input 'batch1/*.bam;batch2/*.bam'
 
-     --reference and --SRA_index each take exactly one file, not a pattern.
+     --reference, --SRA_index and --hifi_SRA_index each take exactly one file,
+     not a pattern.
 
    Reference genome
      --reference <fasta>       Uncompressed reference FASTA.                [required]

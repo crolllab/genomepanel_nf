@@ -16,6 +16,8 @@ params.call_invar_sites = false  // Call invariant sites with GATK HaplotypeCall
 params.use_duplicate_reads = false  // Include reads flagged as duplicates by dupRemoval in GATK HaplotypeCaller calling
 params.genomicsdb_batch_size = 200  // GenomicsDBImport batch size (samples per batch). Default 200 targets a single pass for typical panels; raise if import still batches across retries with increased memory.
 params.bam_input = ""  // Optional: path to pre-existing BAM files
+params.hifi_reads = ""  // Optional (experimental): PacBio HiFi FASTQ files, one per run, mapped with pbmm2
+params.hifi_SRA_index = ""  // Optional (experimental): file of PacBio HiFi SRA/ENA accessions, mapped with pbmm2
 params.SRR_sample_map = ""  // Optional: CSV file mapping run IDs to sample names (Run_ID,Sample_Name)
 params.slurm_queue = ""  // Required when using -profile slurm: SLURM partition name
 params.plink_pca = false  // PCA on the pop. gen. VCF (plink2)
@@ -85,7 +87,7 @@ workflow {
     Steps:
      1. SRA query and download
      2. Fastp filtering
-     3. BWA alignment
+     3. BWA alignment (pbmm2 for PacBio HiFi -- experimental)
      4. GATK HaplotypeCaller
      5. GATK VariantFiltration
      6. Variant quality plotting, read and mapping stats   
@@ -104,6 +106,8 @@ workflow {
    Input data
        Local fastq    : ${params.reads}
        SRA ID file    : ${params.SRA_index}
+       HiFi fastq     : ${params.hifi_reads}
+       HiFi SRA IDs   : ${params.hifi_SRA_index}
        SRR-sample map : ${params.SRR_sample_map}
        Local bam      : ${params.bam_input}
   
