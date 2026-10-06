@@ -152,6 +152,14 @@ workflow and reports failure, rather than dropping the interval from the
 final VCF while reporting success (the 2026-09-04 lepus incident: 85 tasks
 failed this way and were ignored 85 times).
 
+An OOM kill does not always produce one of those statuses: GATK can die of a
+secondary error instead (on 2026-10-04 a GenotypeGVCFs task that Slurm recorded
+as `OUT_OF_MEMORY` exited 135, SIGBUS). These two processes and `RQualPlotting`
+therefore compare the `oom_kill` counter in the task's own cgroup
+(`memory.events`) before and after the main command, and report any failure
+that coincides with an OOM kill as 247 so it is retried with more memory.
+Where that counter cannot be read (no cgroup v2), the original status is kept.
+
 ### The SRA download retry loop
 
 `SRAdownloadPE`/`SRAdownloadSE` also retry *inside* the task, independently of

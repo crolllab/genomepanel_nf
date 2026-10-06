@@ -11,6 +11,13 @@ process GenomicsDBImport {
     // failure was ignored 85 times, and the workflow reported success with an
     // empty VCF. 'finish' lets already-running tasks complete but stops the
     // workflow and reports failure instead.
+    //
+    // An OOM kill does not always surface as one of those three codes: on
+    // 2026-10-04 Slurm OOM-killed a GenotypeGVCFs task (state OUT_OF_MEMORY)
+    // but GATK died of SIGBUS, exit 135, and the run was stopped instead of
+    // retried. The script therefore compares the oom_kill counter of the
+    // task's own cgroup before and after the GATK call and reports a failure
+    // that coincides with an OOM kill as 247, whatever GATK exited with.
     errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'finish' }
     maxRetries 6
 
@@ -30,6 +37,12 @@ process GenomicsDBImport {
     def avail_mem = (task.memory.mega * 0.8).intValue()
     """
     mkdir -p ./gatk_tmp
+
+    oom_kills() {
+        local ev="/sys/fs/cgroup\$(sed -n 's/^0:://p' /proc/self/cgroup)/memory.events"
+        if [ -r "\$ev" ]; then awk '\$1 == "oom_kill" { print \$2 }' "\$ev"; else echo 0; fi
+    }
+    oom_before=\$(oom_kills)
 
     # Build sample-name map (samplename TAB absolute_gvcf_path)
     # Read sample name from each gVCF header to preserve RGSM-based naming
@@ -57,6 +70,13 @@ process GenomicsDBImport {
         --overwrite-existing-genomicsdb-workspace \
         -L "${interval}" \
         --batch-size ${batch_size} \
-        --reader-threads 2
+        --reader-threads 2 || {
+        rc=\$?
+        if [ "\$(oom_kills)" -gt "\$oom_before" ]; then
+            echo "Exit status \$rc coincides with a cgroup OOM kill; reporting it as 247" >&2
+            rc=247
+        fi
+        exit \$rc
+    }
     """
 }
