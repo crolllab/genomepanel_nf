@@ -1,14 +1,19 @@
 # Changelog
 
-## Unreleased
+## v1.1.2 — 2026-10-06
 
 ### New features
 
-- **PacBio HiFi input (experimental).** `--hifi_reads` (local FASTQ, one file per run) and `--hifi_SRA_index` (SRA/ENA accessions) add PacBio HiFi runs, alone or together with Illumina input. HiFi reads are not trimmed. They are mapped with pbmm2 (`--preset CCS`, new `pbmm2Index`, `pbmm2Map`) and pbmm2 writes the read group (`PL:PACBIO`, `LB:<sample>_<run>_HIFI_LB`). They then join the Illumina path at the per-sample merge. A HiFi run given the same `Sample_Name` as Illumina runs in `--SRR_sample_map` is merged with them and called as one sample, with duplicates still marked per library. Mapping statistics (new `hifiFlagstat`) appear in `4_bwa_mapping/` and the report, and dropped HiFi runs in `ignored_samples.txt`. Indel calls in samples with HiFi data should be treated with caution, since HaplotypeCaller's indel error model was built for short reads. A startup warning says so whenever HiFi input is given. `example/README.md` has HiFi examples, both from SRA (`example/hifi_accessions.txt`) and from a local file.
+- **PacBio HiFi input (experimental).** `--hifi_reads` (local FASTQ) and `--hifi_SRA_index` (SRA/ENA accessions) add HiFi runs, mapped with pbmm2 and merged with Illumina runs of the same sample. Treat indel calls in samples with HiFi data with caution.
+
+### Fixes
+
+- **Out-of-memory kills are always retried.** `GenomicsDBImport`, `GenotypeGVCFs` and `RQualPlotting` now detect an OOM kill from the task's cgroup, so it is retried with more memory even when GATK exits with an unexpected status (e.g. 135).
+- **HTML report works with `--call_invar_sites`.** Invariant sites no longer break the variant-quality plots.
 
 ### Changes
 
-- **SRA download timeouts can be set per process.** The 3600 s `prefetch` / `fasterq-dump` timeouts are now read from `ext.prefetch_timeout` / `ext.fasterq_timeout` when set in `nextflow.config`. `SRAdownloadHiFi` raises both to 4 h.
+- **SRA download timeouts can be set per process** via `ext.prefetch_timeout` / `ext.fasterq_timeout`.
 
 ---
 

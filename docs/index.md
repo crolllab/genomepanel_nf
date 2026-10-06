@@ -136,6 +136,11 @@ Please cite the underlying tools if you use them through this pipeline.
 
 ## Release notes
 
+### v1.1.2 *(October 2026)*
+
+- Experimental PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`), mapped with pbmm2.
+- Out-of-memory kills in joint genotyping are always retried with more memory; the HTML report works with `--call_invar_sites`.
+
 ### v1.1.1 *(September 2026)*
 
 - Runs mapped to the same sample (`--SRR_sample_map`, or `--bam_input` files sharing an `@RG SM` tag) are merged before duplicate marking, giving one gVCF per sample; samples move on as soon as their own runs are done, without waiting for the rest of the panel.
