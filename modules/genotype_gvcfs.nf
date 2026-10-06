@@ -3,7 +3,8 @@ process GenotypeGVCFs {
     // Same reasoning as GenomicsDBImport (see that module): a non-OOM exit
     // here is a GATK user error that will recur identically on every retry,
     // not something to retry and then silently drop an entire interval from
-    // the final VCF.
+    // the final VCF. An OOM kill that GATK reports with another exit status
+    // (e.g. SIGBUS, 135) is mapped to 247 below, as in GenomicsDBImport.
     errorStrategy { task.exitStatus in [137, 143, 247] ? 'retry' : 'finish' }
     maxRetries 6
 
@@ -23,6 +24,12 @@ process GenotypeGVCFs {
     """
     mkdir -p ./gatk_tmp
 
+    oom_kills() {
+        local ev="/sys/fs/cgroup\$(sed -n 's/^0:://p' /proc/self/cgroup)/memory.events"
+        if [ -r "\$ev" ]; then awk '\$1 == "oom_kill" { print \$2 }' "\$ev"; else echo 0; fi
+    }
+    oom_before=\$(oom_kills)
+
     output_file="genotyped.${interval_safe}.vcf.gz"
 
     # Add options for invariant sites if enabled
@@ -37,6 +44,13 @@ process GenotypeGVCFs {
         -R $reference \
         -V gendb://${db_dir} \
         \${INVAR_OPTS} \
-        -output \${output_file}
+        -output \${output_file} || {
+        rc=\$?
+        if [ "\$(oom_kills)" -gt "\$oom_before" ]; then
+            echo "Exit status \$rc coincides with a cgroup OOM kill; reporting it as 247" >&2
+            rc=247
+        fi
+        exit \$rc
+    }
     """
 }
