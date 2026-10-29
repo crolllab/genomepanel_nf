@@ -8,7 +8,7 @@
   ],
   "title": "crolllab/genomepanel_nf",
   "description": "Nextflow pipeline for reference genome mapping, SNP calling and quality checks on large genome panels.",
-  "license": "cc-by-4.0",
+  "license": "mit",
   "keywords": [
     "nextflow",
     "variant calling",
