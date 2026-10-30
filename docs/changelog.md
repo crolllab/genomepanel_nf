@@ -12,12 +12,7 @@
   - optionally, a bin × sample matrix (`--cnv_bin_matrix`).
 
   The options are `--cnv_bin_length`, `--cnv_gene_feature`, `--cnv_contig_ploidy_priors`, `--cnv_exclude_intervals`, `--cnv_max_copy_number`, `--cnv_min_mapq`, `--cnv_min_qs`, `--cnv_shard_bins` and `--cnv_gc_correction`.
-- **gCNV settings tuned for whole-genome panels.** `GermlineCNVCaller` runs with the GATK-SV whole-genome settings, adjusted on a panel of 434 haploid fungal isolates, and `FilterIntervals` keeps bins unless more than 90% of samples have almost no reads in them. GATK's own defaults miss deletions carried by many samples. On that panel, genome-wide, the tuned settings:
-  - found 80%, 83% and 94% of deletions carried by <10%, 10–50% and 50–90% of isolates, against 52%, 17% and 6% with GATK's defaults;
-  - called no false deletions;
-  - called gains whose copy numbers match the read depth.
-
-  GC-bias correction in the model is off by default (`--cnv_gc_correction`). See [Model settings](configuration.md#model-settings).
+- **gCNV settings tuned for whole-genome panels.** `GermlineCNVCaller` runs with the GATK-SV whole-genome settings, adjusted for panels, and `FilterIntervals` keeps bins unless more than 90% of samples have almost no reads in them. GATK's own defaults miss deletions carried by many samples. GC-bias correction in the model is off by default (`--cnv_gc_correction`). See [Model settings](configuration.md#model-settings).
 
 ### Changes
 
@@ -30,7 +25,7 @@
 
 ### New features
 
-- **PacBio HiFi input (experimental).** `--hifi_reads` (local FASTQ) and `--hifi_SRA_index` (SRA/ENA accessions) add HiFi runs, mapped with pbmm2 and merged with Illumina runs of the same sample. Treat indel calls in samples with HiFi data with caution.
+- **PacBio HiFi input.** `--hifi_reads` (local FASTQ) and `--hifi_SRA_index` (SRA/ENA accessions) add HiFi runs, mapped with pbmm2 and merged with Illumina runs of the same sample. Treat indel calls in samples with HiFi data with caution.
 
 ### Fixes
 

@@ -1,6 +1,8 @@
 ![genomepanel_nf logo](assets/logo.png){ .gp-logo }
 
-**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for highly efficient reference genome mapping, variant (SNP/indel) calling and quality control of large genome panels. It accepts Illumina reads from local files or NCBI/ENA SRA accessions, pre-processed BAM files, and PacBio HiFi reads (experimental). It produces fully genotyped and filtered VCF files along with tabulated sample statistics and an HTML report, and can optionally call copy-number variants (deletions, duplications and gene presence/absence) across the whole panel.
+**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for highly efficient reference genome mapping, variant (SNP/indel) calling and quality control of large genome panels. It accepts Illumina reads from local files or NCBI/ENA SRA accessions, pre-processed BAM files, and optionally PacBio HiFi reads. It produces fully genotyped and filtered VCF files along with tabulated sample statistics and an HTML report.
+
+With `--cnv`, it also calls **copy-number variants** across the whole panel: deletions and duplications per sample, gene presence/absence from a genome annotation, and per-chromosome copy number (aneuploidy, accessory chromosomes).
 
 We tested **genomepanel_nf** on 100s to 1000s of samples from plant, animal and fungal species with reference genomes in single-digit Gb sizes. Please report any issues or share feature requests on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
 
@@ -19,35 +21,34 @@ The pipeline is designed to run both on HPC clusters via SLURM or on single mach
 ## Pipeline Summary
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "16px", "primaryColor": "#f0f7f5", "primaryBorderColor": "#1a7f6e", "primaryTextColor": "#1a1a1a", "lineColor": "#555"}}}%%
 flowchart TD
-    classDef io fill:#1a7f6e,color:#fff,stroke:#0d5c50
-    classDef step fill:#f0f7f5,color:#1a1a1a,stroke:#1a7f6e,stroke-width:1.5px
+    classDef io stroke-width:3px
+    classDef opt stroke-dasharray:6 4
 
-    A1([Local FASTQ\n--reads]):::io
-    A2([SRA / ENA\n--SRA_index]):::io
-    A3([BAM files\n--bam_input]):::io
-    A4([PacBio HiFi\n--hifi_reads / --hifi_SRA_index\nexperimental]):::io
-    REF([Reference genome\n--reference]):::io
+    A1([Local FASTQ<br/>--reads]):::io
+    A2([SRA / ENA<br/>--SRA_index]):::io
+    A3([BAM files<br/>--bam_input]):::io
+    A4([PacBio HiFi<br/>--hifi_reads<br/>--hifi_SRA_index]):::io
+    REF([Reference genome<br/>--reference]):::io
 
-    T[fastp\ntrimming & QC]:::step
-    M[bwa-mem2\nread mapping]:::step
-    MH[pbmm2\nHiFi read mapping]:::step
-    D[Picard\nread groups & deduplication]:::step
-    HC[GATK HaplotypeCaller\nper-sample GVCF]:::step
-    JG[GATK joint genotyping\nCombineGVCFs + GenotypeGVCFs]:::step
-    VF[VariantFiltration + bcftools\nflagging & filtering]:::step
-    PG[vcftools\npop-gen VCF]:::step
-    PL[PLINK\nPCA, relatedness, LD pruning\noptional]:::step
-    CN[GATK gCNV\ncopy-number calling\noptional]:::step
-    QC[R\npipeline_report.html]:::step
+    T[fastp<br/>trimming & QC]
+    M[bwa-mem2<br/>read mapping]
+    MH[pbmm2<br/>HiFi read mapping]
+    D[Picard<br/>read groups & deduplication]
+    HC[GATK HaplotypeCaller<br/>per-sample GVCF]
+    JG[GATK joint genotyping<br/>GenomicsDBImport + GenotypeGVCFs]
+    VF[VariantFiltration + bcftools<br/>flagging & filtering]
+    PG[vcftools<br/>pop-gen VCF]
+    PL[PLINK 2, optional<br/>PCA, relatedness, LD pruning]:::opt
+    CN[GATK gCNV, optional --cnv<br/>copy-number variants,<br/>gene presence/absence]:::opt
+    QC[R<br/>pipeline_report.html]
 
     O1([final_variants.vcf.gz]):::io
     O2([final_variants.clean.vcf.gz]):::io
     O3([pop-gen VCF]):::io
     O4([pipeline_report.html]):::io
-    O5([plink/ results]):::io
-    O6([cnv/ results]):::io
+    O5([9_plink/]):::io
+    O6([11_cnv/<br/>segments, gene copy numbers]):::io
 
     A1 --> T
     A2 --> T
@@ -75,14 +76,18 @@ flowchart TD
     QC --> O4
 ```
 
+Thick outlines mark inputs and outputs; dashed boxes are optional analyses.
+
 The pipeline accepts four input modes that converge at the variant calling step:
 
 1. **Local FASTQ files** (`--reads`): raw paired-end Illumina reads are trimmed with fastp, mapped with bwa-mem2, sorted with samtools, assigned read groups and deduplicated with Picard.
 2. **SRA/ENA accessions** (`--SRA_index`): accessions are resolved to run IDs and download URLs; paired-end and single-end runs are handled automatically before joining the same read-processing path.
 3. **Pre-processed BAM files** (`--bam_input`): coordinate-sorted, read-group annotated BAMs skip directly to variant calling.
-4. **PacBio HiFi reads** (`--hifi_reads`, `--hifi_SRA_index`; *experimental*): local FASTQ or SRA/ENA accessions are mapped with pbmm2 without trimming. They can be combined with Illumina input, and a HiFi run given the same sample name as Illumina runs is merged with them and called as one sample.
+4. **PacBio HiFi reads** (`--hifi_reads`, `--hifi_SRA_index`; optional): local FASTQ or SRA/ENA accessions are mapped with pbmm2 without trimming. They can be combined with Illumina input, and a HiFi run given the same sample name as Illumina runs is merged with them and called as one sample.
 
-After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. With `--cnv`, the same BAMs also go through GATK's germline CNV workflow (gCNV, cohort mode), giving per-sample copy-number segments and, from a GTF/GFF3 annotation, per-gene copy numbers. All QC metrics are collected into a single `pipeline_report.html`.
+After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), GenomicsDBImport and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. All QC metrics are collected into a single `pipeline_report.html`.
+
+**Copy-number variant calling** (`--cnv`) runs alongside on the same short-read BAMs, using GATK's germline CNV workflow (gCNV) in cohort mode: the panel serves as its own reference, so no panel of normals is needed. It reports per-sample deletion and duplication segments, per-gene copy numbers from a GTF/GFF3 annotation, and the copy number of every chromosome in every sample. The model settings are tuned for whole-genome panels, so that deletions shared by many samples are found. See [Copy-number variant calling](configuration.md#copy-number-variant-calling).
 
 ---
 
@@ -92,9 +97,27 @@ After read processing the pipeline performs **joint genotyping** across all samp
 
 -   :material-dna: **Flexible input**
 
-    --- 
+    ---
 
-    Local FASTQ, SRA/ENA accessions, or pre-processed BAM files — all in the same run.
+    Illumina reads from local FASTQ or SRA/ENA accessions, pre-processed BAM files, and PacBio HiFi reads — all in the same run.
+
+-   :material-format-list-checks: **Joint variant calling**
+
+    ---
+
+    SNPs and indels with GATK HaplotypeCaller and joint genotyping across the panel, filtered following GATK best practices.
+
+-   :material-content-duplicate: **Copy-number variants**
+
+    ---
+
+    `--cnv` calls deletions, duplications and gene presence/absence in every sample with GATK gCNV, tuned for whole-genome panels. [Learn more](configuration.md#copy-number-variant-calling)
+
+-   :material-chart-scatter-plot: **Population genetics**
+
+    ---
+
+    A thinned, MAF-filtered VCF, with optional PLINK 2 PCA, relatedness matrices and LD pruning.
 
 -   :material-server: **HPC-ready**
 
@@ -106,25 +129,19 @@ After read processing the pipeline performs **joint genotyping** across all samp
 
     ---
 
-    All tools run inside Singularity images pulled from the Galaxy Project depot.
+    All tools run inside Singularity images that are pulled automatically.
 
 -   :material-chart-line: **Built-in QC report**
 
     ---
 
-    A single `pipeline_report.html` with fastp, BWA-mem2 and VCF quality plots.
+    A single `pipeline_report.html` with fastp, mapping and VCF quality plots.
 
--   :material-content-duplicate: **Copy-number variants** *(new in v1.2)*
-
-    ---
-
-    `--cnv` calls deletions, duplications and gene presence/absence across the panel with GATK gCNV, tuned for whole-genome panels. [Learn more](configuration.md#copy-number-variant-calling)
-
--   :material-dna: **PacBio HiFi reads** *(experimental)*
+-   :material-alpha-p-box-outline: **PacBio HiFi reads**
 
     ---
 
-    `--hifi_reads` / `--hifi_SRA_index` map HiFi runs with pbmm2, alone or merged with Illumina runs of the same sample. [Learn more](configuration.md#pacbio-hifi-reads-experimental)
+    `--hifi_reads` / `--hifi_SRA_index` map HiFi runs with pbmm2, on their own or merged with Illumina runs of the same sample. [Learn more](configuration.md#pacbio-hifi-reads)
 
 </div>
 
@@ -138,7 +155,7 @@ Please cite the underlying tools if you use them through this pipeline.
 |------|---------|------|-----------|
 | [fastp](https://github.com/OpenGene/fastp) | 1.3.1 | Adapter trimming, read QC | Chen et al. 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty560](https://doi.org/10.1093/bioinformatics/bty560) |
 | [bwa-mem2](https://github.com/bwa-mem2/bwa-mem2) | 2.3 | Read mapping | Vasimuddin et al. 2019, *IPDPS* [doi:10.1109/IPDPS.2019.00041](https://doi.org/10.1109/IPDPS.2019.00041) |
-| [pbmm2](https://github.com/PacificBiosciences/pbmm2) / [minimap2](https://github.com/lh3/minimap2) | 26.2.0 / 2.26 | PacBio HiFi read mapping (experimental) | Li 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty191](https://doi.org/10.1093/bioinformatics/bty191) |
+| [pbmm2](https://github.com/PacificBiosciences/pbmm2) / [minimap2](https://github.com/lh3/minimap2) | 26.2.0 / 2.26 | PacBio HiFi read mapping | Li 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty191](https://doi.org/10.1093/bioinformatics/bty191) |
 | [SAMtools](https://www.htslib.org/) | 1.23.1 | BAM manipulation & sorting | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [Picard](https://broadinstitute.github.io/picard/) | 3.4.0 | Read group assignment, duplicate removal | Broad Institute 2019 |
 | [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration, copy-number calling (gCNV) | Van der Auwera & O'Connor 2020; gCNV: Babadi et al. 2023, *Nature Genetics* [doi:10.1038/s41588-023-01449-0](https://doi.org/10.1038/s41588-023-01449-0) |
@@ -156,12 +173,12 @@ Please cite the underlying tools if you use them through this pipeline.
 ### v1.2.0 *(October 2026)*
 
 - **Copy-number variant calling** with `--cnv`: GATK gCNV in cohort mode gives per-sample deletion and duplication segments, per-gene copy numbers from a GTF/GFF3 annotation (gene presence/absence), and per-contig ploidy (aneuploidy, accessory chromosomes). Results are in `11_cnv/`.
-- The model settings are tuned for whole-genome panels. They find deletions carried by many samples, which GATK's defaults miss: on 434 fungal isolates, 94% (was 6%) of deletions present in 50–90% of isolates, with no false deletions. See [Model settings](configuration.md#model-settings).
-- PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`, experimental since v1.1.2) is described under [Configuration](configuration.md#pacbio-hifi-reads-experimental). HiFi samples are left out of CNV calling.
+- The model settings are tuned for whole-genome panels, so that deletions shared by many samples are found, which GATK's defaults miss. See [Model settings](configuration.md#model-settings).
+- PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`) is described under [Configuration](configuration.md#pacbio-hifi-reads). HiFi samples are left out of CNV calling.
 
 ### v1.1.2 *(October 2026)*
 
-- Experimental PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`), mapped with pbmm2.
+- PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`), mapped with pbmm2.
 - Out-of-memory kills in joint genotyping are always retried with more memory; the HTML report works with `--call_invar_sites`.
 
 ### v1.1.1 *(September 2026)*

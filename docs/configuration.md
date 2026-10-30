@@ -98,7 +98,7 @@ files is rejected.
 
 ## Read input options
 
-Provide either or both of `--reads` and `--SRA_index`, optionally together with PacBio HiFi reads (`--hifi_reads`, `--hifi_SRA_index`; experimental). Alternatively, provide `--bam_input` if you have pre-processed BAM files (can't be combined with any read input). See below for details.
+Provide either or both of `--reads` and `--SRA_index`, optionally together with PacBio HiFi reads (`--hifi_reads`, `--hifi_SRA_index`). Alternatively, provide `--bam_input` if you have pre-processed BAM files (can't be combined with any read input). See below for details.
 
 ### Local FASTQ files
 
@@ -127,7 +127,9 @@ Provide either or both of `--reads` and `--SRA_index`, optionally together with 
     assuming several runs share a library, with no other evidence, is not a safe
     default, since duplicate marking is scoped to the library.
 
-### PacBio HiFi reads (experimental)
+### PacBio HiFi reads
+
+Optional long-read input, given separately from Illumina reads.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -162,7 +164,7 @@ joint-genotyped with the rest of the panel.
     If you set `Library_ID` in the map yourself, never give a HiFi run the same library
     as an Illumina run.
 
-!!! warning "Experimental"
+!!! warning "Limitations"
     - **Treat indel calls in samples with HiFi data with caution.** HiFi's main remaining
       error is a wrong homopolymer length, and HaplotypeCaller's indel error model (its
       default `--pcr-indel-model CONSERVATIVE`, which the pipeline does not change) was
@@ -406,13 +408,11 @@ Two further constraints:
 
 ### Model settings
 
-gCNV's own defaults were made for exome and human data, and they miss deletions that many
+gCNV's own defaults were made for exome and human data. They miss deletions that many
 samples share: the model lets each bin's unexplained variance grow until a shared deletion
 looks like noise, and its "bias factors" learn the deletion as a coverage bias of the bin.
-On a panel of 434 isolates of a haploid fungus, they called none of the 247 isolates that lack
-a 2 kb mating-type gene as deleted, and found only about 10% of the deletions carried by half
-the panel or more. The pipeline therefore runs `GermlineCNVCaller` with the settings of the
-GATK-SV whole-genome pipeline, adjusted on that panel:
+The pipeline therefore runs `GermlineCNVCaller` with the settings of the GATK-SV
+whole-genome pipeline, adjusted for panels:
 
 | GATK option | Pipeline | GATK default |
 |---|---|---|
@@ -433,30 +433,8 @@ GATK-SV whole-genome pipeline, adjusted on that panel:
 50, so a bin is dropped only when more than 90% of samples have fewer than 10 reads in it.
 GATK's default would drop every deletion carried by most of the panel before calling.
 
-On a 2 Mb test region of that panel, scored against the raw read counts, these settings
-called the mating-type gene deleted in all 247 isolates lacking it and in none of the 182
-carrying it. They found 74%, 86% and 95% of deleted bins carried by under 10%, 10–50% and
-50% or more of the isolates, against 57%, 13% and 10% with GATK's defaults. No bin with normal
-coverage was called deleted. Called gains matched the coverage: bins called CN2 to CN5 had
-1.8, 2.7, 3.6 and 5.9 times normal coverage. Normal-coverage bins called at another copy number
-fell from 1.5% to 0.2%. The results held for subsets of 30 and 10 isolates.
-
-Genome-wide on the same 434 isolates (43,500 bins of 1 kb), compared with GATK's defaults:
-- **Deletions found**, by how many isolates carry them: under 10%, 80% (was 52%); 10–50%, 83% (was 17%); 50–90%, 94% (was 6%).
-- **False calls:** no normal-coverage bin was called deleted, and 0.2% got another copy number (was 0.5%).
-- **Deleted sequence per isolate:** a median of 1.37 Mb, close to the 1.4 Mb of near-zero coverage in the raw counts.
-- **Cost:** about the same as with GATK's defaults: each 10,000-bin `GermlineCNVCaller` shard took about 5 hours on 4 CPUs and peaked at 4.8 GB.
-
-Two of the settings matter most, and are best not changed alone. With the variance held
-lower still (`1e-6`, the GATK-SV value), the model can no longer absorb ordinary noise; it
-explains it with CNVs instead, and normal coverage is called CN4–5. With the GC-bias model on,
-each sample's GC curve becomes the one flexible term left; in AT-rich regions it drifted
-about five-fold and turned normal coverage into CN5 calls in 13% of normal bins.
-`--cnv_gc_correction` switches it back on for data that need it.
-
-The settings were tuned on one haploid organism. They come from the GATK-SV pipeline for human
-(diploid) genomes, which holds the variance even lower. Check `cnv_sample_summary.tsv` for
-samples with unusually many calls, and see the next section to change any of them.
+Check `cnv_sample_summary.tsv` for samples with unusually many calls, and see the next
+section to change any of these settings.
 
 ### Contig-ploidy priors format
 

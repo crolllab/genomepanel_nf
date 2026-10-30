@@ -149,13 +149,13 @@ SRR1234570,Sample_C
 
 Pass it with `--SRR_sample_map sample_map.csv`. The repository includes an example `sample_map.csv`.
 
-### PacBio HiFi reads (optional, experimental)
+### PacBio HiFi reads (optional)
 
 HiFi reads are given separately from Illumina reads: `--hifi_reads '/path/to/hifi/*.fastq.gz'`
 for local FASTQ files (one per run), or `--hifi_SRA_index hifi_accessions.txt` for accessions.
 They are mapped with pbmm2 instead of bwa-mem2. To combine a HiFi run with the Illumina
 runs of the same sample, give them the same `Sample_Name` in the sample map. See
-[PacBio HiFi reads](configuration.md#pacbio-hifi-reads-experimental) for details and caveats.
+[PacBio HiFi reads](configuration.md#pacbio-hifi-reads) for details and caveats.
 
 ---
 
@@ -176,7 +176,7 @@ nextflow run main.nf -config nextflow.config -profile slurm \
 ```
 
 Optional analyses are switched on with extra flags. For example, add copy-number variant calling
-with per-gene calls, and PacBio HiFi runs (experimental):
+with per-gene calls, and PacBio HiFi runs:
 
 ```bash
   --cnv \
