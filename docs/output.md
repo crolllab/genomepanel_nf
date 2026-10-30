@@ -4,7 +4,8 @@ All output files are written to the directory specified by `--outdir` (default: 
 
 Output folders are **numbered in pipeline order**. A folder is only created when the step that
 fills it actually runs, so gaps in the numbering are normal — a `--bam_input` run has no
-`1_sra_downloads/`, one without any `--plink_*` flag has no `9_plink/`.
+`1_sra_downloads/`, one without any `--plink_*` flag has no `9_plink/`, one without `--cnv` has
+no `11_cnv/`.
 
 ```
 <outdir>/
@@ -17,7 +18,8 @@ fills it actually runs, so gaps in the numbering are normal — a `--bam_input` 
 ├── 7_variants/        Final VCFs and variant quality metrics      always
 ├── 8_popgen_vcf/      Thinned, MAF-filtered population VCF        always
 ├── 9_plink/           PCA, relatedness and LD pruning results     any --plink_*
-└── 10_reports/        HTML QC report and run statistics           always
+├── 10_reports/        HTML QC report and run statistics           always
+└── 11_cnv/            Copy-number variant calls                    --cnv
 ```
 
 ---
@@ -211,3 +213,54 @@ The report uses inline PDF-embedded plots (font-independent) and requires no ext
 | `pipeline_execution_stats.txt` | Human-readable | Per-process-type summary: task count, average/min/max wall-clock time, peak memory. |
 | `pipeline_execution_stats.tsv` | TSV | Machine-readable version of the above. Useful for benchmarking and resource optimisation. |
 | `pipeline_trace.txt` | TSV | The raw Nextflow execution trace — one row per task, written live during the run. The statistics above are derived from it. |
+
+---
+
+## `11_cnv/`
+
+Only generated with `--cnv`. Copy-number calls from GATK gCNV in cohort mode, for every
+short-read sample (see [Configuration](configuration.md#copy-number-variant-calling)).
+
+Every table is sorted by the **contig order of the reference FASTA** (not alphabetically, so
+`chr2` comes before `chr10`), then by position. Coordinates are 1-based and inclusive, as in VCF
+and GFF. Copy numbers are absolute: with `--ploidy 1`, `0` is a deletion and `2` a duplication;
+with `--ploidy 2`, `1` is a heterozygous deletion.
+
+| File | Description |
+|------|-------------|
+| `cnv_segments.tsv` | Every segment of every sample — the main result. Each sample's genome is cut into runs of bins with the same copy number, so `REF` segments are included; filter on `call` for CNVs only. |
+| `cnv_genes.tsv` | Gene × sample copy-number matrix: `gene_id`, `gene_name`, `contig`, `start`, `end`, `strand`, `n_bins`, then one column per sample. `NA` where the gene overlaps no modelled bin. Only with `--cnv_gene_annotation`. |
+| `cnv_genes_long.tsv` | One row per gene and sample, with the details behind each value of `cnv_genes.tsv`. Only with `--cnv_gene_annotation`. |
+| `cnv_bins.tsv.gz` | Bin × sample copy-number matrix: `contig`, `start`, `end`, then one column per sample. Only the bins that survived filtering. Only with `--cnv_bin_matrix`. |
+| `cnv_contig_ploidy.tsv` | Called ploidy of every contig in every sample (`sample`, `contig`, `ploidy`, `ploidy_gq`). Shows aneuploidy and the presence or absence of accessory chromosomes. |
+| `cnv_sample_summary.tsv` | Per sample: number and total length of `DEL` and `DUP` segments, how many of them pass `--cnv_min_qs`, and the contigs whose called ploidy differs from `--ploidy`. A sample with far more calls than the rest is usually a noisy library rather than a genuinely unusual genome. |
+| `samples/<sample>.cnv_intervals.vcf.gz` | GATK's per-bin calls (`GT`, `CN`, and the copy-number log-posteriors `CNLP`). |
+| `samples/<sample>.cnv_segments.vcf.gz` | GATK's per-segment calls, the source of `cnv_segments.tsv`. |
+| `samples/<sample>.cnv_denoised_copy_ratios.tsv` | Denoised copy ratio of every bin — coverage relative to the cohort's expectation after removing shared biases. Useful for plotting. |
+
+### `cnv_segments.tsv` columns
+
+| Column | Description |
+|--------|-------------|
+| `sample`, `contig`, `start`, `end` | Segment location. |
+| `call` | `REF`, `DEL` or `DUP`, relative to `--ploidy`. |
+| `cn` | Copy number. |
+| `n_bins` | Number of bins in the segment. Filtered-out bins inside the segment are not counted, so a segment may span more than `n_bins` × `--cnv_bin_length`. |
+| `qa`, `qs`, `qse`, `qss` | gCNV's Phred-scaled segment qualities: that *all* bins (`qa`) or *some* bin (`qs`) support the call, and the quality of the start (`qss`) and end (`qse`) breakpoints. |
+| `filter` | `PASS` if `qs` ≥ `--cnv_min_qs`, otherwise `LowQual`. |
+
+### `cnv_genes_long.tsv` columns
+
+A gene's copy number comes from the segments it overlaps.
+
+| Column | Description |
+|--------|-------------|
+| `sample`, `gene_id`, `gene_name`, `contig`, `start`, `end`, `strand` | Gene, from the annotation. |
+| `n_bins` | Modelled bins overlapping the gene. `0` means the gene has no call. |
+| `cn` | Copy number covering the largest part of the gene. This is the value in `cnv_genes.tsv`. |
+| `cn_min`, `cn_max` | Lowest and highest copy number within the gene. They differ when a breakpoint falls inside it. |
+| `frac_altered` | Fraction of the gene's length covered by `DEL` or `DUP` segments. |
+| `mean_denoised_cr` | Mean denoised copy ratio of the bins overlapping the gene: a continuous measure, for genes that are too short or too noisy for a confident integer call. |
+| `qs_min` | Lowest `qs` of the segments overlapping the gene. |
+| `status` | `uniform` (one copy number across the gene), `breakpoint` (a CNV boundary falls inside it) or `no_bins` (no call). |
+| `filter` | `PASS` if `qs_min` ≥ `--cnv_min_qs`, otherwise `LowQual`; `NA` for `no_bins`. |

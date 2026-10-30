@@ -1,6 +1,6 @@
 ![genomepanel_nf logo](assets/logo.png){ .gp-logo }
 
-**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for highly efficient reference genome mapping, variant (SNP/indel) calling and quality control of large genome panels. It accepts Illumina paired-end reads from local files, NCBI/ENA SRA accessions, or pre-processed BAM files, and produces fully genotyped and filtered VCF files along with tabulated sample statistics and an HTML report.
+**genomepanel_nf** is a [Nextflow](https://www.nextflow.io/) pipeline for highly efficient reference genome mapping, variant (SNP/indel) calling and quality control of large genome panels. It accepts Illumina reads from local files or NCBI/ENA SRA accessions, pre-processed BAM files, and PacBio HiFi reads (experimental). It produces fully genotyped and filtered VCF files along with tabulated sample statistics and an HTML report, and can optionally call copy-number variants (deletions, duplications and gene presence/absence) across the whole panel.
 
 We tested **genomepanel_nf** on 100s to 1000s of samples from plant, animal and fungal species with reference genomes in single-digit Gb sizes. Please report any issues or share feature requests on the [GitHub Issues](https://github.com/crolllab/genomepanel_nf/issues) page.
 
@@ -39,6 +39,7 @@ flowchart TD
     VF[VariantFiltration + bcftools\nflagging & filtering]:::step
     PG[vcftools\npop-gen VCF]:::step
     PL[PLINK\nPCA, relatedness, LD pruning\noptional]:::step
+    CN[GATK gCNV\ncopy-number calling\noptional]:::step
     QC[R\npipeline_report.html]:::step
 
     O1([final_variants.vcf.gz]):::io
@@ -46,6 +47,7 @@ flowchart TD
     O3([pop-gen VCF]):::io
     O4([pipeline_report.html]):::io
     O5([plink/ results]):::io
+    O6([cnv/ results]):::io
 
     A1 --> T
     A2 --> T
@@ -66,6 +68,9 @@ flowchart TD
     PG --> O3
     O3 --> PL
     PL --> O5
+    D --> CN
+    A3 --> CN
+    CN --> O6
     O2 --> QC
     QC --> O4
 ```
@@ -77,7 +82,7 @@ The pipeline accepts four input modes that converge at the variant calling step:
 3. **Pre-processed BAM files** (`--bam_input`): coordinate-sorted, read-group annotated BAMs skip directly to variant calling.
 4. **PacBio HiFi reads** (`--hifi_reads`, `--hifi_SRA_index`; *experimental*): local FASTQ or SRA/ENA accessions are mapped with pbmm2 without trimming. They can be combined with Illumina input, and a HiFi run given the same sample name as Illumina runs is merged with them and called as one sample.
 
-After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. All QC metrics are collected into a single `pipeline_report.html`.
+After read processing the pipeline performs **joint genotyping** across all samples using GATK HaplotypeCaller (GVCF mode), CombineGVCFs and GenotypeGVCFs. Variant filtration follows GATK best practices. A population-genetics VCF (thinned, MAF-filtered) is generated with vcftools, and can optionally be carried through PLINK 2 analyses — PCA, GRM and KING relatedness matrices, and LD pruning — with `--plink_pca`, `--plink_relationships` and `--plink_ld_prune`. With `--cnv`, the same BAMs also go through GATK's germline CNV workflow (gCNV, cohort mode), giving per-sample copy-number segments and, from a GTF/GFF3 annotation, per-gene copy numbers. All QC metrics are collected into a single `pipeline_report.html`.
 
 ---
 
@@ -109,6 +114,18 @@ After read processing the pipeline performs **joint genotyping** across all samp
 
     A single `pipeline_report.html` with fastp, BWA-mem2 and VCF quality plots.
 
+-   :material-content-duplicate: **Copy-number variants** *(new in v1.2)*
+
+    ---
+
+    `--cnv` calls deletions, duplications and gene presence/absence across the panel with GATK gCNV, tuned for whole-genome panels. [Learn more](configuration.md#copy-number-variant-calling)
+
+-   :material-dna: **PacBio HiFi reads** *(experimental)*
+
+    ---
+
+    `--hifi_reads` / `--hifi_SRA_index` map HiFi runs with pbmm2, alone or merged with Illumina runs of the same sample. [Learn more](configuration.md#pacbio-hifi-reads-experimental)
+
 </div>
 
 ---
@@ -124,17 +141,23 @@ Please cite the underlying tools if you use them through this pipeline.
 | [pbmm2](https://github.com/PacificBiosciences/pbmm2) / [minimap2](https://github.com/lh3/minimap2) | 26.2.0 / 2.26 | PacBio HiFi read mapping (experimental) | Li 2018, *Bioinformatics* [doi:10.1093/bioinformatics/bty191](https://doi.org/10.1093/bioinformatics/bty191) |
 | [SAMtools](https://www.htslib.org/) | 1.23.1 | BAM manipulation & sorting | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [Picard](https://broadinstitute.github.io/picard/) | 3.4.0 | Read group assignment, duplicate removal | Broad Institute 2019 |
-| [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration | Van der Auwera & O'Connor 2020 |
+| [GATK](https://gatk.broadinstitute.org/) | 4.6.2.0 | Haplotype calling, genotyping, variant filtration, copy-number calling (gCNV) | Van der Auwera & O'Connor 2020; gCNV: Babadi et al. 2023, *Nature Genetics* [doi:10.1038/s41588-023-01449-0](https://doi.org/10.1038/s41588-023-01449-0) |
 | [BCFtools](https://www.htslib.org/) | 1.23.1 | VCF filtering and manipulation | Danecek et al. 2021, *GigaScience* [doi:10.1093/gigascience/giab008](https://doi.org/10.1093/gigascience/giab008) |
 | [vcftools](https://vcftools.github.io/) | 0.1.17 | Population-genetics VCF processing | Danecek et al. 2011, *Bioinformatics* [doi:10.1093/bioinformatics/btr330](https://doi.org/10.1093/bioinformatics/btr330) |
 | [PLINK 2](https://www.cog-genomics.org/plink/2.0/) | 2.0.0-a.6.9 | PCA, GRM and KING relatedness, LD pruning | Chang et al. 2015, *GigaScience* [doi:10.1186/s13742-015-0047-8](https://doi.org/10.1186/s13742-015-0047-8) |
 | [sra-tools](https://github.com/ncbi/sra-tools) | 3.2.1 | NCBI SRA data download | NCBI |
 | [entrez-direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/) | 24.0 | NCBI SRA accession resolution | NCBI |
-| [R / tidyverse](https://www.tidyverse.org/) | 1.2.1 | QC visualisation | R Core Team; Wickham et al. 2019, *JOSS* [doi:10.21105/joss.01686](https://doi.org/10.21105/joss.01686) |
+| [R / tidyverse](https://www.tidyverse.org/) | 1.2.1 | QC visualisation, CNV summary tables | R Core Team; Wickham et al. 2019, *JOSS* [doi:10.21105/joss.01686](https://doi.org/10.21105/joss.01686) |
 
 ---
 
 ## Release notes
+
+### v1.2.0 *(October 2026)*
+
+- **Copy-number variant calling** with `--cnv`: GATK gCNV in cohort mode gives per-sample deletion and duplication segments, per-gene copy numbers from a GTF/GFF3 annotation (gene presence/absence), and per-contig ploidy (aneuploidy, accessory chromosomes). Results are in `11_cnv/`.
+- The model settings are tuned for whole-genome panels. They find deletions carried by many samples, which GATK's defaults miss: on 434 fungal isolates, 94% (was 6%) of deletions present in 50–90% of isolates, with no false deletions. See [Model settings](configuration.md#model-settings).
+- PacBio HiFi input (`--hifi_reads`, `--hifi_SRA_index`, experimental since v1.1.2) is described under [Configuration](configuration.md#pacbio-hifi-reads-experimental). HiFi samples are left out of CNV calling.
 
 ### v1.1.2 *(October 2026)*
 
@@ -224,7 +247,7 @@ Questions, bug reports and feature requests are welcome on the [GitHub Issues](h
 
 If you use genomepanel_nf in your research, please cite:
 
-> Croll, D. (2026). _genomepanel_nf_ - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels (v1.0.5). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
+> Croll, D. (2026). _genomepanel_nf_ - a highly efficient Nextflow pipeline for reference genome variant calling of large genome panels (v1.2.0). Zenodo. [https://doi.org/10.5281/zenodo.19392838](https://doi.org/10.5281/zenodo.19392838)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392838.svg)](https://doi.org/10.5281/zenodo.19392838)
 

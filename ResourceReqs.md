@@ -85,6 +85,25 @@ See gp_wf.nf.
 | `PlinkRelationships` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
 | `PlinkLDPrune` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
 
+### Copy-number variant calling (opt-in, `--cnv`)
+
+| Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
+|---------|------|------|--------|----------|---------------|------------|
+| `CNVPreprocessIntervals` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `CNVAnnotateIntervals` | 1d | 1 | 4 GB × attempt | — | `retry` | 6 |
+| `CNVCollectReadCounts` | 1d | 1 | 4 GB × attempt | 100 | `retry` → **`ignore`** after attempt 7 | 6 |
+| `CNVFilterIntervals` | 1d | 1 | 8 GB × attempt | — | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+| `CNVContigPloidy` | 2d | 4 | 8 GB × attempt | — | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+| `CNVGermlineCaller` | 7d | 4 | 8 GB × attempt | 50 | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+| `CNVPostprocess` | 1d | 2 | 8 GB × attempt | 50 | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+| `CNVSummary` | 1d | 1 | 8 GB × attempt | — | `retry` on OOM (137/143/247), else **`finish`** | 6 |
+
+All `CNV*` processes except `CNVSummary` run in `docker://broadinstitute/gatk:4.6.2.0`
+rather than the biocontainers GATK image, which lacks the Python environment
+(gcnvkernel) of the gCNV model steps. Memory of `CNVContigPloidy` and
+`CNVGermlineCaller` scales with samples × bins (`--cnv_shard_bins` bins per
+`CNVGermlineCaller` task).
+
 ### Summaries and reporting
 
 | Process | Time | CPUs | Memory | maxForks | errorStrategy | maxRetries |
@@ -119,6 +138,7 @@ from the final VCF** while the pipeline still reports success:
 | `trimSequencesPE`, `trimSequencesSE` | attempt 4 |
 | `bwaMap`, `samtoolsSort`, `addRG`, `dupRemoval` | attempt 7 |
 | `pbmm2Map`, `hifiFlagstat` | attempt 7 |
+| `CNVCollectReadCounts` (sample left out of CNV calling only) | attempt 7 |
 | `mergeRunBAMs` | attempt 4 |
 
 A run dropped at `bwaMap`, `samtoolsSort` or `addRG` only removes the whole
@@ -154,9 +174,11 @@ failed this way and were ignored 85 times).
 
 An OOM kill does not always produce one of those statuses: GATK can die of a
 secondary error instead (on 2026-10-04 a GenotypeGVCFs task that Slurm recorded
-as `OUT_OF_MEMORY` exited 135, SIGBUS). These two processes and `RQualPlotting`
-therefore compare the `oom_kill` counter in the task's own cgroup
-(`memory.events`) before and after the main command, and report any failure
+as `OUT_OF_MEMORY` exited 135, SIGBUS). These two processes, `RQualPlotting`
+and the cohort-wide CNV steps (`CNVFilterIntervals`, `CNVContigPloidy`,
+`CNVGermlineCaller`, `CNVPostprocess`) therefore compare the `oom_kill`
+counter in the task's own cgroup (`memory.events`) before and after the main
+command, and report any failure
 that coincides with an OOM kill as 247 so it is retried with more memory.
 Where that counter cannot be read (no cgroup v2), the original status is kept.
 

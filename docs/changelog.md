@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.2.0 — 2026-10-30
+
+### New features
+
+- **Copy-number variant calling (`--cnv`).** The duplicate-marked BAMs of all short-read samples go through GATK's germline CNV workflow (gCNV) in cohort mode, with the panel itself as the cohort, so no panel of normals is needed. Results are in `11_cnv/`:
+  - per-sample segments (`cnv_segments.tsv`, plus GATK's per-bin and per-segment VCFs);
+  - per-gene copy numbers from a GTF/GFF3 annotation (`--cnv_gene_annotation`: `cnv_genes.tsv`, `cnv_genes_long.tsv`);
+  - per-contig ploidy, which shows aneuploidy and accessory chromosomes (`cnv_contig_ploidy.tsv`);
+  - a per-sample summary;
+  - optionally, a bin × sample matrix (`--cnv_bin_matrix`).
+
+  The options are `--cnv_bin_length`, `--cnv_gene_feature`, `--cnv_contig_ploidy_priors`, `--cnv_exclude_intervals`, `--cnv_max_copy_number`, `--cnv_min_mapq`, `--cnv_min_qs`, `--cnv_shard_bins` and `--cnv_gc_correction`.
+- **gCNV settings tuned for whole-genome panels.** `GermlineCNVCaller` runs with the GATK-SV whole-genome settings, adjusted on a panel of 434 haploid fungal isolates, and `FilterIntervals` keeps bins unless more than 90% of samples have almost no reads in them. GATK's own defaults miss deletions carried by many samples. On that panel, genome-wide, the tuned settings:
+  - found 80%, 83% and 94% of deletions carried by <10%, 10–50% and 50–90% of isolates, against 52%, 17% and 6% with GATK's defaults;
+  - called no false deletions;
+  - called gains whose copy numbers match the read depth.
+
+  GC-bias correction in the model is off by default (`--cnv_gc_correction`). See [Model settings](configuration.md#model-settings).
+
+### Changes
+
+- **PacBio HiFi samples are left out of CNV calling.** With `--bam_input`, this covers any sample with a `PL:PACBIO` or `PL:ONT` read group. gCNV counts read starts per bin, so long-read coverage cannot share the short-read model.
+- Options given through `ext.args` for `CNVFilterIntervals` and `CNVGermlineCaller` replace the pipeline's own value for that option.
+
+---
+
 ## v1.1.2 — 2026-10-06
 
 ### New features

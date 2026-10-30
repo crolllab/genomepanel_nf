@@ -48,6 +48,7 @@ include { ReportIgnoredSamples } from '../modules/report_ignored'
 include { MergeGVCFs } from '../modules/merge_gvcfs'
 include { PipelineStatistics } from '../modules/pipeline_statistics'
 include { deleteIntermediates } from '../modules/delete_intermediates'
+include { cnv_wf } from './cnv_wf'
 
 // ---------------------
 // Main workflow
@@ -282,6 +283,10 @@ workflow gp_wf {
         hifi_rg_bams = channel.empty()
         hifi_reports = channel.empty()
     }
+    // Samples with any long-read data, left out of CNV calling (--cnv): one
+    // 15 kb HiFi read counts as a single read start, so their coverage is not
+    // comparable with that of short-read samples in one gCNV cohort.
+    long_read_samples = hifi_rg_bams.map { t -> t[0] }.unique().toList()
 
     // ---------------------
     // Read trimming, reporting
@@ -485,6 +490,14 @@ workflow gp_wf {
 
     probed = probeBAMSample(bam_ch).bam
 
+    // Samples with a PacBio or ONT read group, left out of CNV calling (--cnv;
+    // see the note on long_read_samples in the read-input branch).
+    long_read_samples = probed
+        .filter { _orig_id, _sm, long_read, _bam, _bai -> long_read == 'true' }
+        .map { _orig_id, sm, _long_read, _bam, _bai -> sm }
+        .unique()
+        .toList()
+
     // Group by the header's SM tag. A sample backed by a single BAM is passed
     // through untouched -- this pipeline already trusts --bam_input files to
     // be pre-processed and deduplicated, so nothing is re-run needlessly. A
@@ -492,7 +505,7 @@ workflow gp_wf {
     // dupRemoval, because duplicates shared between those BAMs were never
     // visible while each was deduplicated on its own.
     runs_by_sm = probed
-        .map { _orig_id, sm, bam, bai -> tuple(sm, bam, bai) }
+        .map { _orig_id, sm, _long_read, bam, bai -> tuple(sm, bam, bai) }
         .groupTuple(by: 0)
         .branch { _sm, bams, _bais ->
             single: bams.size() == 1
@@ -581,9 +594,32 @@ workflow gp_wf {
     gvcf        = gvcf_mmap.main
     gatkhc_done = gvcf_mmap.sentinel.count()
 
-    // Delete dedup BAM files once ALL GATKHC tasks have completed.
-    // bams_to_cleanup is empty for --bam_input runs (user files are never deleted).
-    cleanupBAMs(bams_to_cleanup, gatkhc_done)
+    // ---------------------
+    // Copy-number variant calling (optional)
+    // ---------------------
+    // Short-read samples only (see long_read_samples above). Read counting is
+    // the only CNV step that reads the BAMs, so cleanupBAMs waits for it too.
+    if (params.cnv) {
+        long_read_samples.subscribe { ids ->
+            if (ids)
+                log.warn "--cnv: ${ids.size()} sample(s) with PacBio/ONT long-read data are left out of CNV calling: ${ids.sort().take(10).join(', ')}${ids.size() > 10 ? ', ...' : ''}"
+        }
+        cnv_bams = dedup_with_index
+            .combine(long_read_samples.map { ids -> [ids] })
+            .filter { sample_id, _bam, _bai, long_read_ids -> !(sample_id in long_read_ids) }
+            .map { sample_id, bam, bai, _long_read_ids -> tuple(sample_id, bam, bai) }
+        cnv_wf(reference_to_use, fai_index, gatk_index, cnv_bams)
+        bams_released = gatkhc_done.combine(cnv_wf.out.counts_done).map { n_gatkhc, _n_cnv -> n_gatkhc }.first()
+        cnv_done = cnv_wf.out.summary
+    } else {
+        bams_released = gatkhc_done
+        cnv_done = channel.empty()
+    }
+
+    // Delete dedup BAM files once ALL GATKHC (and CNV read-counting) tasks
+    // have completed. bams_to_cleanup is empty for --bam_input runs (user
+    // files are never deleted).
+    cleanupBAMs(bams_to_cleanup, bams_released)
 
     // ---------------------
     // Merge per-segment GVCFs into single per-sample GVCF
@@ -705,6 +741,7 @@ workflow gp_wf {
             .mix(RSummarizingBWA.out)
             .mix(RQualPlotting.out.report)
             .mix(plink_done)
+            .mix(cnv_done)
             .collect()
     } else {
         // For BAM input, no FASTP/BWA TSV files available. Nothing can be
@@ -717,6 +754,7 @@ workflow gp_wf {
         all_done = concat_clean_vcf.mix(concat_vcf)
             .mix(RQualPlotting.out.report)
             .mix(plink_done)
+            .mix(cnv_done)
             .collect()
     }
 

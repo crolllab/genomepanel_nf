@@ -34,6 +34,9 @@ def knownParams() {
         'ploidy', 'call_invar_sites', 'use_duplicate_reads', 'genomicsdb_batch_size',
         'keep_bam', 'keep_gvcf',
         'plink_pca', 'plink_relationships', 'plink_ld_prune',
+        'cnv', 'cnv_bin_length', 'cnv_gene_annotation', 'cnv_gene_feature',
+        'cnv_contig_ploidy_priors', 'cnv_exclude_intervals', 'cnv_max_copy_number',
+        'cnv_shard_bins', 'cnv_min_mapq', 'cnv_min_qs', 'cnv_bin_matrix', 'cnv_gc_correction',
         'slurm_queue'
     ] as Set
 }
@@ -65,13 +68,14 @@ def nextflowOptionAliases() {
 def stringParams() {
     ['reference', 'reads', 'SRA_index', 'bam_input', 'bwa_index',
      'hifi_reads', 'hifi_SRA_index',
-     'SRR_sample_map', 'slurm_queue', 'outdir', 'NCBI_API_key']
+     'SRR_sample_map', 'slurm_queue', 'outdir', 'NCBI_API_key',
+     'cnv_gene_annotation', 'cnv_gene_feature', 'cnv_contig_ploidy_priors', 'cnv_exclude_intervals']
 }
 
 // Parameters that are on/off switches.
 def booleanParams() {
     ['keep_bam', 'keep_gvcf', 'call_invar_sites', 'use_duplicate_reads',
-     'plink_pca', 'plink_relationships', 'plink_ld_prune']
+     'plink_pca', 'plink_relationships', 'plink_ld_prune', 'cnv', 'cnv_bin_matrix', 'cnv_gc_correction']
 }
 
 
@@ -752,6 +756,245 @@ def checkBwaIndex(List problems, List _warnings, Map summary) {
 }
 
 
+// ---------------------
+// CNV calling (--cnv)
+// ---------------------
+
+// Defaults of the --cnv_* options, to tell which were set without --cnv.
+def cnvDefaults() {
+    ['cnv_bin_length': 1000, 'cnv_gene_annotation': '', 'cnv_gene_feature': 'gene',
+     'cnv_contig_ploidy_priors': '', 'cnv_exclude_intervals': '', 'cnv_max_copy_number': 5,
+     'cnv_shard_bins': 10000, 'cnv_min_mapq': 30, 'cnv_min_qs': 50, 'cnv_bin_matrix': false,
+     'cnv_gc_correction': false]
+}
+
+// Exactly one existing file for a --cnv_* path option, or null (reported).
+def singleCnvFile(String name, String what, List problems) {
+    def value = params[name]
+    if (!value || value instanceof Boolean) return null
+    def matches = globMatches(value.toString().trim())
+    if (matches.isEmpty()) {
+        addProblem(problems, "--${name} file not found: ${displayPath(value.toString())}", [what])
+        return null
+    }
+    if (matches.size() > 1) {
+        addProblem(problems, "--${name} matched ${matches.size()} files, but exactly one is required", [what])
+        return null
+    }
+    return matches[0]
+}
+
+// Feature types, contig names and malformed lines of a GTF/GFF3 file (plain
+// or gzipped). Reading stops at a ##FASTA section -- by exception, as in
+// checkMinContigLength, since eachLine has no `break`.
+def scanAnnotation(path) {
+    def STOP   = '__genomepanel_nf_fasta_section__'
+    def scan   = [types: [:], seqids: [] as Set, badLines: 0, first: null]
+    def stream = path.newInputStream()
+    if (path.name.toLowerCase().endsWith('.gz'))
+        stream = new java.util.zip.GZIPInputStream(stream)
+    stream.withCloseable { s ->
+        try {
+            new InputStreamReader(s).eachLine { raw ->
+                // A UTF-8 byte-order mark (files saved on Windows) would
+                // otherwise turn the first comment line into a "feature".
+                def line = raw.startsWith('\uFEFF') ? raw.substring(1) : raw
+                if (line.startsWith('##FASTA')) throw new RuntimeException(STOP)
+                if (!line || line.startsWith('#')) return
+                def fields = line.split('\t', -1)
+                if (fields.size() < 9) {
+                    scan.badLines += 1
+                    if (scan.first == null) scan.first = line
+                    return
+                }
+                scan.types[fields[2]] = (scan.types[fields[2]] ?: 0) + 1
+                scan.seqids << fields[0]
+            }
+        }
+        catch (Exception e) {
+            if (e.message != STOP) throw e
+        }
+    }
+    return scan
+}
+
+// Contig names of the reference, from its .fai when there is one (cheap),
+// otherwise from the FASTA headers.
+def referenceContigs(reference) {
+    def fai = file("${reference}.fai")
+    if (fai.exists())
+        return fai.readLines().collect { l -> l.tokenize('\t')[0] } as Set
+    def contigs = [] as Set
+    reference.eachLine { line ->
+        if (line.startsWith('>')) contigs << line.substring(1).trim().tokenize(' \t')[0]
+    }
+    return contigs
+}
+
+def checkCnvAnnotation(reference, List problems, List warnings, Map summary) {
+    def annotation = singleCnvFile('cnv_gene_annotation',
+        "--cnv_gene_annotation takes one GTF or GFF3 file (optionally gzipped).", problems)
+    if (annotation == null) return
+
+    def feature = params.cnv_gene_feature?.toString() ?: 'gene'
+    def scan
+    try {
+        scan = scanAnnotation(annotation)
+    }
+    catch (Exception e) {
+        addProblem(problems, "--cnv_gene_annotation ${annotation.name} could not be read: ${e.message}")
+        return
+    }
+    def types    = scan.types
+    def seqids   = scan.seqids
+    def badLines = scan.badLines
+    def first    = scan.first
+
+    if (types.isEmpty()) {
+        addProblem(problems, "--cnv_gene_annotation ${annotation.name} contains no GTF/GFF3 feature lines",
+                   ["Each feature line needs 9 tab-separated columns (seqid, source, type, start, end,",
+                    "score, strand, phase, attributes).",
+                    first ? "First offending line: '${first.take(100)}'" : ""].findAll { d -> d })
+        return
+    }
+    if (badLines)
+        warnings << "--cnv_gene_annotation: ${badLines} line(s) do not have 9 tab-separated columns and are ignored."
+
+    // The same rule as modules/r_cnv_summary.R: for the default 'gene', genes
+    // are built from gene lines (Sequence Ontology subtypes such as
+    // protein_coding_gene, ncRNA_gene and pseudogene included) together with
+    // any transcript, exon and CDS lines, grouped by the gene they belong to.
+    def geneTypes = types.findAll { t, _n -> t == feature || (feature == 'gene' && (t.endsWith('_gene') || t == 'pseudogene')) }
+    def nGene = geneTypes.values().sum() ?: 0
+    def nTx   = feature == 'gene' ? (types['mRNA'] ?: 0) + (types['transcript'] ?: 0) : 0
+    def nExon = feature == 'gene' ? (types['exon'] ?: 0) + (types['CDS'] ?: 0) : 0
+    if (nGene + nTx + nExon == 0) {
+        addProblem(problems, "--cnv_gene_annotation ${annotation.name} has no '${feature}' features",
+                   ["Genes are taken from features of type '${feature}' (column 3)" +
+                    (feature == 'gene' ? ", or else from mRNA/transcript or exon/CDS features." : "."),
+                    "Set --cnv_gene_feature to one of the types present:",
+                    "  ${types.sort { a, b -> b.value <=> a.value }.take(12).collect { k, v -> "${k} (${v})" }.join(', ')}"])
+        return
+    }
+    if (nGene == 0)
+        warnings << ("--cnv_gene_annotation has no gene lines: genes are rebuilt from its " +
+                     "${nTx ? 'mRNA/transcript' : 'exon/CDS'} features, grouped by the gene they belong to " +
+                     "(GTF gene_id, GFF3 Parent or geneID), each spanning the outermost of them.")
+    if (reference != null) {
+        def contigs = referenceContigs(reference)
+        def shared  = seqids.intersect(contigs)
+        if (shared.isEmpty()) {
+            addProblem(problems, "--cnv_gene_annotation: none of its contig names occur in the reference",
+                       ["Annotation contigs: ${seqids.take(4).join(', ')}${seqids.size() > 4 ? ', ...' : ''}",
+                        "Reference contigs:  ${contigs.take(4).join(', ')}${contigs.size() > 4 ? ', ...' : ''}",
+                        "The annotation must use the reference's own contig names (e.g. 'chr1' vs '1')."])
+            return
+        }
+        def missing = seqids - contigs
+        if (missing)
+            warnings << ("--cnv_gene_annotation: ${missing.size()} of ${seqids.size()} annotation contigs are not in the " +
+                         "reference, and their genes get no CNV calls: ${missing.take(5).join(', ')}${missing.size() > 5 ? ', ...' : ''}")
+    }
+    summary['Gene annotation'] = "${annotation.name}: " +
+        (feature == 'gene' ? "${nGene} gene, ${nTx} mRNA/transcript, ${nExon} exon/CDS lines" : "${nGene} '${feature}' lines")
+}
+
+def checkCnvPriors(List problems) {
+    def priors = singleCnvFile('cnv_contig_ploidy_priors',
+        "--cnv_contig_ploidy_priors takes one tab-separated table of per-contig ploidy priors.", problems)
+    if (priors == null) return
+
+    def lines = priors.readLines().findAll { l -> l.trim() }
+    def header = lines ? lines[0].split('\t') as List : []
+    def example = ["Expected a tab-separated table, one row per contig, e.g. for a diploid:",
+                   "  CONTIG_NAME  PLOIDY_PRIOR_0  PLOIDY_PRIOR_1  PLOIDY_PRIOR_2  PLOIDY_PRIOR_3",
+                   "  chr1         0.01            0.01            0.97            0.01",
+                   "Every contig of the reference must have a row, and each row must sum to 1."]
+    if (header.size() < 2 || header[0] != 'CONTIG_NAME' ||
+        !header.drop(1).every { h -> h ==~ /PLOIDY_PRIOR_\d+/ }) {
+        addProblem(problems, "--cnv_contig_ploidy_priors ${priors.name} does not have the expected header", example)
+        return
+    }
+    def bad = lines.drop(1).findAll { l ->
+        def f = l.split('\t')
+        if (f.size() != header.size()) return true
+        try { return Math.abs(f.drop(1).collect { v -> v as Double }.sum() - 1.0) > 0.01 }
+        catch (Exception _e) { return true }
+    }
+    if (bad)
+        addProblem(problems, "--cnv_contig_ploidy_priors ${priors.name}: ${bad.size()} row(s) are malformed or do not sum to 1",
+                   ["First offending row: '${bad[0]}'"] + example)
+}
+
+def checkCnv(reference, Integer ploidy, List problems, List warnings, Map summary) {
+    if (!(params.cnv in [true, 'true'])) {
+        def defaults = cnvDefaults()
+        def setAnyway = defaults.findAll { k, v -> params[k] != null && params[k].toString() != v.toString() }.keySet()
+        if (setAnyway)
+            warnings << "${setAnyway.collect { k -> "--${k}" }.join(', ')} ${setAnyway.size() == 1 ? 'has' : 'have'} no effect without --cnv."
+        return
+    }
+
+    def binLength = checkInteger('cnv_bin_length', params.cnv_bin_length,
+                 [min: 100,
+                  purpose: "Length in base pairs of the bins in which reads are counted for CNV calling.",
+                  example: "e.g.  --cnv_bin_length 1000"], problems)
+    def maxCopy = checkInteger('cnv_max_copy_number', params.cnv_max_copy_number,
+                 [min: 1,
+                  purpose: "Highest copy number gCNV can call.",
+                  example: "e.g.  --cnv_max_copy_number 5"], problems)
+    checkInteger('cnv_shard_bins', params.cnv_shard_bins,
+                 [min: 100,
+                  purpose: "Number of bins per GermlineCNVCaller task.",
+                  example: "e.g.  --cnv_shard_bins 10000"], problems)
+    checkInteger('cnv_min_mapq', params.cnv_min_mapq,
+                 [min: 0,
+                  purpose: "Reads below this mapping quality are not counted.",
+                  example: "e.g.  --cnv_min_mapq 30"], problems)
+    checkInteger('cnv_min_qs', params.cnv_min_qs,
+                 [min: 0,
+                  purpose: "CNV segments with a quality (QS) below this are flagged LowQual.",
+                  example: "e.g.  --cnv_min_qs 50"], problems)
+
+    if (binLength != null && binLength < 250)
+        warnings << ("--cnv_bin_length ${binLength} is shorter than a typical sequenced fragment: neighbouring bins " +
+                     "then share reads, and each bin holds few of them. 500-2000 bp suits most panels.")
+    if (maxCopy != null && ploidy != null && maxCopy <= ploidy)
+        addProblem(problems, "--cnv_max_copy_number ${maxCopy} leaves no room for duplications at --ploidy ${ploidy}",
+                   ["gCNV can only call copy numbers up to --cnv_max_copy_number, so it must be at least",
+                    "--ploidy + 1 for any duplication to be callable.",
+                    "e.g.  --cnv_max_copy_number ${ploidy + 3}"])
+
+    def shortReads = params.reads || params.SRA_index || params.bam_input
+    if (!shortReads)
+        addProblem(problems, "--cnv needs short-read samples, but only PacBio HiFi input was given",
+                   ["Samples with long-read data are left out of CNV calling: gCNV counts read starts per",
+                    "bin, and one 15 kb HiFi read counts once, so their coverage cannot share a cohort",
+                    "model with short reads. Add Illumina input or drop --cnv."])
+    else if (params.hifi_reads || params.hifi_SRA_index)
+        warnings << ("--cnv with PacBio HiFi input: every sample with any HiFi data is left out of CNV calling, " +
+                     "including samples that also have Illumina runs.")
+
+    if (!params.min_contig_length || params.min_contig_length.toString() == 'false')
+        warnings << ("--cnv without --min_contig_length: gCNV fits a ploidy model per contig, so an assembly with " +
+                     "many small contigs makes CNV calling slow and its ploidy calls unstable. Consider " +
+                     "--min_contig_length (e.g. 50000) for fragmented assemblies.")
+
+    singleCnvFile('cnv_exclude_intervals',
+        "--cnv_exclude_intervals takes one BED (.bed), Picard interval list (.interval_list) or GATK " +
+        "interval file (.intervals/.list, one 'contig' or 'contig:start-end' per line).", problems)
+    def exclude = params.cnv_exclude_intervals?.toString()?.toLowerCase()
+    if (exclude && !(exclude ==~ /.*\.(bed|interval_list|intervals|list)$/))
+        addProblem(problems, "--cnv_exclude_intervals must end in .bed, .interval_list, .intervals or .list",
+                   ["GATK picks the parser from the extension."])
+
+    checkCnvPriors(problems)
+    checkCnvAnnotation(reference, problems, warnings, summary)
+
+    summary['CNV calling'] = "GATK gCNV, ${params.cnv_bin_length} bp bins"
+}
+
+
 // An unquoted glob is expanded by the shell before Nextflow ever sees it: the first
 // path becomes the parameter value and the rest arrive as positional arguments, which
 // Nextflow silently discards. That is the one mistake that can quietly process a
@@ -843,7 +1086,7 @@ def validateParams(strayArgs = null) {
     booleanParams().each { name -> checkBoolean(name, params[name], problems) }
 
     // --- numeric parameters ---------------------------------------------------
-    checkInteger('ploidy', params.ploidy,
+    def ploidy = checkInteger('ploidy', params.ploidy,
                  [required: true, min: 1,
                   purpose: "GATK HaplotypeCaller needs the sample ploidy to call genotypes: 1 for haploid organisms (most fungi, bacteria), 2 for diploids, higher for pooled samples.",
                   example: "e.g.  --ploidy 2"], problems)
@@ -940,6 +1183,7 @@ def validateParams(strayArgs = null) {
                      "has not been benchmarked on HiFi data in this pipeline.")
     checkBamInput(problems, warnings, summary)
     checkBwaIndex(problems, warnings, summary)
+    checkCnv(reference, ploidy, problems, warnings, summary)
 
     // --- execution environment -------------------------------------------------
     if (workflow.profile.tokenize(',').contains('slurm') && !params.slurm_queue) {
@@ -1076,6 +1320,29 @@ def helpMessage() {
      --plink_pca               Principal component analysis.                 [false]
      --plink_relationships     GRM (.rel) and KING (.king) matrices.         [false]
      --plink_ld_prune          LD pruning plus the pruned VCF.               [false]
+
+   Copy-number variants (GATK gCNV, cohort mode; short-read samples only)
+     --cnv                     Call CNVs, into 11_cnv/.                      [false]
+     --cnv_bin_length <bp>     Bin length. Aim for >= ~100 reads per bin:
+                               ~100 x read length / depth.                   [1000]
+     --cnv_gene_annotation <f> GTF or GFF3 (optionally .gz): adds per-gene
+                               copy numbers.
+     --cnv_gene_feature <type> Feature type (column 3) that defines a gene. [gene]
+     --cnv_contig_ploidy_priors <tsv>
+                               Per-contig ploidy priors, e.g. for sex or
+                               accessory chromosomes. Default: built from
+                               --ploidy for every contig.
+     --cnv_exclude_intervals <f>
+                               Regions to leave out (.bed, .interval_list, or
+                               .intervals with one contig per line), e.g. the
+                               mitochondrial genome.
+     --cnv_max_copy_number <n> Highest copy number that can be called.      [5]
+     --cnv_min_qs <n>          Segments with QS below this are LowQual.     [50]
+     --cnv_min_mapq <n>        Minimum mapping quality of counted reads.    [30]
+     --cnv_shard_bins <n>      Bins per GermlineCNVCaller task.          [10000]
+     --cnv_bin_matrix          Also write the bin x sample matrix.          [false]
+     --cnv_gc_correction       Correct per-sample GC bias in the gCNV model;
+                               for libraries with strong GC bias.         [false]
 
    Output
      --outdir <dir>            Directory for final results.          [./nf_output/]

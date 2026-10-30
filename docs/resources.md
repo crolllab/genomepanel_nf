@@ -38,6 +38,8 @@ singularity {
 }
 ```
 
+**CNV calling image** — `--cnv` uses the Broad Institute's own GATK image (`broadinstitute/gatk:4.6.2.0`, about 2.3 GB as a Singularity image), because GATK's copy-number model needs a Python environment the biocontainers GATK image does not include. It is only pulled when `--cnv` is set.
+
 **Bind mounts** — on clusters running Apptainer (the successor to Singularity), automatic bind-mounting can be disabled by the sysadmin via `/etc/apptainer/apptainer.conf` (`mount hostfs = no`). If tasks fail with "file not found" errors inside the container, add explicit bind paths in `nextflow.config`:
 
 ```groovy

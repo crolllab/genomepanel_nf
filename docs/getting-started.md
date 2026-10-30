@@ -62,7 +62,7 @@ singularity {
 }
 ```
 
-See [HPC usage & utilities](resources.md#singularity--apptainer) for further Singularity/Apptainer configuration notes.
+See [HPC usage & utilities](resources.md#singularity-apptainer) for further Singularity/Apptainer configuration notes.
 
 ---
 
@@ -174,6 +174,19 @@ nextflow run main.nf -config nextflow.config -profile slurm \
   --reads '/path/to/reads/*{1,2}.fq.gz' \
   --SRA_index './SRA_accessions.txt'
 ```
+
+Optional analyses are switched on with extra flags. For example, add copy-number variant calling
+with per-gene calls, and PacBio HiFi runs (experimental):
+
+```bash
+  --cnv \
+  --cnv_gene_annotation /path/to/annotation.gff3 \
+  --hifi_reads '/path/to/hifi/*.fastq.gz'
+```
+
+See [Copy-number variant calling](configuration.md#copy-number-variant-calling) for choosing the
+bin length and for what gets called. HiFi samples take part in variant calling but not in CNV
+calling.
 
 To resume a previous run (if the `work-dir` is still intact), simply add `-resume` to the command. Nextflow will skip completed steps and only execute missing ones. The work directory is only deleted automatically when a run finishes with nothing failed and nothing ignored (see [HPC usage & utilities](resources.md#storage-requirements)), so `-resume` stays available after a run that hit a problem.
 

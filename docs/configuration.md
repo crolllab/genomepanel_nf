@@ -330,6 +330,189 @@ frequencies are reliable down to roughly *n*<sup>−0.5</sup> — so no further 
 
 ---
 
+## Copy-number variant calling
+
+`--cnv` adds germline copy-number variant (CNV) calling with GATK's
+[gCNV](https://gatk.broadinstitute.org/hc/en-us/articles/360035531152) workflow in **cohort
+mode**: the panel itself is the cohort, from which gCNV learns the coverage biases shared by all
+samples, so no panel of normals is needed. It calls integer copy numbers per sample — per bin,
+as segments, and, with a gene annotation, per gene. Results are written to `<outdir>/11_cnv/`
+(see [Output](output.md#11_cnv)).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--cnv` | `boolean` | `false` | Turn on CNV calling. |
+| `--cnv_bin_length` | `integer` | `1000` | Length in bp of the bins in which reads are counted — the resolution of the calls. See [Choosing the bin length](#choosing-the-bin-length). |
+| `--cnv_gene_annotation` | `path` | — | GTF or GFF3 file (optionally gzipped). Adds per-gene copy numbers. Its contig names must match the reference; genes on contigs the reference lacks (including those removed by `--min_contig_length`) get no calls. |
+| `--cnv_gene_feature` | `string` | `gene` | Feature type (column 3 of the annotation) that defines a gene. With the default, gene subtypes count too (`protein_coding_gene`, `ncRNA_gene`, `pseudogene`), and genes without a gene line are rebuilt from their transcripts or exons/CDS (see below). Any other value uses only features of exactly that type. |
+| `--cnv_contig_ploidy_priors` | `path` | — | Per-contig ploidy priors for GATK `DetermineGermlineContigPloidy`. Default: for every contig, 0.97 on `--ploidy` and the remaining 0.03 spread over ploidy 0 to `--ploidy` + 1. Give your own for sex chromosomes, or to make ploidy 0 more likely for accessory chromosomes. Format below. |
+| `--cnv_exclude_intervals` | `path` | — | Regions to leave out: a BED file, a Picard `.interval_list`, or a GATK `.intervals`/`.list` file with one `contig` or `contig:start-end` per line. Exclude the mitochondrial genome and other organelles — their coverage is hundreds of times that of the nuclear genome — and, if known, rDNA arrays and large repeat clusters. |
+| `--cnv_max_copy_number` | `integer` | `5` | Highest copy number gCNV can call; higher copy numbers are reported as this value. Raise it for tandemly expanded gene families. Runtime and memory grow with it. Must be at least `--ploidy` + 1. |
+| `--cnv_min_qs` | `integer` | `50` | Segments, and genes, whose quality (QS, Phred-scaled) is below this are flagged `LowQual`. Calls are flagged, not removed. |
+| `--cnv_min_mapq` | `integer` | `30` | Reads below this mapping quality are not counted. Multi-mapping reads in repeats have mapping quality 0, so repeats show as low coverage; gCNV models that as a bin-specific bias shared by the cohort. |
+| `--cnv_shard_bins` | `integer` | `10000` | Bins per `GermlineCNVCaller` task. Memory of each task grows with bins × samples; lower it if those tasks run out of memory on large panels. |
+| `--cnv_bin_matrix` | `boolean` | `false` | Also write `cnv_bins.tsv.gz`, the bin × sample copy-number matrix. Off by default because it is large for big genomes (3 Gb at 1 kb bins is 3 million rows). |
+| `--cnv_gc_correction` | `boolean` | `false` | Let gCNV correct each sample's GC bias. Off by default: with the pipeline's model settings it misreads normal coverage in AT-rich regions as high copy numbers (see [Model settings](#model-settings)). Turn it on for libraries with strong GC bias, e.g. heavily PCR-amplified ones, and check that normal regions stay at the reference copy number. Bins below 10% or above 90% GC are removed either way. |
+
+Duplicate-flagged reads are counted only with `--use_duplicate_reads`, as for variant calling.
+
+### Gene annotation formats
+
+GFF3 and GTF are recognised from their attribute syntax, so the file extension does not
+matter, and gzipped files, Windows line endings, a UTF-8 byte-order mark, UCSC
+`track`/`browser` lines and an embedded `##FASTA` section are all accepted. GTF values
+may be quoted (`gene_id "g1";`) or not (`gene_id g1;`); GFF3 values are URL-decoded.
+
+With `--cnv_gene_feature gene` (the default), every gene, transcript (`mRNA`,
+`transcript`), exon and CDS line is grouped under the gene it belongs to, so it does not
+matter which of these levels a file contains:
+
+- **GFF3**: `Parent` links are followed up to the top-level feature. Files written by
+  gffread, whose transcripts have no `Parent`, are grouped by their `geneID` attribute.
+- **GTF**: lines are grouped by `gene_id`.
+
+Each gene spans the outermost of its features, so a gene written over several lines
+under one `ID`, or several isoforms of one gene, gives one gene. The gene ID in the output
+tables is the GFF3 `ID` of the gene (or of the top-level feature), or the GTF `gene_id`;
+the gene name is its `Name` / `gene_name`, or the ID when there is none. The log of
+`CNVSummary` reports how many genes came from gene lines and how many were rebuilt.
+
+This was tested on variants of one fungal annotation: NCBI and Ensembl-style GFF3,
+NCBI GTF, GTFs with only transcripts or only exons/CDS, gffread output with and without
+isoforms, files with gene lines for only some loci, and the formatting variants above.
+Every variant describing the same genes gave the same genes and the same copy-number
+calls. An annotation whose contig names do not match the reference is rejected at
+startup.
+
+### Choosing the bin length
+
+The bin length trades resolution against noise. gCNV counts read starts, so a bin holds about
+*depth* × *bin length* / *read length* reads, and its count fluctuates by roughly one over the
+square root of that. Aim for at least ~100 reads per bin at the panel's typical depth:
+
+| Depth (150 bp reads) | Bin length for ~100 reads per bin |
+|---|---|
+| 5× | 3000 bp |
+| 10× | 1500 bp |
+| 30× | 500 bp |
+
+Two further constraints:
+
+- **Gene-level calls** need bins clearly shorter than the genes of interest. A gene shorter than
+  a bin still gets a call, from the bin(s) it overlaps, but that call mostly reflects its
+  neighbourhood. The `n_bins` column of the gene tables shows how many bins each gene spans.
+- **Compute** grows with the number of bins × samples. A 40 Mb genome at 1 kb bins has 40,000
+  bins, which is quick; a 3 Gb genome has 3 million, which needs many `GermlineCNVCaller` shards.
+
+### Model settings
+
+gCNV's own defaults were made for exome and human data, and they miss deletions that many
+samples share: the model lets each bin's unexplained variance grow until a shared deletion
+looks like noise, and its "bias factors" learn the deletion as a coverage bias of the bin.
+On a panel of 434 isolates of a haploid fungus, they called none of the 247 isolates that lack
+a 2 kb mating-type gene as deleted, and found only about 10% of the deletions carried by half
+the panel or more. The pipeline therefore runs `GermlineCNVCaller` with the settings of the
+GATK-SV whole-genome pipeline, adjusted on that panel:
+
+| GATK option | Pipeline | GATK default |
+|---|---|---|
+| `--interval-psi-scale`, `--sample-psi-scale` | `1e-4` | `0.01` |
+| `--p-active` | `0.01` | `0.1` |
+| `--p-alt` | `1e-6` | `5e-4` |
+| `--enable-bias-factors` | `false` | `true` |
+| `--log-mean-bias-standard-deviation` | `0.01` | `0.1` |
+| `--class-coherence-length`, `--cnv-coherence-length` | `--cnv_bin_length` | `10000` |
+| `--copy-number-posterior-expectation-mode` | `EXACT` | `HYBRID` |
+| `--caller-update-convergence-threshold` | `1e-6` | `0.001` |
+| `--learning-rate` | `0.03` | `0.01` |
+| `--convergence-snr-trigger-threshold` | `0.2` | `0.1` |
+| `--convergence-snr-averaging-window` | `100` | `500` |
+| GC-bias model (`--annotated-intervals`) | off (`--cnv_gc_correction`) | on |
+
+`FilterIntervals` also runs with `--low-count-filter-percentage-of-samples 90` instead of GATK's
+50, so a bin is dropped only when more than 90% of samples have fewer than 10 reads in it.
+GATK's default would drop every deletion carried by most of the panel before calling.
+
+On a 2 Mb test region of that panel, scored against the raw read counts, these settings
+called the mating-type gene deleted in all 247 isolates lacking it and in none of the 182
+carrying it. They found 74%, 86% and 95% of deleted bins carried by under 10%, 10–50% and
+50% or more of the isolates, against 57%, 13% and 10% with GATK's defaults. No bin with normal
+coverage was called deleted. Called gains matched the coverage: bins called CN2 to CN5 had
+1.8, 2.7, 3.6 and 5.9 times normal coverage. Normal-coverage bins called at another copy number
+fell from 1.5% to 0.2%. The results held for subsets of 30 and 10 isolates.
+
+Genome-wide on the same 434 isolates (43,500 bins of 1 kb), compared with GATK's defaults:
+- **Deletions found**, by how many isolates carry them: under 10%, 80% (was 52%); 10–50%, 83% (was 17%); 50–90%, 94% (was 6%).
+- **False calls:** no normal-coverage bin was called deleted, and 0.2% got another copy number (was 0.5%).
+- **Deleted sequence per isolate:** a median of 1.37 Mb, close to the 1.4 Mb of near-zero coverage in the raw counts.
+- **Cost:** about the same as with GATK's defaults: each 10,000-bin `GermlineCNVCaller` shard took about 5 hours on 4 CPUs and peaked at 4.8 GB.
+
+Two of the settings matter most, and are best not changed alone. With the variance held
+lower still (`1e-6`, the GATK-SV value), the model can no longer absorb ordinary noise; it
+explains it with CNVs instead, and normal coverage is called CN4–5. With the GC-bias model on,
+each sample's GC curve becomes the one flexible term left; in AT-rich regions it drifted
+about five-fold and turned normal coverage into CN5 calls in 13% of normal bins.
+`--cnv_gc_correction` switches it back on for data that need it.
+
+The settings were tuned on one haploid organism. They come from the GATK-SV pipeline for human
+(diploid) genomes, which holds the variance even lower. Check `cnv_sample_summary.tsv` for
+samples with unusually many calls, and see the next section to change any of them.
+
+### Contig-ploidy priors format
+
+A tab-separated table with a row for every contig of the reference (after `--min_contig_length`)
+and one column per ploidy state, each row summing to 1:
+
+```
+CONTIG_NAME	PLOIDY_PRIOR_0	PLOIDY_PRIOR_1	PLOIDY_PRIOR_2	PLOIDY_PRIOR_3
+chr1	0.01	0.01	0.97	0.01
+chrX	0.01	0.49	0.49	0.01
+```
+
+The called ploidy of every contig in every sample is in `11_cnv/cnv_contig_ploidy.tsv`, which
+directly shows aneuploidy and the presence or absence of accessory chromosomes.
+
+!!! warning "What gets called, and what doesn't"
+    - **Short-read samples only.** Samples with any PacBio HiFi data (or, with `--bam_input`, any
+      `PL:PACBIO` or `PL:ONT` read group) are left out with a warning: gCNV counts read starts
+      per bin, and one 15 kb HiFi read counts once, so long-read coverage cannot share a cohort
+      model with short-read coverage. This includes samples that also have Illumina runs.
+    - **Cohort size.** gCNV learns what normal coverage looks like from the cohort. It is most
+      reliable with 30 or more samples, and the pipeline warns below that; with fewer than 2 it
+      does not call CNVs at all. The cohort should be technically homogeneous — a panel mixing
+      very different library preparations or read lengths gives noisier calls.
+    - **Fragmented assemblies.** gCNV fits a ploidy per contig, so thousands of small scaffolds
+      make it slow and its ploidy calls unstable. Use `--min_contig_length` (e.g. `50000`).
+    - **Shared CNVs.** Before calling, GATK `FilterIntervals` removes bins with fewer than 10 reads
+      in more than 90% of samples, bins among the lowest or highest 1% of counts in more
+      than 90% of samples, and bins below 10% or above 90% GC. A deletion carried by nearly the
+      whole panel (more than 90%) is therefore not called: there is too little normal coverage left
+      to call it against.
+
+!!! tip "Passing other GATK options"
+    Any further GATK argument can be added per step with `ext.args` in a custom config
+    (`-c my.config`). An option given there replaces the pipeline's own value for it (see
+    [Model settings](#model-settings)). For example, to relax the GC filter, or to go back to
+    GATK's own `GermlineCNVCaller` defaults:
+
+    ```groovy
+    process {
+        withName:CNVFilterIntervals { ext.args = '--minimum-gc-content 0.05 --maximum-gc-content 0.95' }
+        withName:CNVGermlineCaller  {
+            ext.args = '--interval-psi-scale 0.01 --sample-psi-scale 0.01 --p-active 0.1 --p-alt 5e-4 ' +
+                       '--enable-bias-factors true --log-mean-bias-standard-deviation 0.1 ' +
+                       '--class-coherence-length 10000 --cnv-coherence-length 10000 ' +
+                       '--copy-number-posterior-expectation-mode HYBRID --caller-update-convergence-threshold 0.001 ' +
+                       '--learning-rate 0.01 --convergence-snr-trigger-threshold 0.1 --convergence-snr-averaging-window 500'
+        }
+    }
+    ```
+
+    together with `--cnv_gc_correction`. `ext.args` is read by `CNVFilterIntervals`,
+    `CNVContigPloidy` and `CNVGermlineCaller`.
+
+---
+
 ## Output options
 
 | Parameter | Type | Default | Description |

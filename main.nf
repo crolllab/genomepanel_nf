@@ -23,6 +23,18 @@ params.slurm_queue = ""  // Required when using -profile slurm: SLURM partition 
 params.plink_pca = false  // PCA on the pop. gen. VCF (plink2)
 params.plink_relationships = false  // GRM and KING relationship matrices on the pop. gen. VCF (plink2)
 params.plink_ld_prune = false  // LD pruning of the pop. gen. VCF (plink2)
+params.cnv = false  // Germline CNV calling with GATK gCNV (cohort mode, short-read samples only)
+params.cnv_bin_length = 1000  // CNV bin length (bp)
+params.cnv_gene_annotation = ""  // Optional: GTF/GFF3 file for gene-level CNV calls
+params.cnv_gene_feature = "gene"  // Annotation feature type (column 3) that defines a gene
+params.cnv_contig_ploidy_priors = ""  // Optional: contig-ploidy priors table; default built from --ploidy
+params.cnv_exclude_intervals = ""  // Optional: BED / interval list of regions (e.g. organelle contigs) to leave out
+params.cnv_max_copy_number = 5  // Highest copy number gCNV can call
+params.cnv_shard_bins = 10000  // Bins per GermlineCNVCaller task
+params.cnv_min_mapq = 30  // Minimum mapping quality of reads counted
+params.cnv_min_qs = 50  // Segment quality (QS) below which calls are flagged LowQual
+params.cnv_bin_matrix = false  // Also write the bin x sample copy-number matrix
+params.cnv_gc_correction = false  // Per-sample GC-bias correction in the gCNV model
 
 include { gp_wf } from './workflows/gp_wf'
 include { validateParams; formatProblems; helpMessage } from './modules/validate_params'
@@ -79,6 +91,15 @@ workflow {
 
    workflow.onComplete { cleanUpWorkDirIfClean() }
 
+   def cnv_details = !params.cnv ? '' : [
+       "       Bin length     : ${params.cnv_bin_length}",
+       "       Gene annotation: ${params.cnv_gene_annotation ?: '(none -- no gene-level calls)'}",
+       "       Ploidy priors  : ${params.cnv_contig_ploidy_priors ?: "(from --ploidy ${params.ploidy})"}",
+       "       Excluded       : ${params.cnv_exclude_intervals ?: '(none)'}",
+       "       GC correction  : ${params.cnv_gc_correction}",
+       "       Bin matrix     : ${params.cnv_bin_matrix}"
+   ].join('\n')
+
    log.info """
    =============================================
    || GENOMEPANEL_NF VARIANT CALLING WORKFLOW ||
@@ -90,7 +111,8 @@ workflow {
      3. BWA alignment (pbmm2 for PacBio HiFi -- experimental)
      4. GATK HaplotypeCaller
      5. GATK VariantFiltration
-     6. Variant quality plotting, read and mapping stats   
+     6. Variant quality plotting, read and mapping stats
+     7. GATK gCNV copy-number calling (optional, --cnv)
    
    Configuration:
        NCBI API key   : ${params.NCBI_API_key ? '(set)' : '(not set)'}
@@ -124,6 +146,10 @@ ${check.summary.collect { k, v -> "       ${k.padRight(15)}: ${v}" }.join('\n')}
        PLINK PCA      : ${params.plink_pca}
        PLINK relation.: ${params.plink_relationships}
        PLINK LD prune : ${params.plink_ld_prune}
+
+   CNV calling
+       GATK gCNV      : ${params.cnv}
+${cnv_details}
 
    SLURM
        Queue          : ${params.slurm_queue ?: '(not set — not using SLURM)'}

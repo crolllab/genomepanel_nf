@@ -7,7 +7,7 @@ process probeBAMSample {
     tuple val(orig_id), path(bam), path(bai)
 
     output:
-    tuple val(orig_id), env('SM'), path(bam), path(bai), emit: bam
+    tuple val(orig_id), env('SM'), env('LONG_READ'), path(bam), path(bai), emit: bam
 
     script:
     // --bam_input's sample identity comes from the BAM's own @RG SM tag, not
@@ -30,5 +30,15 @@ process probeBAMSample {
         echo "  picard AddOrReplaceReadGroups -RGSM <name> ..." >&2
         exit 1
     fi
+
+    # LONG_READ: whether any read group is PacBio or ONT. Such samples are left
+    # out of CNV calling (--cnv), whose read counts assume short reads.
+    LONG_READ=\$(samtools view -H ${bam} | awk -F'\t' '
+        /^@RG/ {
+            for (i = 1; i <= NF; i++) {
+                if (toupper(\$i) ~ /^PL:(PACBIO|ONT)\$/) found = 1
+            }
+        }
+        END { print (found ? "true" : "false") }')
     """
 }
